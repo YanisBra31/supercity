@@ -8,7 +8,12 @@ $file = getenv('STRIPE_MOCK_STATE') ?: sys_get_temp_dir() . '/stripe-mock.json';
 $state = is_file($file) ? json_decode(file_get_contents($file), true) : ['n' => 0, 'accounts' => [], 'sessions' => [], 'refunds' => [], 'requests' => []];
 $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-parse_str(file_get_contents('php://input') ?: '', $in);
+$raw = file_get_contents('php://input') ?: '';
+if (str_starts_with($path, '/v2/')) {
+    $in = json_decode($raw, true) ?? [];
+} else {
+    parse_str($raw, $in);
+}
 if ($method === 'GET') {
     $in = $_GET;
 }
@@ -24,20 +29,24 @@ function out(int $status, array $data): never
 }
 $id = fn(string $prefix) => $prefix . '_' . (++$GLOBALS['state']['n']);
 
-if (str_starts_with($path, '/v1/')) {
+if (str_starts_with($path, '/v1/') || str_starts_with($path, '/v2/')) {
     if (!preg_match('/^Bearer sk_/', $_SERVER['HTTP_AUTHORIZATION'] ?? '')) {
         out(401, ['error' => ['message' => 'No API key']]);
     }
-    $state['requests'][] = ['method' => $method, 'path' => $path, 'params' => $in];
+    $state['requests'][] = ['method' => $method, 'path' => $path, 'params' => $in, 'version' => $_SERVER['HTTP_STRIPE_VERSION'] ?? null];
 }
 
 switch (true) {
-    case $method === 'POST' && $path === '/v1/accounts' && str_starts_with($in['email'] ?? '', 'sansconnect'):
-        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => "You can only create new accounts if you've signed up for Connect, which you can learn how to do at https://stripe.com/docs/connect."]]);
     case $method === 'POST' && $path === '/v1/accounts':
-        $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'email' => $in['email'] ?? null];
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Stripe no longer recommends Accounts v1 for new Connect integrations.']]);
+    case $method === 'POST' && $path === '/v2/core/accounts' && str_starts_with($in['contact_email'] ?? '', 'sansconnect'):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'platform_registration_required', 'message' => 'The direct merchant has not signed up for Connect and cannot create connected accounts.']]);
+    case $method === 'POST' && $path === '/v2/core/accounts':
+        $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'capabilities' => ['transfers' => 'inactive'], 'email' => $in['contact_email'] ?? null];
         $state['accounts'][$a['id']] = $a;
-        out(200, $a);
+        out(200, ['id' => $a['id'], 'object' => 'v2.core.account', 'dashboard' => $in['dashboard'] ?? null]);
+    case $method === 'POST' && $path === '/v2/core/account_links':
+        out(200, ['object' => 'v2.core.account_link', 'account' => $in['account'], 'url' => "https://connect.stripe.test/onboard/{$in['account']}", 'use_case' => $in['use_case']]);
     case $method === 'GET' && preg_match('#^/v1/accounts/([\w]+)$#', $path, $m) === 1:
         out(isset($state['accounts'][$m[1]]) ? 200 : 404, $state['accounts'][$m[1]] ?? ['error' => ['message' => 'No such account']]);
     case $method === 'POST' && $path === '/v1/account_links':
@@ -63,7 +72,7 @@ switch (true) {
         $state['refunds'][] = $r;
         out(200, $r);
     case $method === 'POST' && preg_match('#^/test/accounts/(\w+)/ready$#', $path, $m) === 1:
-        $state['accounts'][$m[1]]['charges_enabled'] = $state['accounts'][$m[1]]['payouts_enabled'] = true;
+        $state['accounts'][$m[1]]['capabilities']['transfers'] = 'active';
         out(200, $state['accounts'][$m[1]]);
     case $method === 'POST' && preg_match('#^/test/sessions/(\w+)/pay$#', $path, $m) === 1:
         $state['sessions'][$m[1]]['status'] = 'complete';
