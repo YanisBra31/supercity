@@ -124,9 +124,9 @@ export default function Profile() {
         ) : null}
         <View style={st.stats}>
           {[
-            [pub?.stats.played ?? 0, 'Matchs joués'],
-            [pub?.stats.organized ?? 0, 'Organisés'],
-            [pub?.teams.length ?? 0, pub?.teams.length === 1 ? 'Équipe' : 'Équipes'],
+            [pub?.stats?.played ?? 0, 'Matchs joués'],
+            [pub?.stats?.organized ?? 0, 'Organisés'],
+            [pub?.teams?.length ?? 0, pub?.teams?.length === 1 ? 'Équipe' : 'Équipes'],
           ].map(([n, l]) => (
             <View key={String(l)} style={{ flex: 1, alignItems: 'center' }}>
               <Text style={st.statNum}>{n}</Text>
@@ -140,7 +140,7 @@ export default function Profile() {
         <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
       ) : null}
 
-      {pub?.teams.length ? (
+      {pub?.teams?.length ? (
         <>
           <Kicker>Mes équipes</Kicker>
           <View style={[s.row, { flexWrap: 'wrap', gap: 12 }]}>
