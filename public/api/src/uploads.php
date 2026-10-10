@@ -17,8 +17,9 @@ function upload_url(string $name): string
 
 /**
  * Lit l'image envoyée dans le champ `photo` (multipart/form-data), la recadre en carré
- * IMAGE_SIZE px et l'enregistre. `$mode` : 'cover' (photo, rognée, JPEG) ou 'contain'
- * (logo, entier sur fond transparent, PNG). Renvoie l'adresse publique.
+ * IMAGE_SIZE px et l'enregistre. `$mode` : 'cover' (photo, rognée, JPEG), 'contain'
+ * (logo, entier sur fond transparent, PNG) ou 'fit' (publication, proportions gardées,
+ * 1080 px au plus, JPEG). Renvoie l'adresse publique.
  */
 function save_uploaded_image(string $prefix, string $mode): string
 {
@@ -45,11 +46,19 @@ function save_uploaded_image(string $prefix, string $mode): string
     }
     $src = orient($src, $f['tmp_name'], $info[2]);
     [$w, $h] = [imagesx($src), imagesy($src)];
-    $dst = imagecreatetruecolor(IMAGE_SIZE, IMAGE_SIZE);
+    if ($mode === 'fit') {
+        $scale = min(1, 1080 / max($w, $h));
+        [$nw, $nh] = [max(1, (int)round($w * $scale)), max(1, (int)round($h * $scale))];
+        $dst = imagecreatetruecolor($nw, $nh);
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    } else {
+        $dst = imagecreatetruecolor(IMAGE_SIZE, IMAGE_SIZE);
+    }
     if ($mode === 'cover') {
         $side = min($w, $h);
         imagecopyresampled($dst, $src, 0, 0, intdiv($w - $side, 2), intdiv($h - $side, 2), IMAGE_SIZE, IMAGE_SIZE, $side, $side);
-    } else {
+    } elseif ($mode === 'contain') {
         imagealphablending($dst, false);
         imagesavealpha($dst, true);
         imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
@@ -66,9 +75,9 @@ function save_uploaded_image(string $prefix, string $mode): string
     if (!is_file("$dir/.htaccess")) {
         file_put_contents("$dir/.htaccess", "Options -Indexes -ExecCGI\nRemoveHandler .php .phtml .php5 .php7 .php8\n<FilesMatch \"\\.(php|phtml|phar)\">\n  Require all denied\n</FilesMatch>\n");
     }
-    $ext = $mode === 'cover' ? 'jpg' : 'png';
+    $ext = $mode === 'contain' ? 'png' : 'jpg';
     $name = $prefix . '-' . bin2hex(random_bytes(10)) . '.' . $ext;
-    $ok = $mode === 'cover' ? imagejpeg($dst, "$dir/$name", 85) : imagepng($dst, "$dir/$name", 7);
+    $ok = $mode === 'contain' ? imagepng($dst, "$dir/$name", 7) : imagejpeg($dst, "$dir/$name", 85);
     if (!$ok) {
         throw new HttpError(500, 'upload_failed', "Impossible d'enregistrer l'image.");
     }

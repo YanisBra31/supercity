@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FadeIn, Hero } from '../../components/brand';
 import { Avatar, Card, colors, ErrorText, font, Kicker, Loading, Pill, s, Screen, TeamCrest } from '../../components/ui';
-import { ApiError, get, PublicProfile } from '../../lib/api';
+import { ApiError, get, Post, PublicProfile } from '../../lib/api';
+import { PostCard } from '../../components/PostCard';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -14,6 +15,11 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [p, setP] = useState<PublicProfile | null>(null);
   const [error, setError] = useState('');
+
+  const [posts, setPosts] = useState<Post[]>([]);
+  useEffect(() => {
+    get<{ items: Post[] }>('/feed', { author_id: id, limit: 10 }).then((r) => setPosts(r.items)).catch(() => undefined);
+  }, [id]);
 
   useEffect(() => {
     get<PublicProfile>(`/users/${id}`)
@@ -85,6 +91,17 @@ export default function UserProfile() {
             </Card>
           </Pressable>
         </FadeIn>
+      ))}
+
+      {posts.length ? <Kicker>Publications</Kicker> : null}
+      {posts.map((x, i) => (
+        <PostCard
+          key={x.id}
+          p={x}
+          index={i}
+          onChange={(np) => setPosts((prev) => prev.map((y) => (y.id === np.id ? np : y)))}
+          onRemove={(pid) => setPosts((prev) => prev.filter((y) => y.id !== pid))}
+        />
       ))}
     </Screen>
   );

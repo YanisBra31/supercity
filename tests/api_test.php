@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -61,6 +61,21 @@ function upload(string $path, string $file, string $type, ?string $token, string
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"],
         CURLOPT_POSTFIELDS => ['photo' => new CURLFile($file, $type, basename($file))],
+    ]);
+    $raw = curl_exec($ch);
+    return [curl_getinfo($ch, CURLINFO_HTTP_CODE), json_decode((string)$raw, true)];
+}
+
+/** Publication multipart (texte + photo). */
+function post_with_photo(string $text, string $file, string $token): array
+{
+    global $base;
+    $ch = curl_init($base . '/posts');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"],
+        CURLOPT_POSTFIELDS => ['body' => $text, 'photo' => new CURLFile($file, 'image/jpeg', 'photo.jpg')],
     ]);
     $raw = curl_exec($ch);
     return [curl_getinfo($ch, CURLINFO_HTTP_CODE), json_decode((string)$raw, true)];
@@ -349,6 +364,44 @@ check('accepter un nouveau créneau crée le match Lions contre Cartel', $s === 
 [$s, $ch4] = api('POST', '/challenges', ['from_team_id' => $lionsId, 'to_team_id' => $teamId, 'venue_id' => $v1["id"], 'format' => 'city5', 'starts_at' => $dim], $sam);
 [$s, $r] = api('POST', "/challenges/{$ch4['id']}/cancel", null, $sam);
 check('le capitaine peut retirer son défi', $s === 200 && $r['status'] === 'cancelled', $r);
+
+echo "Fil d'actualité\n";
+[$s, $r] = api('GET', '/feed', null, $sam);
+check('le défi relevé apparaît dans le fil', $s === 200 && ($r['items'][0]['kind'] ?? '') === 'challenge' && $r['items'][0]['match'] !== null, $r);
+[$s, $r] = api('POST', '/posts', ['body' => ''], $lea);
+check('refuse une publication vide', $s === 422, $r);
+[$s, $r] = api('POST', '/posts', ['body' => 'Qui est chaud pour un five ce soir ?', 'team_id' => $lionsId], $lea);
+check('impossible de citer une équipe dont on ne fait pas partie', $s === 422 && isset($r['fields']['team_id']), $r);
+[$s, $p1] = api('POST', '/posts', ['body' => 'Victoire 7-5 hier soir, merci les gars 💪', 'team_id' => $teamId], $karim);
+check('publie un texte avec son équipe', $s === 201 && $p1['team']['id'] === $teamId && $p1['is_mine'] === true, $p1);
+[$s, $p2] = post_with_photo('Le terrain est refait à neuf !', "$tmp/sc-photo.jpg", $lea);
+check('publie une photo (proportions gardées)', $s === 201 && $p2['image_url'] && getimagesize($p2['image_url'])[0] === 900, $p2);
+[$s, $r] = api('POST', "/posts/{$p1['id']}/like", null, $lea);
+api('POST', "/posts/{$p1['id']}/like", null, $lea);
+check('aime une publication (une seule fois)', $s === 200 && $r['liked'] === true && $r['likes_count'] === 1, $r);
+[$s, $r] = api('DELETE', "/posts/{$p1['id']}/like", null, $lea);
+check('retire son j\'aime', $r['liked'] === false && $r['likes_count'] === 0, $r);
+[$s, $c1] = api('POST', "/posts/{$p1['id']}/comments", ['body' => 'Bien joué !'], $lea);
+check('commente', $s === 201 && $c1['can_delete'] === true, $c1);
+[$s, $r] = api('GET', "/posts/{$p1['id']}/comments", null, $karim);
+check('l\'auteur voit le commentaire et peut le supprimer', count($r['items']) === 1 && $r['items'][0]['can_delete'] === true, $r);
+[$s, $r] = api('GET', '/feed?scope=teams', null, $yassin);
+$ids = array_column($r['items'], 'id');
+check('fil « mes équipes » : coéquipiers oui, inconnus non', in_array($p1['id'], $ids) && !in_array($p2['id'], $ids), $ids);
+[$s, $r] = api('GET', "/feed?author_id=$leaId", null, $yassin);
+check('publications d\'un joueur', count($r['items']) === 1 && $r['items'][0]['id'] === $p2['id'], $r);
+[$s] = api('DELETE', "/posts/{$p1['id']}", null, $lea);
+check('impossible de supprimer la publication d\'un autre', $s === 403);
+[$s] = api('POST', "/posts/{$p2['id']}/report", ['reason' => 'Spam'], $yassin);
+[$s2, $r] = api('GET', '/feed', null, $yassin);
+check('une publication signalée disparaît du fil de celui qui la signale', $s === 204 && !in_array($p2['id'], array_column($r['items'], 'id')), $r);
+api('POST', "/posts/{$p2['id']}/report", null, $karim);
+api('POST', "/posts/{$p2['id']}/report", null, $sam);
+[$s, $r] = api('GET', '/feed', null, $lea);
+check('masquée pour tous après 3 signalements', !in_array($p2['id'], array_column($r['items'], 'id')), $r);
+[$s] = api('DELETE', "/posts/{$p1['id']}", null, $karim);
+[$s2] = api('GET', "/posts/{$p1['id']}", null, $karim);
+check('supprime sa publication (et ses commentaires)', $s === 204 && $s2 === 404);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

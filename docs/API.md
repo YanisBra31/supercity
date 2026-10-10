@@ -106,3 +106,18 @@ Un capitaine invite une autre équipe à l'affronter, soit sur un match de son �
 | GET | `/matches/{id}/rivals` | | Équipes qui jouent sur le même terrain à 3 h près : adversaires à défier |
 
 Statuts : `pending`, `accepted`, `declined`, `cancelled`, et `expired` (en attente mais créneau passé).
+
+## Fil d'actualité
+
+| Méthode | Adresse | Corps | Effet |
+| --- | --- | --- | --- |
+| GET | `/feed` | `?scope=all` (défaut) ou `teams` (moi, mes coéquipiers, mes équipes citées), `?author_id=`, `?before_id=` pour la page suivante, `?limit=` (30 max.) | Publications, les plus récentes d'abord |
+| POST | `/posts` | JSON `body`, `team_id` facultatif ; ou multipart avec en plus `photo` | Publie (texte et/ou photo, 1080 px max.) ; 20 publications par heure au plus |
+| GET | `/posts/{id}` | | Une publication |
+| DELETE | `/posts/{id}` | | Supprime sa publication |
+| POST / DELETE | `/posts/{id}/like` | | J'aime / je n'aime plus |
+| GET / POST | `/posts/{id}/comments` | `body` (500 car.) pour POST | Commentaires |
+| DELETE | `/comments/{id}` | | Supprime un commentaire (son auteur ou l'auteur de la publication) |
+| POST | `/posts/{id}/report` | `reason` facultatif | Signale : la publication disparaît pour celui qui signale, et pour tous à 3 signalements |
+
+Chaque publication renvoie `author`, `team`, `match` (pour les défis relevés, publiés automatiquement), `likes_count`, `comments_count`, `liked` et `is_mine`.

@@ -232,6 +232,7 @@ function register_challenge_routes(Router $r): void
                 'UPDATE challenges SET status = "accepted", match_id = ?, responded_by = ?, responded_at = UTC_TIMESTAMP(), response_message = ? WHERE id = ?',
                 [$matchId, $uid, $in['message'] ?? null, $c['id']]
             );
+            post_challenge_accepted($uid, $from, $to, $matchId);
             // Les autres défis en attente sur ce même match n'ont plus lieu d'être.
             query('UPDATE challenges SET status = "cancelled" WHERE match_id = ? AND status = "pending" AND id <> ?', [$matchId, $c['id']]);
         });

@@ -40,6 +40,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Matchs', tabBarIcon: icon('football-outline', 'football') }} />
+      <Tabs.Screen name="feed" options={{ title: 'Fil', tabBarIcon: icon('newspaper-outline', 'newspaper') }} />
       <Tabs.Screen name="create" options={{ title: 'Organiser', tabBarIcon: icon('add-circle-outline', 'add-circle') }} />
       <Tabs.Screen
         name="teams"

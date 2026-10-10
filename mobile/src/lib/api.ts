@@ -184,3 +184,33 @@ export type Challenge = {
 };
 
 export type Rival = { team: TeamBrief; match_id: number; starts_at: string };
+
+export type Post = {
+  id: number;
+  kind: 'post' | 'challenge';
+  author: PublicUser;
+  body: string | null;
+  image_url: string | null;
+  team: TeamBrief | null;
+  match: Match | null;
+  likes_count: number;
+  comments_count: number;
+  liked: boolean;
+  is_mine: boolean;
+  created_at: string;
+};
+
+export type Comment = { id: number; author: PublicUser; body: string; created_at: string; can_delete: boolean };
+
+// Publier : JSON pour du texte seul, multipart dès qu'il y a une photo.
+export async function createPost(data: { body: string; team_id: number | null }, image?: { uri: string; mimeType?: string | null; fileName?: string | null } | null): Promise<Post> {
+  if (!image) return post<Post>('/posts', { body: data.body || null, team_id: data.team_id });
+  const form = new FormData();
+  if (data.body) form.append('body', data.body);
+  if (data.team_id) form.append('team_id', String(data.team_id));
+  const type = image.mimeType ?? 'image/jpeg';
+  const name = image.fileName ?? 'photo.jpg';
+  if (typeof document !== 'undefined') form.append('photo', await (await fetch(image.uri)).blob(), name);
+  else form.append('photo', { uri: image.uri, name, type } as unknown as Blob);
+  return api<Post>('POST', '/posts', { body: form });
+}
