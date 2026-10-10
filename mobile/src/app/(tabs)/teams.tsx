@@ -2,7 +2,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, Card, Chips, colors, Empty, ErrorText, Field, Label, Pill, s, Screen } from '../../components/ui';
+import { Hero } from '../../components/brand';
+import { Button, Avatar, Card, Chips, colors, Empty, ErrorText, Field, Label, Pill, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, post, Team } from '../../lib/api';
 import { FORMATS, formatLabel } from '../../lib/format';
 
@@ -48,7 +49,8 @@ export default function Teams() {
   };
 
   return (
-    <Screen>
+    <Screen top>
+      <Hero kicker="Ton vestiaire" title="Mes équipes" sub="Monte ton équipe, invite tes potes avec un code." />
       {mode === 'none' ? (
         <View style={[s.row]}>
           <Button title="Créer" icon="add" onPress={() => setMode('create')} style={{ flex: 1 }} />
@@ -82,10 +84,12 @@ export default function Teams() {
       {teams?.length === 0 ? (
         <Empty icon="people-outline" title="Pas encore d'équipe" text="Crée la tienne ou rejoins celle de tes potes avec leur code." />
       ) : null}
-      {teams?.map((t) => (
-        <Card key={t.id} onPress={() => router.push(`/team/${t.id}`)}>
+      {teams?.map((t, i) => (
+        <Card key={t.id} index={i} onPress={() => router.push(`/team/${t.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Avatar name={t.name} size={50} tone={i % 2 ? 'night' : 'orange'} />
+          <View style={{ flex: 1, gap: 2 }}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, flex: 1 }}>{t.name}</Text>
+            <Text style={{ fontSize: 17, ...font.extrabold, color: colors.ink, flex: 1 }}>{t.name}</Text>
             {t.my_role === 'captain' ? <Pill text="Capitaine" /> : null}
           </View>
           <Text style={s.sub}>
@@ -93,6 +97,7 @@ export default function Teams() {
             {t.city ? ` · ${t.city}` : ''}
             {t.usual_format ? ` · ${formatLabel(t.usual_format)}` : ''}
           </Text>
+          </View>
         </Card>
       ))}
     </Screen>

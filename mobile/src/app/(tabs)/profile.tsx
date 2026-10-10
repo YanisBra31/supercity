@@ -1,9 +1,10 @@
 // Profil du joueur et ses prochains matchs.
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
-import { Button, Chips, colors, ErrorText, Field, Label, s, Screen } from '../../components/ui';
+import { Hero } from '../../components/brand';
+import { Banner, Button, Chips, ErrorText, Field, Kicker, Label, Pill, s, Screen, Success } from '../../components/ui';
 import { ApiError, Foot, get, Match, Position } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
@@ -41,20 +42,22 @@ export default function Profile() {
   };
 
   return (
-    <Screen>
-      <View style={[s.row, { gap: 14 }]}>
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.orange2, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: colors.white, fontSize: 28, fontWeight: '900' }}>{(user?.display_name ?? '?').slice(0, 1).toUpperCase()}</Text>
+    <Screen top>
+      <Hero kicker="Ton profil de joueur" title={user?.display_name ?? ''} sub={user?.email}>
+        <View style={[s.row, { marginTop: 10, flexWrap: 'wrap' }]}>
+          {position ? <Pill text={POSITIONS.find((p) => p.value === position)!.label} tone="dark" /> : null}
+          {level ? <Pill text={LEVELS[level - 1]} tone="dark" /> : null}
+          {city ? <Pill text={city} tone="dark" /> : null}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 22, fontWeight: '800' }}>{user?.display_name}</Text>
-          <Text style={s.sub}>{user?.email}</Text>
-        </View>
-      </View>
+      </Hero>
 
-      <Label>Mes prochains matchs</Label>
-      {matches.length ? matches.map((m) => <MatchCard key={m.id} match={m} />) : <Text style={s.sub}>Aucun match prévu. Va voir l'onglet Matchs !</Text>}
+      {user && !user.email_verified ? (
+        <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
+      ) : null}
+      <Kicker>Mes prochains matchs</Kicker>
+      {matches.length ? matches.map((m, i) => <MatchCard key={m.id} match={m} index={i} />) : <Text style={s.sub}>Aucun match prévu. Va voir l'onglet Matchs !</Text>}
 
+      <Kicker>Mes infos</Kicker>
       <Field label="Pseudo" value={name} onChangeText={setName} />
       <Field label="Ville" value={city} onChangeText={setCity} />
       <Label>Poste</Label>
@@ -64,8 +67,10 @@ export default function Profile() {
       <Label>Pied fort</Label>
       <Chips options={FEET} value={foot} onChange={setFoot} allowEmpty />
       <ErrorText>{error}</ErrorText>
-      {msg ? <Text style={{ color: colors.success, textAlign: 'center' }}>{msg}</Text> : null}
+      <Success>{msg}</Success>
       <Button title="Enregistrer" onPress={save} loading={saving} />
+      <Kicker>Sécurité</Kicker>
+      <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />
     </Screen>
   );

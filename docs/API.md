@@ -2,7 +2,7 @@
 
 Adresse de base : `https://supercity.fr/api/v1`. Corps et réponses en JSON, dates en ISO 8601 (renvoyées en UTC, suffixe `Z`).
 
-Toutes les routes sauf `/health`, `/auth/register` et `/auth/login` demandent l'en-tête `Authorization: Bearer <jeton>`. Le jeton est valable 60 jours.
+Toutes les routes sauf `/health`, `/auth/register`, `/auth/login` et `/auth/password/*` demandent l'en-tête `Authorization: Bearer <jeton>`. Le jeton est valable 60 jours.
 
 En cas d'erreur, la réponse ressemble à `{"error": "validation_failed", "message": "...", "fields": {"email": "Adresse e-mail invalide."}}`.
 
@@ -12,7 +12,8 @@ En cas d'erreur, la réponse ressemble à `{"error": "validation_failed", "messa
 | 403 `forbidden` | Action réservée au capitaine ou à l'organisateur |
 | 404 `not_found` | Ressource ou adresse inconnue |
 | 409 | Conflit : e-mail déjà pris, match annulé ou joué, capitaine qui part sans passer le brassard |
-| 422 `validation_failed` | Champs invalides, détaillés dans `fields` |
+| 422 `validation_failed` / `invalid_code` | Champs invalides, détaillés dans `fields`, ou code e-mail faux ou expiré |
+| 429 `too_many_attempts` | Trop d'essais (connexion, inscription, codes, e-mails) : réessayer plus tard |
 
 Les listes acceptent `?limit=` (20 par défaut, 50 au plus) et `?offset=`, et renvoient `{"items": [...]}`.
 
@@ -20,12 +21,19 @@ Les listes acceptent `?limit=` (20 par défaut, 50 au plus) et `?offset=`, et re
 
 | Méthode | Adresse | Corps | Effet |
 | --- | --- | --- | --- |
-| POST | `/auth/register` | `email`, `password` (8 car. min.), `display_name`, et facultatifs `city`, `position`, `level`, `strong_foot`, `avatar_url` | Crée le compte, renvoie `user` + `token` |
-| POST | `/auth/login` | `email`, `password` | Renvoie `user` + `token` |
+| POST | `/auth/register` | `email`, `password`, `display_name`, `birth_date` (AAAA-MM-JJ, 15 ans min.), `accept_terms: true`, et facultatifs `city`, `position`, `level`, `strong_foot`, `avatar_url` | Crée le compte, envoie un code de vérification par e-mail, renvoie `user` + `token` |
+| POST | `/auth/login` | `email`, `password` | Renvoie `user` + `token`. Bloqué 15 min après 5 échecs sur un compte (ou 30 depuis une même IP) |
+| POST | `/auth/verify-email` | `code` | Confirme l'e-mail, renvoie le profil |
+| POST | `/auth/resend-code` | | Renvoie un code de vérification |
+| POST | `/auth/password/forgot` | `email` | Envoie un code de réinitialisation (réponse 204 que le compte existe ou non) |
+| POST | `/auth/password/reset` | `email`, `code`, `password` | Change le mot de passe, coupe toutes les sessions, renvoie `user` + `token` |
+| POST | `/me/password` | `current_password`, `new_password` | Change le mot de passe, coupe les autres sessions |
 | POST | `/auth/logout` | | Invalide le jeton utilisé |
 | GET | `/me` | | Mon profil (avec e-mail) |
 | PATCH | `/me` | Champs du profil à changer | Profil mis à jour |
 | GET | `/users/{id}` | | Profil public d'un joueur |
+
+Mot de passe : 10 caractères minimum, au moins une lettre et un chiffre, pas un mot de passe courant, sans le pseudo ni le début de l'e-mail. Les codes e-mail ont 6 chiffres, valent 30 minutes et 5 essais ; 3 e-mails au plus par compte et par heure. `/me` renvoie aussi `email_verified` et `birth_date`.
 
 Valeurs : `position` = `gardien`, `defenseur`, `milieu`, `attaquant` ; `level` = 1 à 5 ; `strong_foot` = `droit`, `gauche`, `les_deux`.
 

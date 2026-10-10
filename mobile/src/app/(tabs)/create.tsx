@@ -2,7 +2,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Button, Card, Chips, colors, ErrorText, Field, Label, s, Screen, Title } from '../../components/ui';
+import { Hero } from '../../components/brand';
+import { Button, Card, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, post, Team, Venue } from '../../lib/api';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
 import { getPosition } from '../../lib/location';
@@ -106,8 +107,8 @@ export default function CreateMatch() {
   };
 
   return (
-    <Screen>
-      <Title sub="Publie ton match, les joueurs du coin s'inscrivent.">Organiser un match</Title>
+    <Screen top>
+      <Hero kicker="Coup d'envoi" title="Organise ton match" sub="Publie-le, les joueurs du coin s'inscrivent." />
 
       <Label>Format</Label>
       <Chips options={FORMATS.map((f) => ({ value: f.value, label: `${f.label} · ${f.short}` }))} value={format} onChange={(v) => { if (v) { setFormat(v); setMaxPlayers(null); } }} />
@@ -131,16 +132,16 @@ export default function CreateMatch() {
       <Label>Terrain</Label>
       {venue ? (
         <Card style={{ borderColor: colors.orange2, borderWidth: 2 }} onPress={() => setVenue(null)}>
-          <Text style={{ fontWeight: '800', fontSize: 16 }}>{venue.name}</Text>
+          <Text style={{ ...font.extrabold, fontSize: 16 }}>{venue.name}</Text>
           <Text style={s.sub}>{venue.address}</Text>
-          <Text style={{ color: colors.orange2, fontWeight: '600' }}>Changer de terrain</Text>
+          <Text style={{ color: colors.orange2, ...font.semibold }}>Changer de terrain</Text>
         </Card>
       ) : (
         <View style={{ gap: 8 }}>
           <Field label="Chercher un terrain" value={q} onChangeText={(t) => { setQ(t); loadVenues(t); }} placeholder="Nom ou adresse" />
           {venues.map((v) => (
             <Card key={v.id} onPress={() => setVenue(v)}>
-              <Text style={{ fontWeight: '700' }}>{v.name}</Text>
+              <Text style={{ ...font.bold }}>{v.name}</Text>
               <Text style={s.sub}>
                 {surfaceLabel(v.surface)}
                 {v.distance_km !== null ? ` · ${distanceLabel(v.distance_km)}` : ''} · {v.address}
@@ -158,7 +159,7 @@ export default function CreateMatch() {
       <Label>Nombre de joueurs</Label>
       <View style={s.row}>
         <Button title="−" variant="ghost" onPress={() => setMaxPlayers(Math.max(2, players - 1))} style={{ width: 54 }} />
-        <Text style={{ fontSize: 22, fontWeight: '800', minWidth: 50, textAlign: 'center' }}>{players}</Text>
+        <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 50, textAlign: 'center' }}>{players}</Text>
         <Button title="+" variant="ghost" onPress={() => setMaxPlayers(Math.min(30, players + 1))} style={{ width: 54 }} />
       </View>
 
@@ -176,7 +177,7 @@ export default function CreateMatch() {
         onChange={(v) => setIsPrivate(v === 'private')}
       />
 
-      <Field label="Infos pour les joueurs" value={description} onChangeText={setDescription} placeholder="Chasubles fournies, rendez-vous 10 min avant…" multiline style={[s.input, { minHeight: 80, paddingTop: 12 }]} />
+      <Field label="Infos pour les joueurs" value={description} onChangeText={setDescription} placeholder="Chasubles fournies, rendez-vous 10 min avant…" multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
 
       <ErrorText>{error}</ErrorText>
       <Button title="Publier le match" icon="megaphone-outline" onPress={submit} loading={loading} />

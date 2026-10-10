@@ -9,7 +9,9 @@ type AuthState = {
   ready: boolean;
   user: Me | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; display_name: string }) => Promise<void>;
+  register: (data: { email: string; password: string; display_name: string; birth_date: string; accept_terms: boolean }) => Promise<void>;
+  resetPassword: (data: { email: string; code: string; password: string }) => Promise<void>;
+  setUser: (u: Me) => void;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<Me>) => Promise<void>;
 };
@@ -56,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       login: async (email, password) => start(await post<AuthResponse>('/auth/login', { email, password })),
       register: async (data) => start(await post<AuthResponse>('/auth/register', data)),
+      resetPassword: async (data) => start(await post<AuthResponse>('/auth/password/reset', data)),
+      setUser,
       logout: async () => {
         await post('/auth/logout').catch(() => undefined);
         await clear();

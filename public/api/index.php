@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/src/lib.php';
 require __DIR__ . '/src/router.php';
+require __DIR__ . '/src/security.php';
 require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/teams.php';
 require __DIR__ . '/src/venues.php';

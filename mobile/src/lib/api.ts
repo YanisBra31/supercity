@@ -18,7 +18,7 @@ export type PublicUser = {
   strong_foot: Foot | null;
   avatar_url: string | null;
 };
-export type Me = PublicUser & { email: string; created_at: string };
+export type Me = PublicUser & { email: string; email_verified: boolean; birth_date: string | null; created_at: string };
 
 export type Team = {
   id: number;
