@@ -23,7 +23,7 @@ En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'h
 
 1. Dans phpMyAdmin, importer `sql/001_waitlist.sql` puis `sql/002_core.sql`.
 2. Copier `public/api/config.example.php` en `supercity-config.php` dans le dossier qui contient `public_html` (pas dedans), et le remplir avec les identifiants MySQL.
-3. Remplir les champs « À REMPLIR » de `app/legal.ts` (éditeur, adresse, contact) : ils alimentent les mentions légales et la politique de confidentialité.
+3. Vérifier `app/legal.ts` (éditeur, adresse, contact) : il alimente les mentions légales et la politique de confidentialité.
 4. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).
 
 ## Tester l'API
