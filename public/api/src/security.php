@@ -108,7 +108,7 @@ function send_mail(string $to, string $subject, string $text): void
         file_put_contents($c['mail_log'], json_encode(['to' => $to, 'subject' => $subject, 'text' => $text]) . "\n", FILE_APPEND);
         return;
     }
-    $from = $c['mail_from'] ?? 'Supercity <no-reply@supercity.fr>';
+    $from = $c['mail_from'] ?? 'Supercity <contact@supercity.fr>';
     $headers = "From: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
     @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, $headers);
 }

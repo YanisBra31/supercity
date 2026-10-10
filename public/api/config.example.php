@@ -10,5 +10,5 @@ return [
     'cors_origins' => [],
     // Expéditeur des e-mails (codes de vérification, mot de passe oublié). L'adresse doit être
     // sur le domaine supercity.fr ; la créer dans hPanel > E-mails si besoin.
-    'mail_from' => 'Supercity <no-reply@supercity.fr>',
+    'mail_from' => 'Supercity <contact@supercity.fr>',
 ];
