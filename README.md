@@ -23,7 +23,8 @@ En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'h
 
 1. Dans phpMyAdmin, importer dans l'ordre `sql/001_waitlist.sql`, `sql/002_core.sql`, `sql/003_securite.sql`, `sql/004_personnalisation.sql`, `sql/005_defis.sql` puis `sql/006_fil.sql`. Les photos envoyées vont dans `public_html/uploads/` (créé automatiquement).
 2. Copier `public/api/config.example.php` en `supercity-config.php` dans le dossier qui contient `public_html` (pas dedans), et le remplir avec les identifiants MySQL.
-3. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).
+3. Vérifier `app/legal.ts` (éditeur, adresse, contact) : il alimente les mentions légales et la politique de confidentialité.
+4. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).
 
 ## Tester l'API
 

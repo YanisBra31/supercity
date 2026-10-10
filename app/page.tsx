@@ -2,7 +2,8 @@ import { Fragment } from "react";
 import Image from "next/image";
 import Waitlist from "./components/Waitlist";
 import Motion from "./components/Motion";
-import { Ball } from "./components/Loader";
+import Loader, { Ball } from "./components/Loader";
+import Footer from "./components/Footer";
 
 const steps = [
   {
@@ -85,6 +86,7 @@ function Words({ text, start = 0 }: { text: string; start?: number }) {
 export default function Home() {
   return (
     <>
+      <Loader />
       <Motion />
       <header className="nav">
         <a className="nav__brand" href="#top" aria-label="Supercity, accueil">
@@ -241,10 +243,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="footer">
-        <span>Créer ton équipe. Organiser tes matchs. Partout, sur tous les terrains.</span>
-        <span>© Supercity 2026</span>
-      </footer>
+      <Footer />
     </>
   );
 }

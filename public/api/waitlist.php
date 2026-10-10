@@ -1,5 +1,5 @@
 <?php
-// Inscription à la liste d'attente : reçoit {"email": "..."} en POST et l'enregistre dans MySQL.
+// Inscription à la liste d'attente : reçoit {"email": "...", "consent": true} en POST et l'enregistre dans MySQL.
 header('Content-Type: application/json; charset=utf-8');
 
 function respond(int $status, array $body): void {
@@ -16,6 +16,10 @@ $input = json_decode(file_get_contents('php://input') ?: '', true);
 $email = strtolower(trim((string)($input['email'] ?? '')));
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254) {
     respond(422, ['error' => 'invalid_email']);
+}
+// Consentement RGPD : la case du formulaire doit être cochée.
+if (($input['consent'] ?? false) !== true) {
+    respond(422, ['error' => 'consent_required']);
 }
 
 // Identifiants MySQL hors du dossier public : supercity-config.php à côté de public_html
