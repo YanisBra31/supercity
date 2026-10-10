@@ -136,3 +136,26 @@ Chaque joueur porte un `site_role` : `user`, `moderator` ou `admin` (à ne pas c
 | POST | `/mod/users/{id}/suspend` | `days` (1 à 365), `reason` facultatif | modérateur | Suspend un joueur de rang inférieur |
 | DELETE | `/mod/users/{id}/suspend` | | modérateur | Lève la suspension |
 | POST | `/admin/users/{id}/role` | `role` : user, moderator, admin | admin | Change le rôle (pas le sien) |
+
+## Paiement de la place
+
+Un match peut avoir un prix par joueur (`price_cents`, de 100 à 5000, 0 = gratuit). Le joueur paie ce prix plus les frais de service Supercity (`fee_cents`, 50 par défaut) par Stripe Checkout. Le prix part à l'organisateur (compte Stripe Connect Express), les frais restent à Supercity. L'organisateur joue sans payer. Sans bloc `stripe` dans la configuration, les matchs restent gratuits (`503 payments_disabled` si on fixe un prix).
+
+| Méthode | Chemin | Corps | Effet |
+|---|---|---|---|
+| GET | `/me/payouts` | | `enabled`, `connected`, `ready`, `fee_cents`, `refund_hours` ; met à jour `ready` depuis Stripe |
+| POST | `/me/payouts/onboard` | `return_url` facultatif | Crée le compte Stripe au besoin, renvoie `url` (inscription Stripe) |
+| POST | `/me/payouts/dashboard` | | Renvoie `url` du tableau de bord Stripe (virements) |
+| POST | `/matches/{id}/join` | `return_url` facultatif | Match payant : place réservée 30 min (`my_status: pending`), renvoie `checkout_url` |
+| POST | `/matches/{id}/pay` | `return_url` facultatif | Nouvelle page de paiement pour une place réservée |
+| POST | `/matches/{id}/pay/confirm` | | Vérifie chez Stripe et valide le paiement sans attendre le webhook |
+| POST | `/stripe/webhook` | événement Stripe signé | `checkout.session.completed`, `checkout.session.expired`, `account.updated` |
+| GET | `/pay/back?to=` | | Page de retour Stripe qui renvoie vers l'appli (`supercity://`, `exp://` ou une origine de `cors_origins`) |
+
+Règles :
+- Les vues de match ajoutent `price_cents`, `fee_cents`, `my_hold_until` et `my_paid`.
+- Place non payée à temps : elle passe au premier de la liste d'attente, qui a 6 h (au plus jusqu'au coup d'envoi) pour payer.
+- Paiement arrivé après la fin de la réservation et match complet : remboursé en entier.
+- Désistement plus de 24 h avant : prix remboursé, frais gardés (`refunded_cents` dans la réponse). Moins de 24 h : pas de remboursement, et pas de second paiement si le joueur revient.
+- Match annulé : tout le monde est remboursé, frais compris.
+- Le prix ne change plus une fois qu'un joueur a payé (`409 price_locked`). Les défis entre équipes se font sur des matchs gratuits.

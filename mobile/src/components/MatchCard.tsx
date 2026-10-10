@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { Match } from '../lib/api';
+import { euros } from '../lib/pay';
 import { distanceLabel, formatLabel, formatShort, levelLabel, timeLabel } from '../lib/format';
 import { Gradient } from './brand';
 import { Card, colors, font, Meta, Pill } from './ui';
@@ -13,6 +14,7 @@ export function statusPill(m: Match) {
   if (m.status === 'cancelled') return <Pill text="Annulé" tone="grey" />;
   if (m.status === 'played') return <Pill text="Joué" tone="grey" />;
   if (m.my_status === 'registered') return <Pill text="Inscrit" tone="green" />;
+  if (m.my_status === 'pending') return <Pill text="À payer" />;
   if (m.my_status === 'waitlist') return <Pill text="Liste d'attente" tone="dark" />;
   if (m.status === 'full') return <Pill text="Complet" tone="dark" />;
   return <Pill text={`${m.spots_left} place${m.spots_left > 1 ? 's' : ''}`} />;
@@ -65,6 +67,7 @@ export function MatchCard({ match: m, index }: { match: Match; index?: number })
             {m.players_count}/{m.max_players} joueurs
             {m.waitlist_count ? ` · ${m.waitlist_count} en attente` : ''}
           </Text>
+          <Text style={[st.count, { marginLeft: 'auto', color: m.price_cents ? colors.ink : colors.success, ...font.bold }]}>{m.price_cents ? euros(m.price_cents) : 'Gratuit'}</Text>
         </View>
       </View>
     </Card>

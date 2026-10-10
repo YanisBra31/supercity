@@ -103,6 +103,9 @@ function check_challenge_match(array $m, int $fromTeam, int $toTeam): void
     if ($m['status'] === 'cancelled' || match_status($m) === 'played') {
         throw new HttpError(409, 'match_closed', 'Ce match est terminé ou annulé.');
     }
+    if ((int)$m['price_cents'] > 0) {
+        throw new HttpError(409, 'match_paid', 'Les défis se jouent sur des matchs gratuits.');
+    }
     if ($m['away_team_id'] !== null) {
         throw new HttpError(409, 'match_has_opponent', 'Ce match a déjà un adversaire.');
     }

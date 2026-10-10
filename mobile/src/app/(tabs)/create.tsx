@@ -5,7 +5,8 @@ import { ScrollView, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { Hero } from '../../components/brand';
 import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
-import { ApiError, Format, get, Match, post, Team, Venue } from '../../lib/api';
+import { ApiError, Format, get, Match, Payouts, post, Team, Venue } from '../../lib/api';
+import { euros } from '../../lib/pay';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
 import { Place } from '../../lib/address';
 import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
@@ -38,6 +39,8 @@ export default function CreateMatch() {
   const [placeSheet, setPlaceSheet] = useState(false);
   const [level, setLevel] = useState<number | null>(null);
   const [maxPlayers, setMaxPlayers] = useState<number | null>(null);
+  const [price, setPrice] = useState(0);
+  const [payouts, setPayouts] = useState<Payouts | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState<number | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -67,6 +70,7 @@ export default function CreateMatch() {
       if (created) setVenue(created);
       loadVenues('');
       get<{ items: Team[] }>('/me/teams').then((r) => setTeams(r.items)).catch(() => undefined);
+      get<Payouts>('/me/payouts').then(setPayouts).catch(() => undefined);
     }, [loadVenues])
   );
 
@@ -80,6 +84,7 @@ export default function CreateMatch() {
     setError('');
     if (minutes === null) return setError("Choisis l'heure du match.");
     if (!venue) return setError('Choisis un terrain.');
+    if (price > 0 && !payouts?.ready) return setError('Active les paiements dans ton profil pour fixer un prix.');
     const start = new Date(days[day]);
     start.setMinutes(minutes);
     setLoading(true);
@@ -93,6 +98,7 @@ export default function CreateMatch() {
         home_team_id: teamId,
         visibility: isPrivate ? 'private' : 'public',
         description: description.trim() || null,
+        price_cents: price,
       });
       setMinutes(null);
       setDescription('');
@@ -171,6 +177,30 @@ export default function CreateMatch() {
         <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 50, textAlign: 'center' }}>{players}</Text>
         <Button title="+" variant="ghost" onPress={() => setMaxPlayers(Math.min(30, players + 1))} style={{ width: 54 }} />
       </View>
+
+      {payouts?.enabled ? (
+        <>
+          <Label>Prix de la place</Label>
+          <View style={s.row}>
+            <Button title="−" variant="ghost" onPress={() => setPrice((p) => (p <= 100 ? 0 : p - 50))} style={{ width: 54 }} />
+            <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 90, textAlign: 'center', color: price ? colors.ink : colors.success }}>{price ? euros(price) : 'Gratuit'}</Text>
+            <Button title="+" variant="ghost" onPress={() => setPrice((p) => Math.min(5000, p < 100 ? 100 : p + 50))} style={{ width: 54 }} />
+          </View>
+          {price > 0 ? (
+            payouts.ready ? (
+              <Text style={s.sub}>
+                Chaque joueur paie {euros(price + payouts.fee_cents)} ({euros(payouts.fee_cents)} de frais de service). Tu reçois {euros(price * (players - 1))} si le match est complet.
+              </Text>
+            ) : (
+              <Card style={{ gap: 8, borderColor: colors.orange2, borderWidth: 2 }}>
+                <Text style={{ ...font.bold, color: colors.ink }}>Active les paiements pour encaisser</Text>
+                <Text style={s.sub}>Relie ton compte bancaire via Stripe, une seule fois.</Text>
+                <Button title="Activer les paiements" icon="card-outline" onPress={() => router.push('/payouts')} />
+              </Card>
+            )
+          ) : null}
+        </>
+      ) : null}
 
       {teams.length ? (
         <>

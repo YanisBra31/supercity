@@ -97,10 +97,22 @@ export type Match = {
   organizer: PublicUser;
   home_team: MatchTeam | null;
   away_team: MatchTeam | null;
-  my_status: 'registered' | 'waitlist' | 'withdrawn' | null;
+  my_status: 'registered' | 'waitlist' | 'withdrawn' | 'pending' | null;
+  /** Place réservée en attendant le paiement, jusqu'à cette date. */
+  my_hold_until: string | null;
+  my_paid: boolean;
+  /** Prix de la place en centimes (0 : gratuit), hors frais de service. */
+  price_cents: number;
+  fee_cents: number;
   is_organizer: boolean;
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
 };
+
+/** Réponse d'inscription ou de désistement d'un match. */
+export type JoinResult = Match & { checkout_url?: string | null; refunded_cents?: number | null };
+
+/** Paiements de l'organisateur (compte Stripe relié). */
+export type Payouts = { enabled: boolean; connected: boolean; ready: boolean; fee_cents: number; refund_hours: number };
 
 export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string };
 

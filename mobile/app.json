@@ -40,7 +40,8 @@
           "photosPermission": "Supercity utilise tes photos pour ta photo de profil et le logo de ton équipe.",
           "cameraPermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "supercity",
     "splash": {

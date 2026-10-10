@@ -228,6 +228,9 @@ export default function Profile() {
         </>
       ) : null}
 
+      <Kicker>Paiements</Kicker>
+      <Button title="Encaisser mes matchs payants" icon="card-outline" variant="dark" onPress={() => router.push('/payouts')} />
+
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />

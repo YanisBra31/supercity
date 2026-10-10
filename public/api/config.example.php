@@ -20,4 +20,11 @@ return [
         'user' => 'contact@supercity.fr',
         'password' => 'mot_de_passe_de_la_boite',
     ],
+    // Paiement de la place (Stripe Connect). Laisser vide tant que le compte Stripe n'est pas prêt :
+    // les matchs restent alors gratuits. Clés dans dashboard.stripe.com > Développeurs > Clés API.
+    'stripe' => [
+        'secret_key' => '',            // sk_live_... (ou sk_test_... pour essayer sans vrai argent)
+        'webhook_secret' => '',        // whsec_... affiché à la création du webhook
+        'fee_cents' => 50,             // frais de service Supercity par place, en centimes
+    ],
 ];

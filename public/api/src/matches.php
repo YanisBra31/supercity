@@ -10,9 +10,14 @@ function load_match(int $id, bool $lock = false): array
     return one('SELECT * FROM matches WHERE id = ?' . ($lock ? ' FOR UPDATE' : ''), [$id]) ?? not_found('Match');
 }
 
+/** Places prises : inscrits, plus les places réservées en attente de paiement. */
 function registered_count(int $matchId): int
 {
-    return (int)one('SELECT COUNT(*) AS n FROM match_participants WHERE match_id = ? AND status = "registered"', [$matchId])['n'];
+    return (int)one(
+        'SELECT COUNT(*) AS n FROM match_participants WHERE match_id = ?
+         AND (status = "registered" OR (status = "pending" AND hold_until > UTC_TIMESTAMP()))',
+        [$matchId]
+    )['n'];
 }
 
 /** Statut affiché : « played » une fois le match terminé, sinon le statut stocké. */
@@ -34,12 +39,15 @@ function refresh_match(int $matchId): void
     if ($m['status'] === 'cancelled') {
         return;
     }
+    expire_holds($matchId);
     $free = (int)$m['max_players'] - registered_count($matchId);
     if ($free > 0) {
+        // Match payant : la place est réservée, le joueur a quelques heures pour la payer.
+        $paid = (int)$m['price_cents'] > 0;
         query(
-            'UPDATE match_participants SET status = "registered" WHERE match_id = ? AND status = "waitlist"
-             ORDER BY updated_at, created_at LIMIT ' . $free,
-            [$matchId]
+            'UPDATE match_participants SET status = ' . ($paid ? '"pending", hold_until = ?' : '"registered"') . '
+             WHERE match_id = ? AND status = "waitlist" ORDER BY updated_at, created_at LIMIT ' . $free,
+            $paid ? [promoted_hold($m), $matchId] : [$matchId]
         );
     }
     $status = registered_count($matchId) >= (int)$m['max_players'] ? 'full' : 'open';
@@ -58,7 +66,12 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         [$id]
     )->fetchAll(PDO::FETCH_KEY_PAIR);
     $registered = (int)($counts['registered'] ?? 0);
-    $mine = $viewerId ? one('SELECT status, team_id FROM match_participants WHERE match_id = ? AND user_id = ?', [$id, $viewerId]) : null;
+    $taken = registered_count($id);
+    $mine = $viewerId ? one('SELECT status, team_id, hold_until FROM match_participants WHERE match_id = ? AND user_id = ?', [$id, $viewerId]) : null;
+    if ($mine && $mine['status'] === 'pending' && strtotime($mine['hold_until'] . ' UTC') <= time()) {
+        $mine['status'] = 'withdrawn';
+    }
+    $price = (int)$m['price_cents'];
     $team = fn($tid) => $tid ? (($t = one('SELECT id, name, logo_url, color_primary, color_secondary FROM teams WHERE id = ?', [$tid]))
         ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'], 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary']]
         : null) : null;
@@ -72,7 +85,9 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'max_players' => (int)$m['max_players'],
         'players_count' => $registered,
         'waitlist_count' => (int)($counts['waitlist'] ?? 0),
-        'spots_left' => max(0, (int)$m['max_players'] - $registered),
+        'spots_left' => max(0, (int)$m['max_players'] - $taken),
+        'price_cents' => $price,
+        'fee_cents' => $price > 0 ? service_fee() : 0,
         'level' => $m['level'] === null ? null : (int)$m['level'],
         'status' => match_status($m),
         'visibility' => $m['visibility'],
@@ -82,12 +97,14 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'home_team' => $team($m['home_team_id']),
         'away_team' => $team($m['away_team_id']),
         'my_status' => $mine['status'] ?? null,
+        'my_hold_until' => ($mine['status'] ?? null) === 'pending' ? iso($mine['hold_until']) : null,
+        'my_paid' => $price > 0 && $viewerId !== null && paid_payment($id, $viewerId) !== null,
         'is_organizer' => $viewerId !== null && (int)$m['organizer_id'] === $viewerId,
     ];
     if ($withPlayers) {
         $rows = query(
             'SELECT u.*, p.status AS p_status, p.team_id AS p_team FROM match_participants p JOIN users u ON u.id = p.user_id
-             WHERE p.match_id = ? AND p.status <> "withdrawn" ORDER BY p.status = "waitlist", p.updated_at, p.created_at',
+             WHERE p.match_id = ? AND p.status IN ("registered", "waitlist") ORDER BY p.status = "waitlist", p.updated_at, p.created_at',
             [$id]
         )->fetchAll();
         $out['players'] = array_map(
@@ -117,7 +134,26 @@ function match_validator(array $data, bool $partial): Validator
         ->int('home_team_id', 1, PHP_INT_MAX, false)
         ->int('away_team_id', 1, PHP_INT_MAX, false)
         ->enum('visibility', ['public', 'private'], false)
-        ->string('description', 1, 500, false);
+        ->string('description', 1, 500, false)
+        ->int('price_cents', 0, PRICE_MAX_CENTS, false);
+}
+
+/** Un match payant demande un compte Stripe prêt à encaisser, et un prix d'au moins 1 €. */
+function check_price(array $in, array $user): void
+{
+    $price = $in['price_cents'] ?? 0;
+    if ($price === null || $price === 0) {
+        return;
+    }
+    if ($price < 100) {
+        throw new HttpError(422, 'validation_failed', 'Prix minimum : 1 €.', ['price_cents' => 'Au moins 1 €.']);
+    }
+    if (!stripe_config()) {
+        throw new HttpError(503, 'payments_disabled', "Le paiement en ligne n'est pas encore activé.");
+    }
+    if (!$user['stripe_ready']) {
+        throw new HttpError(409, 'payouts_not_ready', 'Active les paiements dans ton profil pour fixer un prix.');
+    }
 }
 
 function register_match_routes(Router $r): void
@@ -127,6 +163,7 @@ function register_match_routes(Router $r): void
         $uid = (int)$user['id'];
         $data = body();
         $in = match_validator($data, false)->check();
+        check_price($in, $user);
         if (strtotime($in['starts_at'] . ' UTC') < time()) {
             throw new HttpError(422, 'validation_failed', 'Le match doit être dans le futur.', ['starts_at' => 'Date passée.']);
         }
@@ -140,13 +177,13 @@ function register_match_routes(Router $r): void
         $id = transaction(function () use ($in, $uid, $join) {
             query(
                 'INSERT INTO matches (organizer_id, venue_id, format, starts_at, duration_min, max_players, level,
-                   home_team_id, away_team_id, visibility, description)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                   home_team_id, away_team_id, visibility, description, price_cents)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $uid, $in['venue_id'], $in['format'], $in['starts_at'], $in['duration_min'] ?? 60,
                     $in['max_players'] ?? DEFAULT_PLAYERS[$in['format']], $in['level'] ?? null,
                     $in['home_team_id'] ?? null, $in['away_team_id'] ?? null, $in['visibility'] ?? 'public',
-                    $in['description'] ?? null,
+                    $in['description'] ?? null, $in['price_cents'] ?? 0,
                 ]
             );
             $id = (int)db()->lastInsertId();
@@ -228,6 +265,10 @@ function register_match_routes(Router $r): void
     // Un match privé n'apparaît pas dans la recherche, mais reste accessible par son lien.
     $r->get('/matches/(\d+)', function (string $id) {
         $user = require_user();
+        // Une place réservée non payée à temps revient à la liste d'attente.
+        if (one('SELECT 1 FROM match_participants WHERE match_id = ? AND status = "pending" AND hold_until <= UTC_TIMESTAMP() LIMIT 1', [(int)$id])) {
+            transaction(fn() => refresh_match((int)$id));
+        }
         respond(200, match_view(load_match((int)$id), (int)$user['id'], true));
     });
 
@@ -243,6 +284,15 @@ function register_match_routes(Router $r): void
         }
         $in = match_validator(body(), true)->check();
         unset($in['format']); // le format fixe les places : on ne le change pas après coup
+        if (array_key_exists('price_cents', $in)) {
+            $in['price_cents'] ??= 0;
+            if ($in['price_cents'] !== (int)$m['price_cents']) {
+                if (one('SELECT id FROM payments WHERE match_id = ? AND status IN ("open", "paid") LIMIT 1', [$m['id']])) {
+                    throw new HttpError(409, 'price_locked', 'Des joueurs ont déjà payé : le prix ne peut plus changer.', ['price_cents' => 'Déjà payé par des joueurs.']);
+                }
+                check_price($in, $user);
+            }
+        }
         if (isset($in['starts_at']) && strtotime($in['starts_at'] . ' UTC') < time()) {
             throw new HttpError(422, 'validation_failed', 'Le match doit être dans le futur.', ['starts_at' => 'Date passée.']);
         }
@@ -288,53 +338,79 @@ function register_match_routes(Router $r): void
             forbidden('Seul l\'organisateur peut annuler le match.');
         }
         query('UPDATE matches SET status = "cancelled" WHERE id = ?', [$m['id']]);
+        refund_all((int)$m['id']);
         respond(200, match_view(load_match((int)$id), (int)$user['id']));
     });
 
     // S'inscrire : place libre -> inscrit, sinon liste d'attente. Corps facultatif : {"team_id": 3}
+    // Match payant : la place est réservée 30 min et la réponse contient checkout_url, la page de paiement.
     $r->post('/matches/(\d+)/join', function (string $id) {
         $user = require_user();
         $uid = (int)$user['id'];
-        $in = validate(body())->int('team_id', 1, PHP_INT_MAX, false)->check();
+        $in = validate(body())->int('team_id', 1, PHP_INT_MAX, false)->string('return_url', 1, 500, false)->check();
         check_team_member($in['team_id'] ?? null, $uid, 'team_id');
-        transaction(function () use ($id, $uid, $in) {
+        $pay = transaction(function () use ($id, $uid, $in) {
             $m = load_match((int)$id, true);
             if ($m['status'] === 'cancelled' || match_status($m) === 'played') {
                 throw new HttpError(409, 'match_closed', 'Ce match est terminé ou annulé.');
             }
+            expire_holds((int)$m['id']);
+            // Déjà payé (désistement tardif non remboursé, puis retour) : pas de second paiement.
+            $paid = (int)$m['price_cents'] > 0 && (int)$m['organizer_id'] !== $uid && !paid_payment((int)$m['id'], $uid);
             $current = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [$m['id'], $uid]);
             if ($current && $current['status'] !== 'withdrawn') {
                 if (array_key_exists('team_id', $in)) {
                     query('UPDATE match_participants SET team_id = ? WHERE match_id = ? AND user_id = ?', [$in['team_id'], $m['id'], $uid]);
                 }
-                return;
+                return $current['status'] === 'pending' ? $m : null;
             }
-            $status = registered_count((int)$m['id']) < (int)$m['max_players'] ? 'registered' : 'waitlist';
+            if ($paid && !one('SELECT stripe_ready FROM users WHERE id = ? AND stripe_ready = 1', [$m['organizer_id']])) {
+                throw new HttpError(409, 'organizer_not_ready', "L'organisateur ne peut pas encore encaisser. Réessaie plus tard.");
+            }
+            $free = registered_count((int)$m['id']) < (int)$m['max_players'];
+            $status = !$free ? 'waitlist' : ($paid ? 'pending' : 'registered');
             query(
-                'INSERT INTO match_participants (match_id, user_id, team_id, status) VALUES (?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE status = VALUES(status), team_id = VALUES(team_id), updated_at = CURRENT_TIMESTAMP',
-                [$m['id'], $uid, $in['team_id'] ?? null, $status]
+                'INSERT INTO match_participants (match_id, user_id, team_id, status, hold_until) VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE status = VALUES(status), team_id = VALUES(team_id), hold_until = VALUES(hold_until), updated_at = CURRENT_TIMESTAMP',
+                [$m['id'], $uid, $in['team_id'] ?? null, $status, $status === 'pending' ? gmdate('Y-m-d H:i:s', time() + HOLD_MINUTES * 60) : null]
             );
             refresh_match((int)$m['id']);
+            return $status === 'pending' ? $m : null;
         });
-        respond(200, match_view(load_match((int)$id), $uid, true));
+        $checkout = null;
+        if ($pay) {
+            try {
+                $checkout = create_checkout($pay, $user, app_return($in['return_url'] ?? null));
+            } catch (HttpError $e) {
+                // Pas de page de paiement : on rend la place tout de suite.
+                transaction(function () use ($pay, $uid) {
+                    query('UPDATE match_participants SET status = "withdrawn", hold_until = NULL WHERE match_id = ? AND user_id = ? AND status = "pending"', [$pay['id'], $uid]);
+                    refresh_match((int)$pay['id']);
+                });
+                throw $e;
+            }
+        }
+        respond(200, match_view(load_match((int)$id), $uid, true) + ['checkout_url' => $checkout]);
     });
 
     // Se désister : la première personne en liste d'attente prend la place.
+    // Match payant : remboursé (hors frais de service) jusqu'à 24 h avant le coup d'envoi.
     $r->delete('/matches/(\d+)/join', function (string $id) {
         $user = require_user();
         $uid = (int)$user['id'];
-        transaction(function () use ($id, $uid) {
+        $m = transaction(function () use ($id, $uid) {
             $m = load_match((int)$id, true);
             if (match_status($m) === 'played') {
                 throw new HttpError(409, 'match_closed', 'Ce match est déjà joué.');
             }
             query(
-                'UPDATE match_participants SET status = "withdrawn" WHERE match_id = ? AND user_id = ? AND status <> "withdrawn"',
+                'UPDATE match_participants SET status = "withdrawn", hold_until = NULL WHERE match_id = ? AND user_id = ? AND status <> "withdrawn"',
                 [$m['id'], $uid]
             );
             refresh_match((int)$m['id']);
+            return $m;
         });
-        respond(200, match_view(load_match((int)$id), $uid, true));
+        $refunded = (int)$m['price_cents'] > 0 ? settle_withdrawal($m, $uid) : null;
+        respond(200, match_view(load_match((int)$id), $uid, true) + ['refunded_cents' => $refunded]);
     });
 }
