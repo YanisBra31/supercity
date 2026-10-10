@@ -8,6 +8,7 @@ import { del, Post, post } from '../lib/api';
 import { timeAgo, whenLabel } from '../lib/format';
 import { Gradient } from './brand';
 import { Avatar, Card, colors, font, s, TeamCrest } from './ui';
+import { RoleBadge } from './Grade';
 
 function ask(title: string, actions: { text: string; destructive?: boolean; onPress: () => void }[]) {
   if (Platform.OS === 'web') {
@@ -41,10 +42,11 @@ export function PostCard({ p, index, onChange, onRemove, detail }: { p: Post; in
     }
   };
 
+  const remove = { text: p.is_mine ? 'Supprimer la publication' : 'Supprimer (modération)', destructive: true, onPress: async () => { await del(`/posts/${p.id}`); onRemove(p.id); } };
+  const report = { text: 'Signaler la publication', destructive: true, onPress: async () => { await post(`/posts/${p.id}/report`, {}); onRemove(p.id); } };
+  // Un modérateur peut supprimer la publication d'un autre directement, ou la signaler comme tout le monde.
   const more = () =>
-    p.is_mine
-      ? ask('Ta publication', [{ text: 'Supprimer la publication', destructive: true, onPress: async () => { await del(`/posts/${p.id}`); onRemove(p.id); } }])
-      : ask('Cette publication', [{ text: 'Signaler la publication', destructive: true, onPress: async () => { await post(`/posts/${p.id}/report`, {}); onRemove(p.id); } }]);
+    p.is_mine ? ask('Ta publication', [remove]) : ask('Cette publication', p.can_delete ? [remove, report] : [report]);
 
   return (
     <Card index={index} style={{ gap: 10, padding: 0, overflow: 'hidden' }}>
@@ -53,9 +55,12 @@ export function PostCard({ p, index, onChange, onRemove, detail }: { p: Post; in
           <Avatar name={p.author.display_name} uri={p.author.avatar_url} tone={p.author.accent} size={42} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={st.author} onPress={() => router.push(`/user/${p.author.id}`)}>
-            {p.author.display_name}
-          </Text>
+          <View style={[s.row, { gap: 6 }]}>
+            <Text style={st.author} onPress={() => router.push(`/user/${p.author.id}`)}>
+              {p.author.display_name}
+            </Text>
+            <RoleBadge role={p.author.site_role} />
+          </View>
           <Text style={st.meta}>
             {timeAgo(p.created_at)}
             {p.team ? ` · ${p.team.name}` : ''}

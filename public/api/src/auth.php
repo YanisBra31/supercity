@@ -30,7 +30,9 @@ function current_user(): ?array
 
 function require_user(): array
 {
-    return current_user() ?? throw new HttpError(401, 'unauthenticated', 'Connexion requise.');
+    $user = current_user() ?? throw new HttpError(401, 'unauthenticated', 'Connexion requise.');
+    refuse_if_suspended($user);
+    return $user;
 }
 
 function issue_token(int $userId): array
@@ -115,6 +117,7 @@ function public_user(array $u): array
         'favorite_club' => $u['favorite_club'] ?? null,
         'accent' => $u['accent'] ?? 'orange',
         'grade' => grade_for(user_stats((int)$u['id'])),
+        'site_role' => role_of($u),
     ];
 }
 
@@ -123,6 +126,8 @@ function private_user(array $u): array
     return public_user($u) + [
         'email' => $u['email'],
         'email_verified' => $u['email_verified_at'] !== null,
+        'suspended_until' => suspension_of($u),
+        'suspended_reason' => suspension_of($u) ? ($u['suspended_reason'] ?? null) : null,
         'birth_date' => $u['birth_date'],
         'created_at' => iso($u['created_at']),
     ];

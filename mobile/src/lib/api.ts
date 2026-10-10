@@ -23,7 +23,9 @@ export type PublicUser = {
   accent: Accent;
   // Absent si l'API en ligne est plus ancienne que l'appli.
   grade?: Grade;
+  site_role?: Role;
 };
+export type Role = 'user' | 'moderator' | 'admin';
 export type Grade = {
   key: 'rookie' | 'espoir' | 'titulaire' | 'cadre' | 'star' | 'legende';
   label: string;
@@ -39,7 +41,14 @@ export type PublicProfile = PublicUser & {
   teams: { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; role: 'captain' | 'player' }[];
   member_since: string;
 };
-export type Me = PublicUser & { email: string; email_verified: boolean; birth_date: string | null; created_at: string };
+export type Me = PublicUser & {
+  email: string;
+  email_verified: boolean;
+  birth_date: string | null;
+  created_at: string;
+  suspended_until?: string | null;
+  suspended_reason?: string | null;
+};
 
 export type Team = {
   id: number;
@@ -213,12 +222,16 @@ export type Post = {
   comments_count: number;
   liked: boolean;
   is_mine: boolean;
+  can_delete?: boolean;
   created_at: string;
 };
 
+export type ModReport = { post: Post; reports: number; reasons: string[]; hidden: boolean };
+export type ModUser = PublicUser & { email: string };
+
 export type Comment = { id: number; author: PublicUser; body: string; created_at: string; can_delete: boolean };
 
-// Publier : JSON pour du texte seul, multipart dès qu'il y a une photo.
+// Publier : JSON (photo en base64 si l'appli l'a convertie), multipart sinon.
 export async function createPost(data: { body: string; team_id: number | null }, image?: UploadImage | null): Promise<Post> {
   if (!image || image.base64) return post<Post>('/posts', { body: data.body || null, team_id: data.team_id, photo_base64: image?.base64 });
   const form = new FormData();

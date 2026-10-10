@@ -2,7 +2,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ComponentProps, useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { Grade } from '../lib/api';
+import { Grade, Role } from '../lib/api';
 import { brand, Gradient } from './brand';
 import { colors, font } from './ui';
 
@@ -79,3 +79,15 @@ const st = StyleSheet.create({
   track: { height: 8, borderRadius: 4, backgroundColor: colors.tint, overflow: 'hidden' },
   hint: { ...font.regular, fontSize: 11.5, color: colors.dim },
 });
+
+/** Badge « Admin » ou « Modo » ; rien pour un joueur. */
+export function RoleBadge({ role }: { role?: Role }) {
+  if (!role || role === 'user') return null;
+  const admin = role === 'admin';
+  return (
+    <View style={[st.badge, { backgroundColor: admin ? brand.night : '#2e7d32' }]}>
+      <Ionicons name={admin ? 'shield-checkmark' : 'shield-half'} size={11} color="#fff" />
+      <Text style={st.badgeText}>{admin ? 'Admin' : 'Modo'}</Text>
+    </View>
+  );
+}

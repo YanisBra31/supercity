@@ -8,7 +8,7 @@ import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, Match, post, Rival, Team } from '../../lib/api';
 import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
-import { GradeBadge } from '../../components/Grade';
+import { GradeBadge, RoleBadge } from '../../components/Grade';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -174,7 +174,10 @@ export default function MatchDetail() {
             <Avatar name={p.display_name} uri={p.avatar_url} size={38} tone={p.accent} />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={{ ...font.semibold, color: colors.ink }}>{p.display_name}</Text>
-              <GradeBadge grade={p.grade} />
+              <View style={[s.row, { gap: 6 }]}>
+                <GradeBadge grade={p.grade} />
+                <RoleBadge role={p.site_role} />
+              </View>
             </View>
             {p.position ? <Pill text={POSITIONS.find((x) => x.value === p.position)?.label ?? ''} tone="grey" /> : null}
           </Pressable>
