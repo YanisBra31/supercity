@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ComponentProps, ReactNode, useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BallLoader, BouncingBall, brand, FadeIn, Gradient } from './brand';
+import { AccentName, BallLoader, BouncingBall, brand, FadeIn, Gradient } from './brand';
 
 export const colors = {
   orange1: brand.orange1,
@@ -298,15 +299,73 @@ export function Pill({ text, tone = 'orange' }: { text: string; tone?: 'orange' 
   );
 }
 
-// Pastille ronde avec initiale (joueurs, équipes).
-export function Avatar({ name, size = 44, tone = 'orange' }: { name: string; size?: number; tone?: 'orange' | 'night' }) {
+// Pastille ronde : photo du joueur si elle existe, sinon initiale sur dégradé.
+export function Avatar({
+  name,
+  size = 44,
+  tone = 'orange',
+  uri,
+  ring,
+}: {
+  name: string;
+  size?: number;
+  tone?: 'orange' | 'night' | AccentName;
+  uri?: string | null;
+  ring?: boolean;
+}) {
+  const border = ring ? { borderWidth: 3, borderColor: colors.chalk } : null;
+  if (uri) {
+    return <Image source={{ uri }} style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.tint }, border]} />;
+  }
   return (
-    <Gradient tone={tone} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}>
+    <Gradient tone={tone} style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }, border]}>
       <Text style={[font.extrabold, { color: colors.chalk, fontSize: size * 0.42, lineHeight: size * 0.56 }]}>
         {(name || '?').slice(0, 1).toUpperCase()}
       </Text>
     </Gradient>
   );
+}
+
+// Blason d'équipe : logo envoyé, sinon initiales aux couleurs de l'équipe.
+export function TeamCrest({
+  name,
+  logo,
+  primary = colors.orange2,
+  secondary = colors.night,
+  size = 50,
+}: {
+  name: string;
+  logo?: string | null;
+  primary?: string;
+  secondary?: string;
+  size?: number;
+}) {
+  const r = size * 0.3;
+  if (logo) {
+    return (
+      <View style={{ width: size, height: size, borderRadius: r, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+        <Image source={{ uri: logo }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+      </View>
+    );
+  }
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join('');
+  return (
+    <Gradient colors={[primary, primary, secondary]} style={{ width: size, height: size, borderRadius: r, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={[font.black, { color: readableOn(primary), fontSize: size * 0.34, lineHeight: size * 0.46 }]}>{initials || '?'}</Text>
+    </Gradient>
+  );
+}
+
+// Texte lisible (craie ou nuit) sur une couleur de fond donnée.
+export function readableOn(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b > 170 ? colors.night : colors.chalk;
 }
 
 // Ligne icône + texte.

@@ -31,13 +31,19 @@ Les listes acceptent `?limit=` (20 par défaut, 50 au plus) et `?offset=`, et re
 | POST | `/auth/logout` | | Invalide le jeton utilisé |
 | GET | `/me` | | Mon profil (avec e-mail) |
 | PATCH | `/me` | Champs du profil à changer | Profil mis à jour |
-| GET | `/users/{id}` | | Profil public d'un joueur |
+| POST | `/me/avatar` | Formulaire multipart, champ `photo` (JPEG, PNG ou WebP, 6 Mo max.) | Photo recadrée en carré 512 px, renvoie le profil |
+| DELETE | `/me/avatar` | | Retire la photo |
+| GET | `/users/{id}` | | Profil public d'un joueur, avec `stats` (`played`, `organized`), `teams` et `member_since` |
 
 Mot de passe : 10 caractères minimum, au moins une lettre et un chiffre, pas un mot de passe courant, sans le pseudo ni le début de l'e-mail. Les codes e-mail ont 6 chiffres, valent 30 minutes et 5 essais ; 3 e-mails au plus par compte et par heure. `/me` renvoie aussi `email_verified` et `birth_date`.
+
+Champs de profil en plus : `bio` (160 car.), `shirt_number` (0 à 99), `favorite_club`, `accent` (`orange`, `nuit`, `rouge`, `bleu`, `vert`, `violet`, couleur de la carte du joueur).
 
 Valeurs : `position` = `gardien`, `defenseur`, `milieu`, `attaquant` ; `level` = 1 à 5 ; `strong_foot` = `droit`, `gauche`, `les_deux`.
 
 ## Équipes
+
+Personnalisation (création et `PATCH`, capitaine seulement) : `description` (300 car.), `color_primary` et `color_secondary` (`#rrggbb`), `founded_year`, `recruiting` (booléen). Logo : `POST /teams/{id}/logo` (multipart, champ `photo`, rendu en PNG carré 512 px) et `DELETE /teams/{id}/logo`.
 
 | Méthode | Adresse | Corps | Effet |
 | --- | --- | --- | --- |

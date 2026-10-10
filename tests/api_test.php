@@ -51,6 +51,21 @@ function api(string $method, string $path, ?array $body = null, ?string $token =
     return [$status, json_decode((string)$raw, true)];
 }
 
+/** Envoie un fichier en multipart (champ `photo`). */
+function upload(string $path, string $file, string $type, ?string $token, string $method = 'POST'): array
+{
+    global $base;
+    $ch = curl_init($base . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ["Authorization: Bearer $token"],
+        CURLOPT_POSTFIELDS => ['photo' => new CURLFile($file, $type, basename($file))],
+    ]);
+    $raw = curl_exec($ch);
+    return [curl_getinfo($ch, CURLINFO_HTTP_CODE), json_decode((string)$raw, true)];
+}
+
 function check(string $label, bool $ok, mixed $debug = null): void
 {
     global $passed, $failed;
@@ -191,6 +206,35 @@ check('refuse une latitude impossible', $s === 422 && isset($r['fields']['lat'])
 $names = array_column($r['items'] ?? [], 'name');
 check('terrains autour de Toulouse, du plus proche au plus loin', $s === 200 && $names === ['City stade Bagatelle', 'Five Toulouse Nord'], $r);
 
+echo "Personnalisation\n";
+$tmp = sys_get_temp_dir();
+$img = imagecreatetruecolor(900, 600);
+imagefill($img, 0, 0, imagecolorallocate($img, 255, 82, 35));
+imagejpeg($img, "$tmp/sc-photo.jpg");
+imagepng($img, "$tmp/sc-logo.png");
+file_put_contents("$tmp/sc-faux.jpg", "<?php echo 'pirate';");
+[$s, $r] = api('PATCH', '/me', ['bio' => 'Milieu box-to-box, toujours chaud le dimanche.', 'shirt_number' => 8, 'favorite_club' => 'Toulouse FC', 'accent' => 'bleu'], $yassin);
+check('profil : bio, numéro, club, couleur', $s === 200 && $r['shirt_number'] === 8 && $r['accent'] === 'bleu' && $r['favorite_club'] === 'Toulouse FC', $r);
+[$s, $r] = api('PATCH', '/me', ['shirt_number' => 120, 'accent' => 'rose'], $yassin);
+check('refuse un numéro ou une couleur hors liste', $s === 422 && isset($r['fields']['shirt_number'], $r['fields']['accent']), $r);
+[$s, $r] = upload('/me/avatar', "$tmp/sc-photo.jpg", 'image/jpeg', $yassin);
+$avatar = $r['avatar_url'] ?? '';
+$size = $avatar ? getimagesize($avatar) : false;
+check('photo de profil recadrée en carré 512 px', $s === 200 && $size && $size[0] === 512 && $size[1] === 512, $r);
+[$s, $r] = upload('/me/avatar', "$tmp/sc-faux.jpg", 'image/jpeg', $yassin);
+check('refuse un faux fichier image', $s === 422 && isset($r['fields']['photo']), $r);
+[$s, $r] = upload('/me/avatar', "$tmp/sc-photo.jpg", 'image/jpeg', $yassin);
+check('nouvelle photo : l\'ancienne est supprimée', $s === 200 && @file_get_contents($avatar) === false, $r);
+
+[$s, $r] = api('PATCH', "/teams/$teamId", ['description' => 'Le city du dimanche matin.', 'color_primary' => '#1E88E5', 'color_secondary' => '#ffffff', 'founded_year' => 2019, 'recruiting' => true], $yassin);
+check('équipe : description, couleurs, année, recrutement', $s === 200 && $r['color_primary'] === '#1e88e5' && $r['recruiting'] === true && $r['founded_year'] === 2019, $r);
+[$s, $r] = api('PATCH', "/teams/$teamId", ['color_primary' => 'bleu'], $yassin);
+check('refuse une couleur mal écrite', $s === 422 && isset($r['fields']['color_primary']), $r);
+[$s, $r] = upload("/teams/$teamId/logo", "$tmp/sc-logo.png", 'image/png', $karim);
+check('seul le capitaine change le logo', $s === 403, $r);
+[$s, $r] = upload("/teams/$teamId/logo", "$tmp/sc-logo.png", 'image/png', $yassin);
+check('logo envoyé en PNG carré', $s === 200 && str_ends_with($r['logo_url'] ?? '', '.png') && getimagesize($r['logo_url'])[0] === 512, $r);
+
 echo "Matchs\n";
 $soon = (new DateTimeImmutable('+2 days', new DateTimeZone('Europe/Paris')))->setTime(18, 30)->format(DATE_ATOM);
 $later = (new DateTimeImmutable('+5 days', new DateTimeZone('Europe/Paris')))->setTime(20, 0)->format(DATE_ATOM);
@@ -255,6 +299,9 @@ check('annule le match', $s === 200 && $r['status'] === 'cancelled', $r);
 check('impossible de rejoindre un match annulé', $s === 409, $r);
 [$s, $r] = api('GET', '/matches', null, $lea);
 check('un match annulé sort de la recherche', !in_array($matchId, array_column($r['items'], 'id')), $r);
+
+[$s, $r] = api('GET', "/users/$yassinId", null, $lea);
+check('profil public : stats et équipes, sans e-mail', $s === 200 && isset($r['stats']['played'], $r['stats']['organized']) && count($r['teams']) >= 1 && !isset($r['email']) && $r['bio'] !== null, $r);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

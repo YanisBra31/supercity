@@ -1,8 +1,8 @@
 // Détail d'un match : infos, joueurs, inscription.
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Share, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, font } from '../../components/ui';
@@ -78,12 +78,12 @@ export default function MatchDetail() {
       {m.home_team || m.away_team ? (
         <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-            <Avatar name={m.home_team?.name ?? '?'} size={46} />
+            <Avatar name={m.home_team?.name ?? '?'} uri={m.home_team?.logo_url} size={46} />
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.home_team?.name ?? 'Joueurs libres'}</Text>
           </View>
           <Text style={{ ...font.black, fontSize: 22, color: colors.orange1 }}>VS</Text>
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-            <Avatar name={m.away_team?.name ?? '?'} size={46} tone="night" />
+            <Avatar name={m.away_team?.name ?? '?'} uri={m.away_team?.logo_url} size={46} tone="night" />
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.away_team?.name ?? 'Adversaire à trouver'}</Text>
           </View>
         </Gradient>
@@ -139,11 +139,11 @@ export default function MatchDetail() {
           Joueurs {m.players_count}/{m.max_players}
         </Label>
         {registered.map((p) => (
-          <View key={p.id} style={[s.row, { paddingVertical: 4 }]}>
-            <Avatar name={p.display_name} size={36} />
+          <Pressable key={p.id} onPress={() => router.push(`/user/${p.id}`)} style={[s.row, { paddingVertical: 4 }]}>
+            <Avatar name={p.display_name} uri={p.avatar_url} size={38} tone={p.accent} />
             <Text style={{ flex: 1, ...font.semibold, color: colors.ink }}>{p.display_name}</Text>
             {p.position ? <Pill text={POSITIONS.find((x) => x.value === p.position)?.label ?? ''} tone="grey" /> : null}
-          </View>
+          </Pressable>
         ))}
         {waiting.length ? <Label>Liste d'attente</Label> : null}
         {waiting.map((p, i) => (

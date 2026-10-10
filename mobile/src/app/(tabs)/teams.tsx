@@ -3,7 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Hero } from '../../components/brand';
-import { Button, Avatar, Card, Chips, colors, Empty, ErrorText, Field, Label, Pill, s, Screen, font } from '../../components/ui';
+import { Button, TeamCrest, Card, Chips, colors, Empty, ErrorText, Field, Label, Pill, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, post, Team } from '../../lib/api';
 import { FORMATS, formatLabel } from '../../lib/format';
 
@@ -86,7 +86,7 @@ export default function Teams() {
       ) : null}
       {teams?.map((t, i) => (
         <Card key={t.id} index={i} onPress={() => router.push(`/team/${t.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Avatar name={t.name} size={50} tone={i % 2 ? 'night' : 'orange'} />
+          <TeamCrest name={t.name} logo={t.logo_url} primary={t.color_primary} secondary={t.color_secondary} size={52} />
           <View style={{ flex: 1, gap: 2 }}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
             <Text style={{ fontSize: 17, ...font.extrabold, color: colors.ink, flex: 1 }}>{t.name}</Text>
