@@ -2,7 +2,7 @@
 // orange avec le nombre de matchs, gris s'il n'y a pas de match prévu.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Circle, Marker, Region } from 'react-native-maps';
 import { Match, Venue } from '../lib/api';
@@ -36,6 +36,11 @@ export function MatchMap({ matches, venues, coords, radiusKm }: MapProps) {
     }
     return [...byVenue.values()];
   }, [matches, venues]);
+
+  // Recentre quand le lieu de recherche ou le rayon change.
+  useEffect(() => {
+    if (coords) map.current?.animateToRegion(regionFor(coords, radiusKm), 400);
+  }, [coords?.lat, coords?.lng, radiusKm]);
 
   const current = spots.find((s) => s.venue.id === selected) ?? null;
   const center = coords ?? PARIS;

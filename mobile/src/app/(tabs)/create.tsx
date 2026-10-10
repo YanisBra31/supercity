@@ -1,12 +1,14 @@
 // Organiser un match : format, date, terrain, puis options.
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
+import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { Hero } from '../../components/brand';
-import { Button, Card, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
+import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, post, Team, Venue } from '../../lib/api';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
-import { getPosition } from '../../lib/location';
+import { Place } from '../../lib/address';
+import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 import { takeLastVenue } from '../../lib/venueStore';
 
 const TIMES = Array.from({ length: 32 }, (_, i) => 8 * 60 + i * 30); // 8h00 → 23h30
@@ -16,14 +18,6 @@ function HScroll({ children }: { children: React.ReactNode }) {
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
       {children}
     </ScrollView>
-  );
-}
-
-function Slot({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[s.chip, on && s.chipOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-      <Text style={[s.chipText, on && { color: colors.white }]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -40,6 +34,8 @@ export default function CreateMatch() {
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [q, setQ] = useState('');
+  const [center, setCenter] = useState<{ coords: Coords | null; place: Place | null }>({ coords: null, place: null });
+  const [placeSheet, setPlaceSheet] = useState(false);
   const [level, setLevel] = useState<number | null>(null);
   const [maxPlayers, setMaxPlayers] = useState<number | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -52,7 +48,9 @@ export default function CreateMatch() {
   const players = maxPlayers ?? FORMATS.find((f) => f.value === format)!.players;
 
   const loadVenues = useCallback(async (search: string) => {
-    const pos = await getPosition();
+    const c = await getSearchCenter();
+    setCenter(c);
+    const pos = c.coords;
     const res = await get<{ items: Venue[] }>('/venues', {
       lat: pos?.lat,
       lng: pos?.lng,
@@ -116,7 +114,7 @@ export default function CreateMatch() {
       <Label>Jour</Label>
       <HScroll>
         {days.map((d, i) => (
-          <Slot key={i} label={dayLabel(d)} on={i === day} onPress={() => setDay(i)} />
+          <Chip key={i} label={dayLabel(d)} on={i === day} onPress={() => setDay(i)} />
         ))}
       </HScroll>
 
@@ -125,7 +123,7 @@ export default function CreateMatch() {
         {TIMES.filter((m) => !isPast(day, m)).map((m) => {
           const d = new Date(days[day]);
           d.setMinutes(m);
-          return <Slot key={m} label={timeLabel(d)} on={m === minutes} onPress={() => setMinutes(m)} />;
+          return <Chip key={m} label={timeLabel(d)} on={m === minutes} onPress={() => setMinutes(m)} />;
         })}
       </HScroll>
 
@@ -138,6 +136,7 @@ export default function CreateMatch() {
         </Card>
       ) : (
         <View style={{ gap: 8 }}>
+          <PlaceButton place={center.place} hasCoords={!!center.coords} onPress={() => setPlaceSheet(true)} />
           <Field label="Chercher un terrain" value={q} onChangeText={(t) => { setQ(t); loadVenues(t); }} placeholder="Nom ou adresse" />
           {venues.map((v) => (
             <Card key={v.id} onPress={() => setVenue(v)}>
@@ -152,6 +151,16 @@ export default function CreateMatch() {
           <Button title="Ajouter un terrain" variant="ghost" icon="add" onPress={() => router.push('/venue/new')} />
         </View>
       )}
+
+      <PlaceSheet
+        visible={placeSheet}
+        near={center.coords}
+        onPick={async (p) => {
+          await setSearchPlace(p);
+          loadVenues(q);
+        }}
+        onClose={() => setPlaceSheet(false)}
+      />
 
       <Label>Niveau visé</Label>
       <Chips options={LEVELS.map((l, i) => ({ value: i + 1, label: l }))} value={level} onChange={setLevel} allowEmpty />
