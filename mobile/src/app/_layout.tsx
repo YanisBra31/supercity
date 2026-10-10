@@ -29,6 +29,12 @@ function RootStack() {
         <Stack.Screen name="match/[id]" options={{ title: 'Match' }} />
         <Stack.Screen name="team/[id]" options={{ title: 'Équipe' }} />
         <Stack.Screen name="venue/new" options={{ title: 'Nouveau terrain', presentation: 'modal' }} />
+        <Stack.Screen name="user/[id]" options={{ title: 'Joueur' }} />
+        <Stack.Screen name="team/edit/[id]" options={{ title: "Personnaliser l'équipe", presentation: 'modal' }} />
+        <Stack.Screen name="challenge/new" options={{ title: 'Lancer un défi', presentation: 'modal' }} />
+        <Stack.Screen name="team/find" options={{ title: 'Défier une équipe' }} />
+        <Stack.Screen name="post/new" options={{ title: 'Publier', presentation: 'modal' }} />
+        <Stack.Screen name="post/[id]" options={{ title: 'Publication' }} />
         <Stack.Screen name="verify" options={{ title: 'Confirmation' }} />
         <Stack.Screen name="password" options={{ title: 'Mot de passe', presentation: 'modal' }} />
       </Stack.Protected>

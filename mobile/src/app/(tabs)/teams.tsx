@@ -1,10 +1,11 @@
 // Mes équipes : créer, rejoindre avec un code, ouvrir.
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Platform, Text, View } from 'react-native';
 import { Hero } from '../../components/brand';
-import { Button, Avatar, Card, Chips, colors, Empty, ErrorText, Field, Label, Pill, s, Screen, font } from '../../components/ui';
-import { ApiError, Format, get, post, Team } from '../../lib/api';
+import { Button, Card, Chips, Empty, ErrorText, Field, Kicker, Label, Pill, Screen, TeamCrest, colors, font, s } from '../../components/ui';
+import { ApiError, Challenge, Format, get, post, Team } from '../../lib/api';
+import { ChallengeCard } from '../../components/ChallengeCard';
 import { FORMATS, formatLabel } from '../../lib/format';
 
 export default function Teams() {
@@ -17,7 +18,11 @@ export default function Teams() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const [challenges, setChallenges] = useState<{ received: Challenge[]; sent: Challenge[] }>({ received: [], sent: [] });
+  const [busy, setBusy] = useState<number | null>(null);
+
   const load = useCallback(async () => {
+    get<{ received: Challenge[]; sent: Challenge[] }>('/me/challenges').then(setChallenges).catch(() => undefined);
     try {
       setTeams((await get<{ items: Team[] }>('/me/teams')).items);
     } catch (e) {
@@ -30,6 +35,25 @@ export default function Teams() {
       load();
     }, [load])
   );
+
+  const respond = async (c: Challenge, action: 'accept' | 'decline' | 'cancel') => {
+    setError('');
+    if (action !== 'accept' && !(await confirmAsk(action === 'decline' ? 'Refuser le défi ?' : 'Retirer le défi ?'))) return;
+    setBusy(c.id);
+    try {
+      const res = await post<Challenge>(`/challenges/${c.id}/${action}`);
+      await load();
+      if (action === 'accept' && res.match_id) router.push(`/match/${res.match_id}`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Action impossible.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const all = [...challenges.received, ...challenges.sent];
+  const live = all.filter((c) => c.status === 'pending');
+  const past = all.filter((c) => c.status !== 'pending').slice(0, 4);
 
   const run = async (fn: () => Promise<Team>) => {
     setError('');
@@ -81,12 +105,21 @@ export default function Teams() {
 
       {mode === 'none' ? <ErrorText>{error}</ErrorText> : null}
 
+      {teams?.some((t) => t.my_role === 'captain') ? (
+        <Button title="Défier une équipe" icon="flash" variant="dark" onPress={() => router.push('/team/find')} />
+      ) : null}
+      {live.length ? <Kicker>{`Défis en cours (${live.length})`}</Kicker> : null}
+      {live.map((c, i) => (
+        <ChallengeCard key={c.id} c={c} index={i} busy={busy === c.id} onAccept={() => respond(c, 'accept')} onDecline={() => respond(c, 'decline')} onCancel={() => respond(c, 'cancel')} />
+      ))}
+      {teams?.length ? <Kicker>Mes équipes</Kicker> : null}
+
       {teams?.length === 0 ? (
         <Empty icon="people-outline" title="Pas encore d'équipe" text="Crée la tienne ou rejoins celle de tes potes avec leur code." />
       ) : null}
       {teams?.map((t, i) => (
         <Card key={t.id} index={i} onPress={() => router.push(`/team/${t.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-          <Avatar name={t.name} size={50} tone={i % 2 ? 'night' : 'orange'} />
+          <TeamCrest name={t.name} logo={t.logo_url} primary={t.color_primary} secondary={t.color_secondary} size={52} />
           <View style={{ flex: 1, gap: 2 }}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
             <Text style={{ fontSize: 17, ...font.extrabold, color: colors.ink, flex: 1 }}>{t.name}</Text>
@@ -100,6 +133,20 @@ export default function Teams() {
           </View>
         </Card>
       ))}
+      {past.length ? <Kicker>Derniers défis</Kicker> : null}
+      {past.map((c, i) => (
+        <ChallengeCard key={c.id} c={c} index={i} />
+      ))}
     </Screen>
+  );
+}
+
+function confirmAsk(title: string): Promise<boolean> {
+  if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(title) ?? true);
+  return new Promise((resolve) =>
+    Alert.alert(title, undefined, [
+      { text: 'Non', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Oui', style: 'destructive', onPress: () => resolve(true) },
+    ])
   );
 }

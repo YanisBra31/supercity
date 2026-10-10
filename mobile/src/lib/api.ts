@@ -17,6 +17,16 @@ export type PublicUser = {
   level: number | null;
   strong_foot: Foot | null;
   avatar_url: string | null;
+  bio: string | null;
+  shirt_number: number | null;
+  favorite_club: string | null;
+  accent: Accent;
+};
+export type Accent = 'orange' | 'nuit' | 'rouge' | 'bleu' | 'vert' | 'violet';
+export type PublicProfile = PublicUser & {
+  stats: { played: number; organized: number };
+  teams: { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; role: 'captain' | 'player' }[];
+  member_since: string;
 };
 export type Me = PublicUser & { email: string; email_verified: boolean; birth_date: string | null; created_at: string };
 
@@ -25,6 +35,11 @@ export type Team = {
   name: string;
   city: string | null;
   logo_url: string | null;
+  description: string | null;
+  color_primary: string;
+  color_secondary: string;
+  founded_year: number | null;
+  recruiting: boolean;
   usual_format: Format | null;
   captain_id: number;
   members_count: number;
@@ -60,12 +75,14 @@ export type Match = {
   description: string | null;
   venue: Venue;
   organizer: PublicUser;
-  home_team: { id: number; name: string; logo_url: string | null } | null;
-  away_team: { id: number; name: string; logo_url: string | null } | null;
+  home_team: MatchTeam | null;
+  away_team: MatchTeam | null;
   my_status: 'registered' | 'waitlist' | 'withdrawn' | null;
   is_organizer: boolean;
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
 };
+
+export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string };
 
 export class ApiError extends Error {
   constructor(
@@ -98,15 +115,16 @@ export async function api<T>(method: string, path: string, opts: { body?: unknow
         .join('&')
     : '';
   let res: Response;
+  const form = opts.body instanceof FormData;
   try {
     res = await fetch(`${API_URL}${path}${qs ? `?${qs}` : ''}`, {
       method,
       headers: {
         Accept: 'application/json',
-        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(opts.body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.body === undefined ? undefined : form ? (opts.body as FormData) : JSON.stringify(opts.body),
     });
   } catch {
     throw new ApiError(0, 'network', 'Pas de connexion. Vérifie ton réseau et réessaie.');
@@ -129,3 +147,70 @@ export const get = <T>(path: string, query?: Query) => api<T>('GET', path, { que
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, { body: body ?? {} });
 export const patch = <T>(path: string, body: unknown) => api<T>('PATCH', path, { body });
 export const del = <T>(path: string) => api<T>('DELETE', path);
+
+// Envoie une image choisie dans la galerie (champ `photo`).
+export async function uploadImage<T>(path: string, image: { uri: string; mimeType?: string | null; fileName?: string | null }): Promise<T> {
+  const body = new FormData();
+  const type = image.mimeType ?? 'image/jpeg';
+  const name = image.fileName ?? `photo.${type.split('/')[1] ?? 'jpg'}`;
+  if (typeof document !== 'undefined') {
+    // Web : l'image est une adresse blob/data, on la transforme en fichier.
+    body.append('photo', await (await fetch(image.uri)).blob(), name);
+  } else {
+    body.append('photo', { uri: image.uri, name, type } as unknown as Blob);
+  }
+  return api<T>('POST', path, { body });
+}
+
+export type TeamBrief = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; city: string | null };
+
+export type Challenge = {
+  id: number;
+  from_team: TeamBrief;
+  to_team: TeamBrief;
+  created_by: PublicUser | null;
+  match_id: number | null;
+  starts_at: string | null;
+  duration_min: number;
+  format: Format | null;
+  venue: Venue | null;
+  message: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired';
+  response_message: string | null;
+  created_at: string;
+  responded_at: string | null;
+  can_respond: boolean;
+  can_cancel: boolean;
+};
+
+export type Rival = { team: TeamBrief; match_id: number; starts_at: string };
+
+export type Post = {
+  id: number;
+  kind: 'post' | 'challenge';
+  author: PublicUser;
+  body: string | null;
+  image_url: string | null;
+  team: TeamBrief | null;
+  match: Match | null;
+  likes_count: number;
+  comments_count: number;
+  liked: boolean;
+  is_mine: boolean;
+  created_at: string;
+};
+
+export type Comment = { id: number; author: PublicUser; body: string; created_at: string; can_delete: boolean };
+
+// Publier : JSON pour du texte seul, multipart dès qu'il y a une photo.
+export async function createPost(data: { body: string; team_id: number | null }, image?: { uri: string; mimeType?: string | null; fileName?: string | null } | null): Promise<Post> {
+  if (!image) return post<Post>('/posts', { body: data.body || null, team_id: data.team_id });
+  const form = new FormData();
+  if (data.body) form.append('body', data.body);
+  if (data.team_id) form.append('team_id', String(data.team_id));
+  const type = image.mimeType ?? 'image/jpeg';
+  const name = image.fileName ?? 'photo.jpg';
+  if (typeof document !== 'undefined') form.append('photo', await (await fetch(image.uri)).blob(), name);
+  else form.append('photo', { uri: image.uri, name, type } as unknown as Blob);
+  return api<Post>('POST', '/posts', { body: form });
+}

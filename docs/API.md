@@ -31,13 +31,19 @@ Les listes acceptent `?limit=` (20 par défaut, 50 au plus) et `?offset=`, et re
 | POST | `/auth/logout` | | Invalide le jeton utilisé |
 | GET | `/me` | | Mon profil (avec e-mail) |
 | PATCH | `/me` | Champs du profil à changer | Profil mis à jour |
-| GET | `/users/{id}` | | Profil public d'un joueur |
+| POST | `/me/avatar` | Formulaire multipart, champ `photo` (JPEG, PNG ou WebP, 6 Mo max.) | Photo recadrée en carré 512 px, renvoie le profil |
+| DELETE | `/me/avatar` | | Retire la photo |
+| GET | `/users/{id}` | | Profil public d'un joueur, avec `stats` (`played`, `organized`), `teams` et `member_since` |
 
 Mot de passe : 10 caractères minimum, au moins une lettre et un chiffre, pas un mot de passe courant, sans le pseudo ni le début de l'e-mail. Les codes e-mail ont 6 chiffres, valent 30 minutes et 5 essais ; 3 e-mails au plus par compte et par heure. `/me` renvoie aussi `email_verified` et `birth_date`.
+
+Champs de profil en plus : `bio` (160 car.), `shirt_number` (0 à 99), `favorite_club`, `accent` (`orange`, `nuit`, `rouge`, `bleu`, `vert`, `violet`, couleur de la carte du joueur).
 
 Valeurs : `position` = `gardien`, `defenseur`, `milieu`, `attaquant` ; `level` = 1 à 5 ; `strong_foot` = `droit`, `gauche`, `les_deux`.
 
 ## Équipes
+
+Personnalisation (création et `PATCH`, capitaine seulement) : `description` (300 car.), `color_primary` et `color_secondary` (`#rrggbb`), `founded_year`, `recruiting` (booléen). Logo : `POST /teams/{id}/logo` (multipart, champ `photo`, rendu en PNG carré 512 px) et `DELETE /teams/{id}/logo`.
 
 | Méthode | Adresse | Corps | Effet |
 | --- | --- | --- | --- |
@@ -84,3 +90,34 @@ Règles :
 - Un match `private` n'apparaît pas dans la recherche mais s'ouvre avec son lien (`/matches/{id}`).
 - Statuts : `open`, `full`, `cancelled`, et `played` une fois l'heure de fin passée.
 - Si l'organisateur réduit les places, les derniers inscrits repassent en liste d'attente ; s'il en ajoute, la liste d'attente monte.
+
+## Défis entre équipes
+
+Un capitaine invite une autre équipe à l'affronter, soit sur un match de son équipe qui n'a pas encore d'adversaire (`match_id`), soit sur un nouveau créneau (`venue_id`, `format`, `starts_at`). Le capitaine de l'équipe défiée accepte ou refuse.
+
+| Méthode | Adresse | Corps | Effet |
+| --- | --- | --- | --- |
+| POST | `/challenges` | `from_team_id`, `to_team_id`, `message` facultatif, et `match_id` **ou** `venue_id` + `format` + `starts_at` (+ `duration_min`) | Envoie le défi (capitaine de `from_team_id`) |
+| GET | `/me/challenges` | | `{received: [...], sent: [...]}` pour toutes mes équipes ; chaque défi indique `can_respond` et `can_cancel` |
+| GET | `/challenges/{id}` | | Détail (membres des deux équipes) |
+| POST | `/challenges/{id}/accept` | `message` facultatif | Le match visé reçoit son adversaire, ou un match est créé ; les deux capitaines y sont inscrits avec leur équipe |
+| POST | `/challenges/{id}/decline` | `message` facultatif | Refuse |
+| POST | `/challenges/{id}/cancel` | | Le capitaine qui a défié retire son défi |
+| GET | `/matches/{id}/rivals` | | Équipes qui jouent sur le même terrain à 3 h près : adversaires à défier |
+
+Statuts : `pending`, `accepted`, `declined`, `cancelled`, et `expired` (en attente mais créneau passé).
+
+## Fil d'actualité
+
+| Méthode | Adresse | Corps | Effet |
+| --- | --- | --- | --- |
+| GET | `/feed` | `?scope=all` (défaut) ou `teams` (moi, mes coéquipiers, mes équipes citées), `?author_id=`, `?before_id=` pour la page suivante, `?limit=` (30 max.) | Publications, les plus récentes d'abord |
+| POST | `/posts` | JSON `body`, `team_id` facultatif ; ou multipart avec en plus `photo` | Publie (texte et/ou photo, 1080 px max.) ; 20 publications par heure au plus |
+| GET | `/posts/{id}` | | Une publication |
+| DELETE | `/posts/{id}` | | Supprime sa publication |
+| POST / DELETE | `/posts/{id}/like` | | J'aime / je n'aime plus |
+| GET / POST | `/posts/{id}/comments` | `body` (500 car.) pour POST | Commentaires |
+| DELETE | `/comments/{id}` | | Supprime un commentaire (son auteur ou l'auteur de la publication) |
+| POST | `/posts/{id}/report` | `reason` facultatif | Signale : la publication disparaît pour celui qui signale, et pour tous à 3 signalements |
+
+Chaque publication renvoie `author`, `team`, `match` (pour les défis relevés, publiés automatiquement), `likes_count`, `comments_count`, `liked` et `is_mine`.

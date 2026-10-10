@@ -5,6 +5,7 @@ declare(strict_types=1);
 const TOKEN_DAYS = 60;
 const POSITIONS = ['gardien', 'defenseur', 'milieu', 'attaquant'];
 const FEET = ['droit', 'gauche', 'les_deux'];
+const ACCENTS = ['orange', 'nuit', 'rouge', 'bleu', 'vert', 'violet'];
 
 function current_user(): ?array
 {
@@ -59,6 +60,10 @@ function public_user(array $u): array
         'level' => $u['level'] === null ? null : (int)$u['level'],
         'strong_foot' => $u['strong_foot'],
         'avatar_url' => $u['avatar_url'],
+        'bio' => $u['bio'] ?? null,
+        'shirt_number' => isset($u['shirt_number']) ? (int)$u['shirt_number'] : null,
+        'favorite_club' => $u['favorite_club'] ?? null,
+        'accent' => $u['accent'] ?? 'orange',
     ];
 }
 
@@ -86,7 +91,11 @@ function profile_validator(array $data, bool $partial): Validator
         ->enum('position', POSITIONS, false)
         ->int('level', 1, 5, false)
         ->enum('strong_foot', FEET, false)
-        ->url('avatar_url');
+        ->url('avatar_url')
+        ->string('bio', 1, 160, false)
+        ->int('shirt_number', 0, 99, false)
+        ->string('favorite_club', 1, 60, false)
+        ->enum('accent', ACCENTS, false);
 }
 
 function register_auth_routes(Router $r): void
@@ -258,9 +267,45 @@ function register_auth_routes(Router $r): void
         respond(200, private_user(one('SELECT * FROM users WHERE id = ?', [$user['id']])));
     });
 
+    $r->post('/me/avatar', function () {
+        $user = require_user();
+        $url = save_uploaded_image('avatar', 'cover');
+        delete_upload($user['avatar_url']);
+        query('UPDATE users SET avatar_url = ? WHERE id = ?', [$url, $user['id']]);
+        respond(200, private_user(one('SELECT * FROM users WHERE id = ?', [$user['id']])));
+    });
+
+    $r->delete('/me/avatar', function () {
+        $user = require_user();
+        delete_upload($user['avatar_url']);
+        query('UPDATE users SET avatar_url = NULL WHERE id = ?', [$user['id']]);
+        respond(200, private_user(one('SELECT * FROM users WHERE id = ?', [$user['id']])));
+    });
+
+    // Profil public : infos, statistiques et équipes.
     $r->get('/users/(\d+)', function (string $id) {
         require_user();
         $u = one('SELECT * FROM users WHERE id = ?', [(int)$id]) ?? not_found('Joueur');
-        respond(200, public_user($u));
+        $stats = one(
+            'SELECT
+               (SELECT COUNT(*) FROM match_participants p JOIN matches m ON m.id = p.match_id
+                 WHERE p.user_id = ? AND p.status = "registered" AND m.status <> "cancelled"
+                   AND m.starts_at + INTERVAL m.duration_min MINUTE < UTC_TIMESTAMP()) AS played,
+               (SELECT COUNT(*) FROM matches WHERE organizer_id = ? AND status <> "cancelled") AS organized',
+            [$u['id'], $u['id']]
+        );
+        $teams = query(
+            'SELECT t.id, t.name, t.logo_url, t.color_primary, t.color_secondary, m.role FROM team_members m
+             JOIN teams t ON t.id = m.team_id WHERE m.user_id = ? ORDER BY m.joined_at',
+            [$u['id']]
+        )->fetchAll();
+        respond(200, public_user($u) + [
+            'stats' => ['played' => (int)$stats['played'], 'organized' => (int)$stats['organized']],
+            'teams' => array_map(fn($t) => [
+                'id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'],
+                'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary'], 'role' => $t['role'],
+            ], $teams),
+            'member_since' => iso($u['created_at']),
+        ]);
     });
 }

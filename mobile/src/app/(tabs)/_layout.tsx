@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { get } from '../../lib/api';
 import { ColorValue, View } from 'react-native';
 import { brand } from '../../components/brand';
 import { colors, font } from '../../components/ui';
@@ -17,6 +19,14 @@ const icon =
 
 // Barre d'onglets nuit, comme le pied de page du site.
 export default function TabsLayout() {
+  // Pastille sur l'onglet Équipes : défis reçus qui attendent une réponse.
+  const [pending, setPending] = useState(0);
+  const path = usePathname();
+  useEffect(() => {
+    get<{ received: { can_respond: boolean }[] }>('/me/challenges')
+      .then((r) => setPending(r.received.filter((c) => c.can_respond).length))
+      .catch(() => undefined);
+  }, [path]);
   return (
     <Tabs
       screenOptions={{
@@ -30,8 +40,17 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Matchs', tabBarIcon: icon('football-outline', 'football') }} />
+      <Tabs.Screen name="feed" options={{ title: 'Fil', tabBarIcon: icon('newspaper-outline', 'newspaper') }} />
       <Tabs.Screen name="create" options={{ title: 'Organiser', tabBarIcon: icon('add-circle-outline', 'add-circle') }} />
-      <Tabs.Screen name="teams" options={{ title: 'Équipes', tabBarIcon: icon('people-outline', 'people') }} />
+      <Tabs.Screen
+        name="teams"
+        options={{
+          title: 'Équipes',
+          tabBarIcon: icon('people-outline', 'people'),
+          tabBarBadge: pending || undefined,
+          tabBarBadgeStyle: { backgroundColor: brand.orange2, color: colors.chalk, ...font.bold, fontSize: 11 },
+        }}
+      />
       <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('person-outline', 'person') }} />
     </Tabs>
   );

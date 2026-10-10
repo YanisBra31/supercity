@@ -59,7 +59,9 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
     )->fetchAll(PDO::FETCH_KEY_PAIR);
     $registered = (int)($counts['registered'] ?? 0);
     $mine = $viewerId ? one('SELECT status, team_id FROM match_participants WHERE match_id = ? AND user_id = ?', [$id, $viewerId]) : null;
-    $team = fn($tid) => $tid ? (($t = one('SELECT id, name, logo_url FROM teams WHERE id = ?', [$tid])) ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url']] : null) : null;
+    $team = fn($tid) => $tid ? (($t = one('SELECT id, name, logo_url, color_primary, color_secondary FROM teams WHERE id = ?', [$tid]))
+        ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'], 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary']]
+        : null) : null;
     $organizer = one('SELECT * FROM users WHERE id = ?', [$m['organizer_id']]);
 
     $out = [

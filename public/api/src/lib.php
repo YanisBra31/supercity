@@ -250,6 +250,21 @@ final class Validator
         return $this;
     }
 
+    /** Couleur hexadécimale #rrggbb, rendue en minuscules. */
+    public function color(string $key, bool $required = false): self
+    {
+        if ($this->skip($key, $required)) {
+            return $this;
+        }
+        $v = strtolower(trim((string)$this->data[$key]));
+        if (!preg_match('/^#[0-9a-f]{6}$/', $v)) {
+            $this->errors[$key] = 'Couleur invalide (format #rrggbb).';
+            return $this;
+        }
+        $this->out[$key] = $v;
+        return $this;
+    }
+
     public function url(string $key, bool $required = false): self
     {
         if ($this->skip($key, $required)) {

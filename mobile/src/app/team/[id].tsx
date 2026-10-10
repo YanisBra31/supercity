@@ -1,10 +1,10 @@
 // Détail d'une équipe : code d'invitation, joueurs, départ.
 import * as Clipboard from 'expo-clipboard';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
 import { Gradient, Hero } from '../../components/brand';
-import { Avatar, Button, Card, ErrorText, Kicker, Label, Loading, Pill, Screen, colors, font, s } from '../../components/ui';
+import { Avatar, Button, Card, ErrorText, Kicker, Loading, Pill, readableOn, Screen, TeamCrest, colors, font, s } from '../../components/ui';
 import { ApiError, del, get, post, Team } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatLabel, levelLabel, POSITIONS } from '../../lib/format';
@@ -33,9 +33,11 @@ export default function TeamDetail() {
       setError(e instanceof ApiError ? e.message : 'Équipe introuvable.');
     }
   }, [id]);
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const act = async (fn: () => Promise<unknown>, after?: () => void) => {
     setError('');
@@ -54,10 +56,37 @@ export default function TeamDetail() {
     <Screen>
       <Stack.Screen options={{ title: team.name }} />
       <Hero
-        kicker={captain ? 'Tu es capitaine' : 'Ton équipe'}
-        title={team.name}
-        sub={`${team.members_count} joueur${team.members_count > 1 ? 's' : ''}${team.city ? ` · ${team.city}` : ''}${team.usual_format ? ` · ${formatLabel(team.usual_format)}` : ''}`}
-      />
+        colors={[team.color_primary, team.color_primary, team.color_secondary]}
+        kicker={captain ? 'Tu es capitaine' : team.my_role ? 'Ton équipe' : 'Équipe'}
+        kickerColor={readableOn(team.color_primary)}
+        title=""
+      >
+        <View style={[s.row, { gap: 14 }]}>
+          <TeamCrest name={team.name} logo={team.logo_url} primary={team.color_secondary} secondary={team.color_primary} size={76} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...font.extrabold, fontSize: 26, lineHeight: 32, color: readableOn(team.color_primary) }}>{team.name}</Text>
+            <Text style={{ ...font.regular, fontSize: 13, color: readableOn(team.color_primary), opacity: 0.9 }}>
+              {[`${team.members_count} joueur${team.members_count > 1 ? 's' : ''}`, team.city, team.usual_format ? formatLabel(team.usual_format) : null, team.founded_year ? `depuis ${team.founded_year}` : null]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </View>
+        </View>
+        {team.description ? (
+          <Text style={{ ...font.medium, fontSize: 14, lineHeight: 20, marginTop: 10, color: readableOn(team.color_primary) }}>{team.description}</Text>
+        ) : null}
+        {team.recruiting ? (
+          <View style={{ marginTop: 10 }}>
+            <Pill text="On recrute !" tone="dark" />
+          </View>
+        ) : null}
+      </Hero>
+      {!team.my_role ? (
+        <Button title="Défier cette équipe" icon="flash" onPress={() => router.push({ pathname: '/challenge/new', params: { to: String(team.id) } })} />
+      ) : null}
+      {captain ? (
+        <Button title="Personnaliser l'équipe" icon="color-palette-outline" variant="dark" onPress={() => router.push(`/team/edit/${team.id}`)} />
+      ) : null}
 
       {team.invite_code ? (
         <Gradient tone="night" style={{ borderRadius: 20, padding: 18, gap: 10 }}>
@@ -88,10 +117,13 @@ export default function TeamDetail() {
 
       <Kicker>Effectif</Kicker>
       {team.members?.map((m, i) => (
-        <Card key={m.id} index={i} style={{ paddingVertical: 12 }}>
+        <Card key={m.id} index={i} style={{ paddingVertical: 12 }} onPress={() => router.push(`/user/${m.id}`)}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Avatar name={m.display_name} size={36} tone={m.role === 'captain' ? 'orange' : 'night'} />
-            <Text style={{ ...font.bold, fontSize: 16, flex: 1, color: colors.ink }}>{m.display_name}</Text>
+            <Avatar name={m.display_name} uri={m.avatar_url} size={40} tone={m.accent} />
+            <Text style={{ ...font.bold, fontSize: 16, flex: 1, color: colors.ink }}>
+              {m.display_name}
+              {m.shirt_number != null ? <Text style={{ color: colors.orange2 }}>  #{m.shirt_number}</Text> : null}
+            </Text>
             {m.role === 'captain' ? <Pill text="Capitaine" /> : null}
           </View>
           <Text style={s.sub}>

@@ -35,6 +35,11 @@ function team_view(array $t, ?int $viewerId, bool $withMembers = false): array
         'name' => $t['name'],
         'city' => $t['city'],
         'logo_url' => $t['logo_url'],
+        'description' => $t['description'],
+        'color_primary' => $t['color_primary'],
+        'color_secondary' => $t['color_secondary'],
+        'founded_year' => $t['founded_year'] === null ? null : (int)$t['founded_year'],
+        'recruiting' => (bool)$t['recruiting'],
         'usual_format' => $t['usual_format'],
         'captain_id' => (int)$t['captain_id'],
         'members_count' => $count,
@@ -68,11 +73,21 @@ function register_team_routes(Router $r): void
             ->string('city', 1, 80, false)
             ->url('logo_url')
             ->enum('usual_format', FORMATS, false)
+            ->string('description', 1, 300, false)
+            ->color('color_primary')
+            ->color('color_secondary')
+            ->int('founded_year', 1900, (int)date('Y'), false)
+            ->bool('recruiting', false)
             ->check();
         $id = transaction(function () use ($in, $user) {
             query(
-                'INSERT INTO teams (name, city, logo_url, usual_format, captain_id, invite_code) VALUES (?, ?, ?, ?, ?, ?)',
-                [$in['name'], $in['city'] ?? null, $in['logo_url'] ?? null, $in['usual_format'] ?? null, $user['id'], invite_code()]
+                'INSERT INTO teams (name, city, description, logo_url, color_primary, color_secondary, usual_format, founded_year, recruiting, captain_id, invite_code)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    $in['name'], $in['city'] ?? null, $in['description'] ?? null, $in['logo_url'] ?? null,
+                    $in['color_primary'] ?? '#ff5223', $in['color_secondary'] ?? '#1f1a17', $in['usual_format'] ?? null,
+                    $in['founded_year'] ?? null, $in['recruiting'] ?? 0, $user['id'], invite_code(),
+                ]
             );
             $id = (int)db()->lastInsertId();
             query('INSERT INTO team_members (team_id, user_id, role) VALUES (?, ?, "captain")', [$id, $user['id']]);
@@ -115,6 +130,29 @@ function register_team_routes(Router $r): void
         respond(200, team_view(load_team((int)$id), (int)$user['id'], true));
     });
 
+    $r->post('/teams/(\d+)/logo', function (string $id) {
+        $user = require_user();
+        $team = load_team((int)$id);
+        if ((int)$team['captain_id'] !== (int)$user['id']) {
+            forbidden('Seul le capitaine peut changer le logo.');
+        }
+        $url = save_uploaded_image('logo', 'contain');
+        delete_upload($team['logo_url']);
+        query('UPDATE teams SET logo_url = ? WHERE id = ?', [$url, $team['id']]);
+        respond(200, team_view(load_team((int)$id), (int)$user['id'], true));
+    });
+
+    $r->delete('/teams/(\d+)/logo', function (string $id) {
+        $user = require_user();
+        $team = load_team((int)$id);
+        if ((int)$team['captain_id'] !== (int)$user['id']) {
+            forbidden('Seul le capitaine peut changer le logo.');
+        }
+        delete_upload($team['logo_url']);
+        query('UPDATE teams SET logo_url = NULL WHERE id = ?', [$team['id']]);
+        respond(200, team_view(load_team((int)$id), (int)$user['id'], true));
+    });
+
     $r->patch('/teams/(\d+)', function (string $id) {
         $user = require_user();
         $team = load_team((int)$id);
@@ -126,6 +164,11 @@ function register_team_routes(Router $r): void
             ->string('city', 1, 80, false)
             ->url('logo_url')
             ->enum('usual_format', FORMATS, false)
+            ->string('description', 1, 300, false)
+            ->color('color_primary', true)
+            ->color('color_secondary', true)
+            ->int('founded_year', 1900, (int)date('Y'), false)
+            ->bool('recruiting')
             ->check();
         if ($in) {
             $sets = implode(', ', array_map(fn($k) => "$k = ?", array_keys($in)));

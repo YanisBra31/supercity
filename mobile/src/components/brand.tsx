@@ -27,17 +27,32 @@ export function Ball({ size = 44, color = brand.chalk, ink = brand.night }: { si
   );
 }
 
-// Le dégradé orange du site (diagonale), ou nuit.
+// Couleurs d'accent que le joueur peut choisir pour son profil.
+export const ACCENTS = {
+  orange: { label: 'Orange', stops: [brand.orange1, '#ff7a1e', brand.orange2], solid: brand.orange2 },
+  nuit: { label: 'Nuit', stops: ['#4a3f38', brand.night2, brand.night], solid: brand.night },
+  rouge: { label: 'Rouge', stops: ['#ff5a5f', '#e53935', '#b71c1c'], solid: '#e53935' },
+  bleu: { label: 'Bleu', stops: ['#42a5f5', '#1e88e5', '#1565c0'], solid: '#1e88e5' },
+  vert: { label: 'Vert', stops: ['#66bb6a', '#2e9d4f', '#1b5e20'], solid: '#2e9d4f' },
+  violet: { label: 'Violet', stops: ['#ab47bc', '#7e57c2', '#4527a0'], solid: '#7e57c2' },
+} as const;
+export type AccentName = keyof typeof ACCENTS;
+
+// Le dégradé orange du site (diagonale), nuit, un accent, ou deux couleurs libres (équipes).
 export function Gradient({
   children,
   style,
   tone = 'orange',
+  colors,
 }: {
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
-  tone?: 'orange' | 'night';
+  tone?: 'orange' | 'night' | AccentName;
+  colors?: readonly [string, string, ...string[]];
 }) {
-  const stops = tone === 'orange' ? ([brand.orange1, '#ff7a1e', brand.orange2] as const) : ([brand.night2, brand.night] as const);
+  const stops =
+    colors ??
+    (tone === 'night' ? ([brand.night2, brand.night] as const) : (ACCENTS[tone === 'orange' ? 'orange' : tone].stops as readonly [string, string, string]));
   return (
     <LinearGradient colors={stops} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={style}>
       {children}
@@ -209,14 +224,30 @@ export function FadeIn({ children, index = 0, style }: { children: ReactNode; in
 }
 
 // Grand en-tête dégradé avec sur-titre, titre et lignes de terrain.
-export function Hero({ kicker, title, sub, children }: { kicker?: string; title: string; sub?: string; children?: ReactNode }) {
+export function Hero({
+  kicker,
+  title,
+  sub,
+  children,
+  tone,
+  colors,
+  kickerColor,
+}: {
+  kicker?: string;
+  title: string;
+  sub?: string;
+  children?: ReactNode;
+  tone?: AccentName;
+  colors?: readonly [string, string, ...string[]];
+  kickerColor?: string;
+}) {
   return (
-    <Gradient style={st.hero}>
+    <Gradient style={st.hero} tone={tone} colors={colors}>
       <View style={st.heroPitch}>
         <PitchLines width={300} height={185} opacity={0.22} />
       </View>
-      {kicker ? <Text style={st.heroKicker}>{kicker}</Text> : null}
-      <Text style={st.heroTitle}>{title}</Text>
+      {kicker ? <Text style={[st.heroKicker, kickerColor ? { color: kickerColor } : null]}>{kicker}</Text> : null}
+      {title ? <Text style={st.heroTitle}>{title}</Text> : null}
       {sub ? <Text style={st.heroSub}>{sub}</Text> : null}
       {children}
     </Gradient>
