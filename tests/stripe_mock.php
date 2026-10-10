@@ -32,6 +32,8 @@ if (str_starts_with($path, '/v1/')) {
 }
 
 switch (true) {
+    case $method === 'POST' && $path === '/v1/accounts' && str_starts_with($in['email'] ?? '', 'sansconnect'):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => "You can only create new accounts if you've signed up for Connect, which you can learn how to do at https://stripe.com/docs/connect."]]);
     case $method === 'POST' && $path === '/v1/accounts':
         $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'email' => $in['email'] ?? null];
         $state['accounts'][$a['id']] = $a;

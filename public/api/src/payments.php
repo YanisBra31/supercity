@@ -48,9 +48,23 @@ function stripe(string $method, string $path, array $params = [], ?string $idemp
     $data = json_decode((string)$raw, true);
     if ($raw === false || $status >= 400 || !is_array($data)) {
         error_log("supercity stripe $method $path: $status " . ($raw === false ? curl_error($ch) : $raw));
-        throw new HttpError(502, 'payment_error', 'Le service de paiement ne répond pas, réessaie dans un instant.');
+        throw new HttpError(502, 'payment_error', stripe_problem($status, $raw === false ? null : ($data['error']['message'] ?? null)));
     }
     return $data;
+}
+
+/** Explique un refus de Stripe : les erreurs de réglage du compte Supercity sont dites clairement. */
+function stripe_problem(int $status, ?string $message): string
+{
+    $m = strtolower((string)$message);
+    return match (true) {
+        $message === null => 'Le service de paiement ne répond pas, réessaie dans un instant.',
+        $status === 401 => 'Clé Stripe refusée : vérifie secret_key dans supercity-config.php.',
+        str_contains($m, 'signed up for connect') => "Stripe Connect n'est pas encore activé sur le compte Stripe de Supercity.",
+        str_contains($m, 'platform profile') || str_contains($m, 'responsibilities') => 'Termine le profil de plateforme dans Stripe (Connect > Paramètres).',
+        str_contains($m, 'test mode') || str_contains($m, 'livemode') => "Clés Stripe de test et de production mélangées : utilise le même mode partout.",
+        default => "Paiement refusé par Stripe : $message",
+    };
 }
 
 /** Adresse publique d'une page de l'API (pages de retour Stripe). */
