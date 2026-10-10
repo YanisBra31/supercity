@@ -6,12 +6,14 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Hero } from '../../components/brand';
 import { MatchCard } from '../../components/MatchCard';
+import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { ActiveFilters, activeCount, DEFAULT_FILTERS, FilterButton, Filters, FilterSheet, whenRange, WhenBar } from '../../components/MatchFilters';
 import { MatchMap } from '../../components/MatchMap';
 import { Banner, colors, Empty, ErrorText, font } from '../../components/ui';
 import { ApiError, get, Match, Venue } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { Coords, getPosition } from '../../lib/location';
+import { Place } from '../../lib/address';
+import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 
 type View_ = 'list' | 'map';
 
@@ -21,6 +23,8 @@ export default function Matches() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [view, setView] = useState<View_>('list');
   const [sheet, setSheet] = useState(false);
+  const [placeSheet, setPlaceSheet] = useState(false);
+  const [place, setPlace] = useState<Place | null>(null);
   const [items, setItems] = useState<Match[] | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -30,8 +34,9 @@ export default function Matches() {
   const load = useCallback(async () => {
     setError('');
     try {
-      const pos = await getPosition();
+      const { coords: pos, place: p } = await getSearchCenter();
       setCoords(pos);
+      setPlace(p);
       const geo = pos ? { lat: pos.lat, lng: pos.lng, radius_km: filters.radius } : {};
       const res = await get<{ items: Match[] }>('/matches', {
         ...geo,
@@ -74,17 +79,27 @@ export default function Matches() {
       </View>
       <WhenBar value={filters.when} onChange={(when) => setFilters((f) => ({ ...f, when }))} />
       <ActiveFilters f={filters} hasCoords={!!coords} onChange={setFilters} />
+      <PlaceButton place={place} hasCoords={!!coords} onPress={() => setPlaceSheet(true)} />
       {!coords ? (
         <View style={st.notice}>
           <Ionicons name="location-outline" size={16} color={colors.dim} />
-          <Text style={st.noticeText}>Active la localisation pour voir les matchs autour de toi.</Text>
+          <Text style={st.noticeText}>Active la localisation ou choisis une ville pour voir les matchs autour.</Text>
         </View>
       ) : null}
       <ErrorText>{error}</ErrorText>
     </View>
   );
 
-  const sheetEl = <FilterSheet visible={sheet} value={filters} hasCoords={!!coords} onApply={setFilters} onClose={() => setSheet(false)} />;
+  const choosePlace = async (p: Place | null) => {
+    await setSearchPlace(p);
+    load();
+  };
+  const sheetEl = (
+    <>
+      <FilterSheet visible={sheet} value={filters} hasCoords={!!coords} onApply={setFilters} onClose={() => setSheet(false)} />
+      <PlaceSheet visible={placeSheet} near={coords} onPick={choosePlace} onClose={() => setPlaceSheet(false)} />
+    </>
+  );
   const found = items ? `${items.length} match${items.length > 1 ? 's' : ''} à rejoindre` : 'Recherche des terrains…';
 
   if (view === 'map') {
@@ -112,7 +127,7 @@ export default function Matches() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.orange2} />}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 4 }}>
-            <Hero kicker="Près de chez toi" title="Les matchs autour de toi" sub={found} />
+            <Hero kicker={place ? 'Trouve ton match' : 'Près de chez toi'} title={place ? `Les matchs autour de ${place.city ?? place.name}` : 'Les matchs autour de toi'} sub={found} />
             {user && !user.email_verified ? (
               <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
             ) : null}
