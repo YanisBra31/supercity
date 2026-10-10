@@ -8,6 +8,7 @@ import { Avatar, Button, Card, ErrorText, Kicker, Loading, Pill, readableOn, Scr
 import { ApiError, del, get, post, Team } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatLabel, levelLabel, POSITIONS } from '../../lib/format';
+import { GradeBadge } from '../../components/Grade';
 
 function ask(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -124,6 +125,7 @@ export default function TeamDetail() {
               {m.display_name}
               {m.shirt_number != null ? <Text style={{ color: colors.orange2 }}>  #{m.shirt_number}</Text> : null}
             </Text>
+            <GradeBadge grade={m.grade} />
             {m.role === 'captain' ? <Pill text="Capitaine" /> : null}
           </View>
           <Text style={s.sub}>

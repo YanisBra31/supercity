@@ -7,7 +7,7 @@ import { Gradient } from '../../../components/brand';
 import { Button, Chips, colors, ErrorText, Field, font, Kicker, Label, Loading, readableOn, s, Screen, Success, TeamCrest } from '../../../components/ui';
 import { ApiError, del, Format, get, patch, Team, uploadImage } from '../../../lib/api';
 import { FORMATS } from '../../../lib/format';
-import { pickSquareImage } from '../../../lib/pickImage';
+import { pickLogoImage } from '../../../lib/pickImage';
 
 const swatches = TEAM_COLORS.map((c) => ({ value: c.value, label: c.label, stops: [c.value, c.value] as const }));
 
@@ -45,7 +45,13 @@ export default function EditTeam() {
 
   const changeLogo = async () => {
     setError('');
-    const img = await pickSquareImage();
+    let img;
+    try {
+      img = await pickLogoImage();
+    } catch {
+      setError("Impossible d'ouvrir cette image. Essaie avec une autre.");
+      return;
+    }
     if (!img) return;
     setUploading(true);
     try {

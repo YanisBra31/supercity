@@ -317,6 +317,10 @@ check('un match annulé sort de la recherche', !in_array($matchId, array_column(
 
 [$s, $r] = api('GET', "/users/$yassinId", null, $lea);
 check('profil public : stats et équipes, sans e-mail', $s === 200 && isset($r['stats']['played'], $r['stats']['organized']) && count($r['teams']) >= 1 && !isset($r['email']) && $r['bio'] !== null, $r);
+$pts = $r['stats']['played'] + 2 * $r['stats']['organized'];
+check('profil public : grade calculé (1 pt par match joué, 2 par match organisé)', ($r['grade']['points'] ?? null) === $pts && $r['grade']['points'] >= $r['grade']['min'] && ($r['grade']['next_at'] === null || $pts < $r['grade']['next_at']), $r['grade'] ?? $r);
+[$s, $r] = api('GET', '/me', null, $lea);
+check('nouveau joueur : grade Rookie, prochain Espoir à 5 pts', ($r['grade']['key'] ?? null) === 'rookie' && $r['grade']['next_label'] === 'Espoir' && $r['grade']['next_at'] === 5, $r['grade'] ?? $r);
 
 echo "Défis entre équipes\n";
 // Yassin capitaine du Cartel, Sam crée les Lions ; les deux jouent au même city stade le même soir.

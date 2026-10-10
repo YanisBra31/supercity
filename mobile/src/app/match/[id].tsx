@@ -8,6 +8,7 @@ import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, Match, post, Rival, Team } from '../../lib/api';
 import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
+import { GradeBadge } from '../../components/Grade';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -171,7 +172,10 @@ export default function MatchDetail() {
         {registered.map((p) => (
           <Pressable key={p.id} onPress={() => router.push(`/user/${p.id}`)} style={[s.row, { paddingVertical: 4 }]}>
             <Avatar name={p.display_name} uri={p.avatar_url} size={38} tone={p.accent} />
-            <Text style={{ flex: 1, ...font.semibold, color: colors.ink }}>{p.display_name}</Text>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={{ ...font.semibold, color: colors.ink }}>{p.display_name}</Text>
+              <GradeBadge grade={p.grade} />
+            </View>
             {p.position ? <Pill text={POSITIONS.find((x) => x.value === p.position)?.label ?? ''} tone="grey" /> : null}
           </Pressable>
         ))}
