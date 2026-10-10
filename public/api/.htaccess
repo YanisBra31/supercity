@@ -1,4 +1,14 @@
-# Le modèle de configuration n'a pas à être lisible depuis le web.
+# API Supercity : toutes les adresses /api/v1/... passent par index.php.
+RewriteEngine On
+
+# Certains hébergements retirent l'en-tête Authorization : on le transmet à PHP.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+RewriteRule ^v1(/.*)?$ index.php [L,QSA]
+
+# Le code source et le modèle de configuration ne sont pas lisibles depuis le web.
+RewriteRule ^src(/|$) - [F,L]
 <Files "config.example.php">
   Require all denied
 </Files>

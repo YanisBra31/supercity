@@ -6,4 +6,6 @@ return [
     'dbname' => 'nom_de_la_base',
     'user' => 'utilisateur',
     'password' => 'mot_de_passe',
+    // Sites web d'une autre adresse autorisés à appeler l'API (laisser vide pour supercity.fr seul).
+    'cors_origins' => [],
 ];
