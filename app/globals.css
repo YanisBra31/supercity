@@ -74,13 +74,13 @@ h1, h2, h3 { margin: 0; line-height: 1.08; letter-spacing: -0.02em; }
 
 /* Formulaire liste d'attente */
 .waitlist { display: flex; flex-wrap: wrap; gap: 10px; max-width: 520px; }
-.waitlist input {
+.waitlist input[type="email"] {
   flex: 1 1 240px; min-width: 0; font: inherit; font-size: 1rem;
   padding: 14px 18px; border-radius: 999px; border: 2px solid rgba(255, 248, 241, .7);
   background: rgba(255, 248, 241, .14); color: var(--chalk); outline: none;
 }
-.waitlist input::placeholder { color: rgba(255, 248, 241, .8); }
-.waitlist input:focus { border-color: var(--chalk); background: rgba(255, 248, 241, .22); }
+.waitlist input[type="email"]::placeholder { color: rgba(255, 248, 241, .8); }
+.waitlist input[type="email"]:focus { border-color: var(--chalk); background: rgba(255, 248, 241, .22); }
 .waitlist button {
   font: inherit; font-weight: 600; font-size: 1rem; cursor: pointer;
   padding: 14px 24px; border-radius: 999px; border: 0; background: var(--night); color: var(--chalk);
@@ -90,9 +90,16 @@ h1, h2, h3 { margin: 0; line-height: 1.08; letter-spacing: -0.02em; }
 .waitlist button:disabled { opacity: .7; cursor: wait; }
 .waitlist__msg { flex-basis: 100%; margin: 4px 6px 0; min-height: 1.4em; font-size: .9rem; font-weight: 500; }
 .waitlist__msg.is-error { color: var(--night); }
-.waitlist--dark input { border-color: rgba(255, 248, 241, .35); background: rgba(255, 248, 241, .06); }
+.waitlist--dark input[type="email"] { border-color: rgba(255, 248, 241, .35); background: rgba(255, 248, 241, .06); }
 .waitlist--dark button { background: linear-gradient(90deg, var(--orange-1), var(--orange-2)); }
 .waitlist--dark .waitlist__msg.is-error { color: var(--orange-1); }
+.waitlist__consent {
+  flex-basis: 100%; display: flex; align-items: flex-start; gap: 10px; margin: 4px 6px 0;
+  font-size: .8rem; line-height: 1.45; opacity: .9; cursor: pointer;
+}
+.waitlist__consent input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--night); cursor: pointer; }
+.waitlist--dark .waitlist__consent input { accent-color: var(--orange-2); }
+.waitlist__consent a { text-underline-offset: 2px; }
 
 /* Sections */
 .section { padding: clamp(64px, 10vw, 120px) var(--gutter); max-width: 1288px; margin: 0 auto; }
@@ -143,6 +150,19 @@ h1, h2, h3 { margin: 0; line-height: 1.08; letter-spacing: -0.02em; }
   padding: 22px var(--gutter); font-size: .85rem;
   background: var(--night); color: rgba(255, 248, 241, .6); border-top: 1px solid rgba(255, 248, 241, .1);
 }
+.footer__links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.footer__links a { text-decoration: none; }
+.footer__links a:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Pages légales */
+.nav--simple .nav__cta { margin-left: auto; }
+.legal { max-width: 760px; margin: 0 auto; padding: 120px var(--gutter) 80px; line-height: 1.7; }
+.legal h1 { font-size: clamp(2rem, 4.4vw, 3rem); font-weight: 800; margin-bottom: 28px; }
+.legal h2 { font-size: 1.25rem; font-weight: 700; margin: 36px 0 8px; }
+.legal p, .legal ul { margin: 0 0 12px; color: var(--ink-dim); }
+.legal ul { padding-left: 22px; }
+.legal a { color: var(--orange-2); text-underline-offset: 3px; }
+.legal__updated { margin-top: 40px !important; font-size: .85rem; }
 
 @media (max-width: 960px) {
   .steps__pass { display: none; }
