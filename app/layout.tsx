@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import Loader from "./components/Loader";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -30,8 +31,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
-      <body className={poppins.className}>{children}</body>
+    <html lang="fr" suppressHydrationWarning>
+      <body className={poppins.className}>
+        {/* Active les animations seulement si le JS tourne : sans lui, tout reste visible. */}
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+        <Loader />
+        {children}
+      </body>
     </html>
   );
 }
