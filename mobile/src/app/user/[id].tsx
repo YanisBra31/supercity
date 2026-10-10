@@ -56,9 +56,9 @@ export default function UserProfile() {
         </View>
         <View style={st.stats}>
           {[
-            [p.stats.played, 'Matchs joués'],
-            [p.stats.organized, 'Organisés'],
-            [p.teams.length, p.teams.length === 1 ? 'Équipe' : 'Équipes'],
+            [p.stats?.played ?? 0, 'Matchs joués'],
+            [p.stats?.organized ?? 0, 'Organisés'],
+            [p.teams?.length ?? 0, p.teams?.length === 1 ? 'Équipe' : 'Équipes'],
           ].map(([n, l]) => (
             <View key={String(l)} style={{ flex: 1, alignItems: 'center' }}>
               <Text style={st.statNum}>{n}</Text>
@@ -80,8 +80,8 @@ export default function UserProfile() {
         ))}
       </Card>
 
-      {p.teams.length ? <Kicker>Équipes</Kicker> : null}
-      {p.teams.map((t, i) => (
+      {p.teams?.length ? <Kicker>Équipes</Kicker> : null}
+      {(p.teams ?? []).map((t, i) => (
         <FadeIn key={t.id} index={i + 1}>
           <Pressable onPress={() => router.push(`/team/${t.id}`)}>
             <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
