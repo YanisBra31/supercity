@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
 type State = "idle" | "sending" | "done" | "error";
 
 export default function Waitlist({ dark = false }: { dark?: boolean }) {
@@ -22,21 +19,12 @@ export default function Waitlist({ dark = false }: { dark?: boolean }) {
     }
     setState("sending");
     try {
-      // Tant que Supabase n'est pas branché, on confirme sans enregistrer.
-      if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/waitlist`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
-            Prefer: "return=minimal",
-          },
-          body: JSON.stringify({ email: value.toLowerCase() }),
-        });
-        // 409 : déjà inscrit, on le traite comme un succès.
-        if (!res.ok && res.status !== 409) throw new Error(String(res.status));
-      }
+      const res = await fetch("/api/waitlist.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: value }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
       setState("done");
       setMsg("C'est noté, on te prévient dès le coup d'envoi.");
       setEmail("");

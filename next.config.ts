@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+// Export statique : `npm run build` produit le dossier `out/`, à déposer tel quel sur l'hébergement.
+const nextConfig: NextConfig = {
+  output: "export",
+  trailingSlash: true,
+  images: { unoptimized: true },
+};
 
 export default nextConfig;

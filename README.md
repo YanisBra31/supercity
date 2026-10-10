@@ -4,19 +4,20 @@ Site vitrine de [supercity.fr](https://supercity.fr), l'appli de foot amateur : 
 
 ## Stack
 
-- Next.js (App Router) pour le site, à héberger sur Vercel.
-- Supabase pour le backend : la liste d'attente d'abord, puis comptes, équipes et matchs pour l'appli mobile.
+- Next.js en export statique : le build produit des fichiers HTML/CSS/JS à déposer sur l'hébergement.
+- PHP + MySQL (Hostinger, phpMyAdmin) pour la liste d'attente : `public/api/waitlist.php`.
 
 ## Lancer en local
 
 ```bash
 npm install
-cp .env.example .env.local   # facultatif : clés Supabase pour enregistrer la liste d'attente
 npm run dev
 ```
 
-Sans clés Supabase, le formulaire valide l'e-mail et confirme, mais n'enregistre rien.
+En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'hébergement.
 
-## Supabase
+## Mise en ligne
 
-Les migrations SQL sont dans `supabase/migrations`. La première crée la table `waitlist`, ouverte en écriture et fermée en lecture côté client.
+1. Dans phpMyAdmin, importer `sql/001_waitlist.sql`.
+2. Copier `public/api/config.example.php` en `supercity-config.php` dans le dossier qui contient `public_html` (pas dedans), et le remplir avec les identifiants MySQL.
+3. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).

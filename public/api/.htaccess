@@ -1,0 +1,4 @@
+# Le modèle de configuration n'a pas à être lisible depuis le web.
+<Files "config.example.php">
+  Require all denied
+</Files>
