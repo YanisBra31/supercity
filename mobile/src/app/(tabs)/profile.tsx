@@ -11,6 +11,7 @@ import { ApiError, del, Foot, get, Match, Me, Position, PublicProfile, uploadIma
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
+import { GradeBadge, GradeCard } from '../../components/Grade';
 
 export default function Profile() {
   const { user, updateProfile, logout, setUser } = useAuth();
@@ -29,6 +30,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -62,14 +64,21 @@ export default function Profile() {
   };
 
   const changePhoto = async () => {
-    setError('');
-    const img = await pickSquareImage();
+    setPhotoError('');
+    setPhotoError('');
+    let img;
+    try {
+      img = await pickSquareImage();
+    } catch {
+      setPhotoError("Impossible d'ouvrir cette photo. Essaie avec une autre.");
+      return;
+    }
     if (!img) return;
     setUploading(true);
     try {
       setUser(await uploadImage<Me>('/me/avatar', img));
     } catch (e) {
-      setError(e instanceof ApiError ? Object.values(e.fields)[0] ?? e.message : "Envoi de la photo impossible.");
+      setPhotoError(e instanceof ApiError ? Object.values(e.fields)[0] ?? e.message : "Envoi de la photo impossible.");
     } finally {
       setUploading(false);
     }
@@ -106,6 +115,7 @@ export default function Profile() {
             <Text style={st.name} numberOfLines={2}>
               {user.display_name}
             </Text>
+            <GradeBadge grade={user.grade ?? pub?.grade} size="md" />
             {user.bio ? <Text style={st.bio}>{user.bio}</Text> : <Text style={[st.bio, { opacity: 0.7 }]}>Ajoute une bio pour te présenter.</Text>}
           </View>
           {user.shirt_number != null ? (
@@ -158,6 +168,8 @@ export default function Profile() {
         </>
       ) : null}
 
+      <GradeCard grade={user.grade ?? pub?.grade} />
+
       <Kicker>Mes prochains matchs</Kicker>
       {matches.length ? matches.map((m, i) => <MatchCard key={m.id} match={m} index={i} />) : <Text style={s.sub}>Aucun match prévu. Va voir l'onglet Matchs !</Text>}
 
@@ -166,6 +178,7 @@ export default function Profile() {
         <Button title={user.avatar_url ? 'Changer la photo' : 'Ajouter une photo'} icon="camera-outline" variant="dark" loading={uploading} onPress={changePhoto} style={{ flex: 1 }} />
         {user.avatar_url ? <Button title="Retirer" variant="ghost" onPress={removePhoto} /> : null}
       </View>
+      <ErrorText>{photoError}</ErrorText>
       <Label>Couleur de ma carte</Label>
       <Swatches
         options={(Object.keys(ACCENTS) as AccentName[]).map((k) => ({ value: k, stops: ACCENTS[k].stops, label: ACCENTS[k].label }))}

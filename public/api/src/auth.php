@@ -50,6 +50,56 @@ function issue_token(int $userId): array
 }
 
 /** Profil public d'un joueur (sans e-mail). */
+// Grades de joueur : seuil de points (1 par match joué, 2 par match organisé).
+const GRADES = [
+    ['key' => 'rookie', 'label' => 'Rookie', 'min' => 0],
+    ['key' => 'espoir', 'label' => 'Espoir', 'min' => 5],
+    ['key' => 'titulaire', 'label' => 'Titulaire', 'min' => 15],
+    ['key' => 'cadre', 'label' => 'Cadre', 'min' => 30],
+    ['key' => 'star', 'label' => 'Star', 'min' => 60],
+    ['key' => 'legende', 'label' => 'Légende', 'min' => 120],
+];
+
+/** Matchs joués (terminés, non annulés) et organisés ; gardés en mémoire le temps de la requête. */
+function user_stats(int $id): array
+{
+    static $cache = [];
+    if (!isset($cache[$id])) {
+        $row = one(
+            'SELECT
+               (SELECT COUNT(*) FROM match_participants p JOIN matches m ON m.id = p.match_id
+                 WHERE p.user_id = ? AND p.status = "registered" AND m.status <> "cancelled"
+                   AND m.starts_at + INTERVAL m.duration_min MINUTE < UTC_TIMESTAMP()) AS played,
+               (SELECT COUNT(*) FROM matches WHERE organizer_id = ? AND status <> "cancelled") AS organized',
+            [$id, $id]
+        );
+        $cache[$id] = ['played' => (int)$row['played'], 'organized' => (int)$row['organized']];
+    }
+    return $cache[$id];
+}
+
+/** Grade atteint, avec le suivant pour afficher la progression. */
+function grade_for(array $stats): array
+{
+    $points = $stats['played'] + 2 * $stats['organized'];
+    $i = 0;
+    foreach (GRADES as $k => $g) {
+        if ($points >= $g['min']) {
+            $i = $k;
+        }
+    }
+    $next = GRADES[$i + 1] ?? null;
+    return [
+        'key' => GRADES[$i]['key'],
+        'label' => GRADES[$i]['label'],
+        'level' => $i + 1,
+        'points' => $points,
+        'min' => GRADES[$i]['min'],
+        'next_label' => $next['label'] ?? null,
+        'next_at' => $next['min'] ?? null,
+    ];
+}
+
 function public_user(array $u): array
 {
     return [
@@ -64,6 +114,7 @@ function public_user(array $u): array
         'shirt_number' => isset($u['shirt_number']) ? (int)$u['shirt_number'] : null,
         'favorite_club' => $u['favorite_club'] ?? null,
         'accent' => $u['accent'] ?? 'orange',
+        'grade' => grade_for(user_stats((int)$u['id'])),
     ];
 }
 
@@ -286,21 +337,14 @@ function register_auth_routes(Router $r): void
     $r->get('/users/(\d+)', function (string $id) {
         require_user();
         $u = one('SELECT * FROM users WHERE id = ?', [(int)$id]) ?? not_found('Joueur');
-        $stats = one(
-            'SELECT
-               (SELECT COUNT(*) FROM match_participants p JOIN matches m ON m.id = p.match_id
-                 WHERE p.user_id = ? AND p.status = "registered" AND m.status <> "cancelled"
-                   AND m.starts_at + INTERVAL m.duration_min MINUTE < UTC_TIMESTAMP()) AS played,
-               (SELECT COUNT(*) FROM matches WHERE organizer_id = ? AND status <> "cancelled") AS organized',
-            [$u['id'], $u['id']]
-        );
+        $stats = user_stats((int)$u['id']);
         $teams = query(
             'SELECT t.id, t.name, t.logo_url, t.color_primary, t.color_secondary, m.role FROM team_members m
              JOIN teams t ON t.id = m.team_id WHERE m.user_id = ? ORDER BY m.joined_at',
             [$u['id']]
         )->fetchAll();
         respond(200, public_user($u) + [
-            'stats' => ['played' => (int)$stats['played'], 'organized' => (int)$stats['organized']],
+            'stats' => $stats,
             'teams' => array_map(fn($t) => [
                 'id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'],
                 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary'], 'role' => $t['role'],

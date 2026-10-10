@@ -1,6 +1,6 @@
 // Nouvelle publication : texte, photo, équipe citée.
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { pickPostImage, PickedImage } from '../../lib/pickImage';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
@@ -11,7 +11,7 @@ import { useAuth } from '../../lib/auth';
 export default function NewPost() {
   const { user } = useAuth();
   const [body, setBody] = useState('');
-  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [image, setImage] = useState<PickedImage | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -22,10 +22,12 @@ export default function NewPost() {
   }, []);
 
   const pick = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
-    if (!res.canceled) setImage(res.assets[0]);
+    try {
+      const img = await pickPostImage();
+      if (img) setImage(img);
+    } catch {
+      setError("Impossible d'ouvrir cette photo. Essaie avec une autre.");
+    }
   };
 
   const submit = async () => {

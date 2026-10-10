@@ -21,6 +21,17 @@ export type PublicUser = {
   shirt_number: number | null;
   favorite_club: string | null;
   accent: Accent;
+  // Absent si l'API en ligne est plus ancienne que l'appli.
+  grade?: Grade;
+};
+export type Grade = {
+  key: 'rookie' | 'espoir' | 'titulaire' | 'cadre' | 'star' | 'legende';
+  label: string;
+  level: number;
+  points: number;
+  min: number;
+  next_label: string | null;
+  next_at: number | null;
 };
 export type Accent = 'orange' | 'nuit' | 'rouge' | 'bleu' | 'vert' | 'violet';
 export type PublicProfile = PublicUser & {
