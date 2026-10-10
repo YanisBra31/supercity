@@ -29,6 +29,9 @@ export default function Login() {
       <Title kicker="Retour au terrain" sub="Content de te revoir.">Connexion</Title>
       <Field label="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="toi@exemple.fr" />
       <Field label="Mot de passe" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" onSubmitEditing={submit} />
+      <Text style={{ ...font.semibold, color: colors.orange2, textAlign: 'right' }} onPress={() => router.push('/forgot')}>
+        Mot de passe oublié ?
+      </Text>
       <ErrorText>{error}</ErrorText>
       <Button title="Se connecter" onPress={submit} loading={loading} />
       <Text style={{ ...font.regular, textAlign: 'center', color: colors.dim }} onPress={() => router.replace('/register')}>

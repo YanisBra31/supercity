@@ -1,10 +1,10 @@
 // Profil du joueur et ses prochains matchs.
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
 import { Hero } from '../../components/brand';
-import { Button, Chips, ErrorText, Field, Kicker, Label, Pill, s, Screen, Success } from '../../components/ui';
+import { Banner, Button, Chips, ErrorText, Field, Kicker, Label, Pill, s, Screen, Success } from '../../components/ui';
 import { ApiError, Foot, get, Match, Position } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
@@ -51,6 +51,9 @@ export default function Profile() {
         </View>
       </Hero>
 
+      {user && !user.email_verified ? (
+        <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
+      ) : null}
       <Kicker>Mes prochains matchs</Kicker>
       {matches.length ? matches.map((m, i) => <MatchCard key={m.id} match={m} index={i} />) : <Text style={s.sub}>Aucun match prévu. Va voir l'onglet Matchs !</Text>}
 
@@ -66,6 +69,8 @@ export default function Profile() {
       <ErrorText>{error}</ErrorText>
       <Success>{msg}</Success>
       <Button title="Enregistrer" onPress={save} loading={saving} />
+      <Kicker>Sécurité</Kicker>
+      <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />
     </Screen>
   );

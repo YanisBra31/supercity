@@ -29,7 +29,10 @@ function RootStack() {
         <Stack.Screen name="match/[id]" options={{ title: 'Match' }} />
         <Stack.Screen name="team/[id]" options={{ title: 'Équipe' }} />
         <Stack.Screen name="venue/new" options={{ title: 'Nouveau terrain', presentation: 'modal' }} />
+        <Stack.Screen name="verify" options={{ title: 'Confirmation' }} />
+        <Stack.Screen name="password" options={{ title: 'Mot de passe', presentation: 'modal' }} />
       </Stack.Protected>
+      <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
     </Stack>
   );
 }

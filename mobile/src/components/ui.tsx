@@ -359,7 +359,7 @@ export const s = StyleSheet.create({
     gap: 10,
   },
   inputFocus: { borderColor: colors.orange2, backgroundColor: '#fffdfb' },
-  inputText: { ...font.regular, flex: 1, fontSize: 15, color: colors.ink, paddingVertical: 12, outlineStyle: 'none' } as never,
+  inputText: { ...font.regular, flex: 1, minWidth: 0, width: '100%', fontSize: 15, color: colors.ink, paddingVertical: 12, outlineStyle: 'none' } as never,
   error: { ...font.medium, color: colors.danger, fontSize: 13 },
   errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fdecea', borderRadius: 12, padding: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -388,3 +388,19 @@ export const s = StyleSheet.create({
   pillText: { ...font.semibold, fontSize: 11, letterSpacing: 0.3 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });
+
+// Bandeau d'alerte cliquable (ex. : e-mail à confirmer).
+export function Banner({ icon, title, text, onPress }: { icon: IconName; title: string; text: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [{ transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+      <Gradient tone="night" style={{ borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Ionicons name={icon} size={24} color={colors.orange1} />
+        <View style={{ flex: 1 }}>
+          <Text style={[font.bold, { color: colors.chalk, fontSize: 14 }]}>{title}</Text>
+          <Text style={[font.regular, { color: colors.chalk, opacity: 0.75, fontSize: 12 }]}>{text}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.chalk} />
+      </Gradient>
+    </Pressable>
+  );
+}

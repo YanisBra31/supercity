@@ -7,10 +7,27 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+const PASS = 'Crampons-2026';
+@unlink($config['mail_log']);
+
+/** Dernier code à 6 chiffres envoyé à cette adresse. */
+function last_code(string $email): string
+{
+    global $config;
+    $code = '';
+    foreach (file($config['mail_log']) ?: [] as $line) {
+        $m = json_decode($line, true);
+        if ($m['to'] === $email && preg_match('/\b(\d{6})\b/', $m['text'], $x)) {
+            $code = $x[1];
+        }
+    }
+    return $code;
+}
 
 $passed = 0;
 $failed = 0;
@@ -51,7 +68,7 @@ function check(string $label, bool $ok, mixed $debug = null): void
 
 function user(string $name, string $email): array
 {
-    [$s, $r] = api('POST', '/auth/register', ['email' => $email, 'password' => 'motdepasse1', 'display_name' => $name, 'level' => 3]);
+    [$s, $r] = api('POST', '/auth/register', ['email' => $email, 'password' => PASS, 'display_name' => $name, 'level' => 3, 'birth_date' => '1998-05-12', 'accept_terms' => true]);
     check("inscription de $name", $s === 201 && isset($r['token']), $r);
     return [$r['token'] ?? '', $r['user']['id'] ?? 0];
 }
@@ -60,11 +77,11 @@ echo "Comptes\n";
 [$s, $r] = api('POST', '/auth/register', ['email' => 'pas-un-mail', 'password' => 'court', 'display_name' => 'Y']);
 check('refuse un formulaire invalide', $s === 422 && isset($r['fields']['email'], $r['fields']['password'], $r['fields']['display_name']), $r);
 [$yassin, $yassinId] = user('Yassin', 'yassin@example.fr');
-[$s, $r] = api('POST', '/auth/register', ['email' => 'YASSIN@example.fr', 'password' => 'motdepasse1', 'display_name' => 'Doublon']);
+[$s, $r] = api('POST', '/auth/register', ['email' => 'YASSIN@example.fr', 'password' => PASS, 'display_name' => 'Doublon', 'birth_date' => '2000-01-01', 'accept_terms' => true]);
 check('refuse un e-mail déjà pris', $s === 409, $r);
 [$s, $r] = api('POST', '/auth/login', ['email' => 'yassin@example.fr', 'password' => 'mauvais']);
 check('refuse un mauvais mot de passe', $s === 401, $r);
-[$s, $r] = api('POST', '/auth/login', ['email' => 'Yassin@Example.fr', 'password' => 'motdepasse1']);
+[$s, $r] = api('POST', '/auth/login', ['email' => 'Yassin@Example.fr', 'password' => PASS]);
 check('connexion', $s === 200 && isset($r['token']), $r);
 $second = $r['token'] ?? '';
 [$s, $r] = api('PATCH', '/me', ['city' => 'Toulouse', 'position' => 'attaquant', 'strong_foot' => 'gauche'], $yassin);
@@ -76,6 +93,65 @@ check('refuse un pseudo vide', $s === 422, $r);
 check('déconnexion invalide le jeton', $s === 204 && $s2 === 401);
 [$s, $r] = api('GET', '/me', null, $yassin);
 check('l\'autre session reste valide', $s === 200 && $r['email'] === 'yassin@example.fr', $r);
+
+echo "Sécurité des comptes\n";
+$form = fn(array $over) => $over + ['email' => 'nina@example.fr', 'password' => PASS, 'display_name' => 'Nina', 'birth_date' => '2001-03-04', 'accept_terms' => true];
+foreach ([
+    'mot de passe trop court' => ['password' => 'Court-1'],
+    'mot de passe sans chiffre' => ['password' => 'Crampons-sans-chiffre'],
+    'mot de passe trop courant' => ['password' => 'motdepasse123'],
+    'mot de passe avec le pseudo' => ['password' => 'Nina-2026-foot', 'display_name' => 'Nina'],
+] as $label => $over) {
+    [$s, $r] = api('POST', '/auth/register', $form($over));
+    check("refuse un $label", $s === 422 && isset($r['fields']['password']), $r);
+}
+[$s, $r] = api('POST', '/auth/register', $form(['birth_date' => date('Y-m-d', strtotime('-12 years'))]));
+check('refuse un joueur de moins de 15 ans', $s === 422 && str_contains($r['fields']['birth_date'] ?? '', '15 ans'), $r);
+[$s, $r] = api('POST', '/auth/register', $form(['birth_date' => '2001-02-30']));
+check('refuse une date impossible', $s === 422 && isset($r['fields']['birth_date']), $r);
+[$s, $r] = api('POST', '/auth/register', $form(['accept_terms' => false]));
+check('exige les conditions d\'utilisation', $s === 422 && isset($r['fields']['accept_terms']), $r);
+[$s, $r] = api('POST', '/auth/register', $form([]));
+$nina = $r['token'] ?? '';
+check('inscription valide, e-mail pas encore vérifié', $s === 201 && $r['user']['email_verified'] === false && $r['user']['birth_date'] === '2001-03-04', $r);
+$code = last_code('nina@example.fr');
+check('un code de vérification est envoyé par e-mail', strlen($code) === 6);
+[$s, $r] = api('POST', '/auth/verify-email', ['code' => $code === '000000' ? '111111' : '000000'], $nina);
+check('refuse un code faux', $s === 422, $r);
+[$s, $r] = api('POST', '/auth/verify-email', ['code' => $code], $nina);
+check('vérifie l\'e-mail avec le bon code', $s === 200 && $r['email_verified'] === true, $r);
+[$s, $r] = api('POST', '/auth/verify-email', ['code' => $code], $nina);
+check('le code ne sert qu\'une fois (déjà vérifié)', $s === 200 && $r['email_verified'] === true, $r);
+
+for ($i = 0; $i < 5; $i++) {
+    api('POST', '/auth/login', ['email' => 'nina@example.fr', 'password' => 'Mauvais-123']);
+}
+[$s, $r] = api('POST', '/auth/login', ['email' => 'nina@example.fr', 'password' => PASS]);
+check('bloque après 5 mots de passe faux, même avec le bon', $s === 429, $r);
+
+[$s] = api('POST', '/auth/password/forgot', ['email' => 'inconnu@example.fr']);
+check('mot de passe oublié ne révèle pas si le compte existe', $s === 204);
+[$s] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
+$reset = last_code('nina@example.fr');
+check('envoie un code de réinitialisation', $s === 204 && strlen($reset) === 6 && $reset !== $code);
+[$s, $r] = api('POST', '/auth/password/reset', ['email' => 'nina@example.fr', 'code' => $reset, 'password' => 'faible']);
+check('refuse un nouveau mot de passe faible (le code reste valable)', $s === 422 && isset($r['fields']['password']), $r);
+[$s, $r] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
+$reset = last_code('nina@example.fr');
+[$s, $r] = api('POST', '/auth/password/reset', ['email' => 'nina@example.fr', 'code' => $reset, 'password' => 'Lucarne-du-87']);
+check('réinitialise le mot de passe et reconnecte', $s === 200 && isset($r['token']), $r);
+$nina2 = $r['token'] ?? '';
+[$s] = api('GET', '/me', null, $nina);
+check('les anciennes sessions sont coupées', $s === 401);
+[$s] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
+[$s, $r] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
+check('limite les e-mails envoyés sans le révéler', $s === 204 && substr_count(file_get_contents($config['mail_log']), 'nina@example.fr') === 3);
+
+[$s, $r] = api('POST', '/me/password', ['current_password' => 'faux', 'new_password' => 'Petit-pont-22'], $nina2);
+check('changer de mot de passe exige l\'actuel', $s === 422 && isset($r['fields']['current_password']), $r);
+[$s] = api('POST', '/me/password', ['current_password' => 'Lucarne-du-87', 'new_password' => 'Petit-pont-22'], $nina2);
+[$s2] = api('GET', '/me', null, $nina2);
+check('change le mot de passe et garde la session', $s === 204 && $s2 === 200);
 
 [$karim, $karimId] = user('Karim', 'karim@example.fr');
 [$lea, $leaId] = user('Léa', 'lea@example.fr');

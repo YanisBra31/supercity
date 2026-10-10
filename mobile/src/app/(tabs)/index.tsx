@@ -1,11 +1,12 @@
 // Recherche des matchs autour du joueur.
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Hero } from '../../components/brand';
 import { MatchCard } from '../../components/MatchCard';
-import { Chips, colors, Empty, ErrorText, Label, s } from '../../components/ui';
+import { Banner, Chips, colors, Empty, ErrorText, Label, s } from '../../components/ui';
+import { useAuth } from '../../lib/auth';
 import { ApiError, Format, get, Match } from '../../lib/api';
 import { FORMATS } from '../../lib/format';
 import { Coords, getPosition } from '../../lib/location';
@@ -14,6 +15,7 @@ const RADII = [5, 15, 30, 60];
 
 export default function Matches() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [format, setFormat] = useState<Format | null>(null);
   const [radius, setRadius] = useState(15);
   const [onlyOpen, setOnlyOpen] = useState(false);
@@ -69,6 +71,9 @@ export default function Matches() {
             title="Les matchs autour de toi"
             sub={items ? `${items.length} match${items.length > 1 ? 's' : ''} à rejoindre` : 'Recherche des terrains…'}
           />
+          {user && !user.email_verified ? (
+            <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
+          ) : null}
           <Label>Format</Label>
           <Chips
             options={FORMATS.map((f) => ({ value: f.value, label: f.label }))}
