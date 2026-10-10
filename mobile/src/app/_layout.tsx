@@ -37,6 +37,7 @@ function RootStack() {
         <Stack.Screen name="post/[id]" options={{ title: 'Publication' }} />
         <Stack.Screen name="verify" options={{ title: 'Confirmation' }} />
         <Stack.Screen name="password" options={{ title: 'Mot de passe', presentation: 'modal' }} />
+        <Stack.Screen name="moderation" options={{ title: 'Modération' }} />
       </Stack.Protected>
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
     </Stack>

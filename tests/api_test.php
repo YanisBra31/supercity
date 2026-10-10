@@ -240,6 +240,11 @@ check('photo de profil recadrée en carré 512 px', $s === 200 && $size && $size
 check('refuse un faux fichier image', $s === 422 && isset($r['fields']['photo']), $r);
 [$s, $r] = upload('/me/avatar', "$tmp/sc-photo.jpg", 'image/jpeg', $yassin);
 check('nouvelle photo : l\'ancienne est supprimée', $s === 200 && @file_get_contents($avatar) === false, $r);
+[$s, $r] = api('POST', '/me/avatar', ['photo_base64' => base64_encode(file_get_contents("$tmp/sc-photo.jpg"))], $yassin);
+$size = !empty($r['avatar_url']) ? getimagesize($r['avatar_url']) : false;
+check('photo de profil envoyée en base64 (appli téléphone)', $s === 200 && $size && $size[0] === 512, $r);
+[$s, $r] = api('POST', '/me/avatar', ['photo_base64' => 'data:image/jpeg;base64,' . base64_encode('pas une image')], $yassin);
+check('base64 qui n\'est pas une image : refusé', $s === 422 && isset($r['fields']['photo']), $r);
 
 [$s, $r] = api('PATCH', "/teams/$teamId", ['description' => 'Le city du dimanche matin.', 'color_primary' => '#1E88E5', 'color_secondary' => '#ffffff', 'founded_year' => 2019, 'recruiting' => true], $yassin);
 check('équipe : description, couleurs, année, recrutement', $s === 200 && $r['color_primary'] === '#1e88e5' && $r['recruiting'] === true && $r['founded_year'] === 2019, $r);
@@ -380,6 +385,8 @@ check('impossible de citer une équipe dont on ne fait pas partie', $s === 422 &
 check('publie un texte avec son équipe', $s === 201 && $p1['team']['id'] === $teamId && $p1['is_mine'] === true, $p1);
 [$s, $p2] = post_with_photo('Le terrain est refait à neuf !', "$tmp/sc-photo.jpg", $lea);
 check('publie une photo (proportions gardées)', $s === 201 && $p2['image_url'] && getimagesize($p2['image_url'])[0] === 900, $p2);
+[$s, $r] = api('POST', '/posts', ['body' => 'Photo depuis le téléphone', 'photo_base64' => base64_encode(file_get_contents("$tmp/sc-photo.jpg"))], $lea);
+check('publie une photo envoyée en base64', $s === 201 && $r['image_url'] && $r['body'] === 'Photo depuis le téléphone', $r);
 [$s, $r] = api('POST', "/posts/{$p1['id']}/like", null, $lea);
 api('POST', "/posts/{$p1['id']}/like", null, $lea);
 check('aime une publication (une seule fois)', $s === 200 && $r['liked'] === true && $r['likes_count'] === 1, $r);
@@ -393,7 +400,7 @@ check('l\'auteur voit le commentaire et peut le supprimer', count($r['items']) =
 $ids = array_column($r['items'], 'id');
 check('fil « mes équipes » : coéquipiers oui, inconnus non', in_array($p1['id'], $ids) && !in_array($p2['id'], $ids), $ids);
 [$s, $r] = api('GET', "/feed?author_id=$leaId", null, $yassin);
-check('publications d\'un joueur', count($r['items']) === 1 && $r['items'][0]['id'] === $p2['id'], $r);
+check('publications d\'un joueur', count($r['items']) === 2 && $r['items'][1]['id'] === $p2['id'] && count(array_filter($r['items'], fn($x) => $x['author']['id'] !== $leaId)) === 0, $r);
 [$s] = api('DELETE', "/posts/{$p1['id']}", null, $lea);
 check('impossible de supprimer la publication d\'un autre', $s === 403);
 [$s] = api('POST', "/posts/{$p2['id']}/report", ['reason' => 'Spam'], $yassin);
@@ -406,6 +413,46 @@ check('masquée pour tous après 3 signalements', !in_array($p2['id'], array_col
 [$s] = api('DELETE', "/posts/{$p1['id']}", null, $karim);
 [$s2] = api('GET', "/posts/{$p1['id']}", null, $karim);
 check('supprime sa publication (et ses commentaires)', $s === 204 && $s2 === 404);
+
+echo "Modération\n";
+[$s] = api('GET', '/mod/reports', null, $lea);
+check('file des signalements réservée aux modérateurs', $s === 403);
+$pdo->exec("UPDATE users SET site_role = 'admin' WHERE id = $yassinId");
+[$s, $r] = api('GET', '/me', null, $yassin);
+check('rôle admin visible sur le profil', $r['site_role'] === 'admin', $r);
+[$s, $r] = api('GET', "/teams/$teamId", null, $yassin);
+$roles = array_column($r['members'], 'role', 'id');
+check('le rôle d\'équipe (capitaine) ne se mélange pas au rôle du site', $roles[$yassinId] === 'captain' && in_array('admin', array_column($r['members'], 'site_role')) && in_array('user', array_column($r['members'], 'site_role')), $r['members']);
+[$s, $r] = api('POST', "/admin/users/$leaId/role", ['role' => 'moderator'], $yassin);
+check('l\'admin nomme une modératrice', $s === 200 && $r['site_role'] === 'moderator', $r);
+[$s] = api('POST', "/admin/users/$samId/role", ['role' => 'moderator'], $lea);
+check('une modératrice ne peut pas nommer', $s === 403);
+[$s, $r] = api('GET', '/mod/reports', null, $lea);
+$rep = array_values(array_filter($r['items'] ?? [], fn($x) => $x['post']['id'] === $p2['id']))[0] ?? null;
+check('la modératrice voit la publication masquée, ses 3 signalements et le motif', $s === 200 && $rep && $rep['reports'] === 3 && $rep['hidden'] === true && in_array('Spam', $rep['reasons']), $r);
+[$s] = api('POST', "/mod/posts/{$p2['id']}/keep", null, $lea);
+[$s2, $r] = api('GET', '/feed', null, $sam);
+check('garder la publication : elle réapparaît', $s === 204 && in_array($p2['id'], array_column($r['items'], 'id')), $r);
+[$s, $px] = api('POST', '/posts', ['body' => 'Message à retirer'], $sam);
+[$s, $r] = api('GET', "/posts/{$px['id']}", null, $lea);
+check('la modératrice peut supprimer la publication d\'un autre', $r['can_delete'] === true, $r);
+[$s] = api('DELETE', "/posts/{$px['id']}", null, $lea);
+check('suppression par la modératrice', $s === 204);
+[$s, $r] = api('GET', '/mod/users?q=sam', null, $lea);
+check('recherche de joueurs', $s === 200 && in_array($samId, array_column($r['items'], 'id')), $r);
+[$s, $r] = api('POST', "/mod/users/$samId/suspend", ['days' => 3, 'reason' => 'Insultes'], $lea);
+check('suspend un joueur 3 jours', $s === 200, $r);
+[$s, $r] = api('POST', '/posts', ['body' => 'Je peux encore poster ?'], $sam);
+check('compte suspendu : publication refusée avec la date et le motif', $s === 403 && $r['error'] === 'suspended' && str_contains($r['message'], 'Insultes'), $r);
+[$s, $r] = api('GET', '/me', null, $sam);
+check('compte suspendu : lecture possible, date de fin visible', $s === 200 && $r['suspended_until'] !== null, $r);
+[$s] = api('POST', "/mod/users/$yassinId/suspend", ['days' => 1], $lea);
+check('impossible de suspendre un admin', $s === 403);
+[$s, $r] = api('DELETE', "/mod/users/$samId/suspend", null, $lea);
+[$s2] = api('POST', '/posts', ['body' => 'De retour !'], $sam);
+check('fin de la suspension', $s === 200 && $s2 === 201, $r);
+[$s] = api('POST', "/admin/users/$yassinId/role", ['role' => 'user'], $yassin);
+check('l\'admin ne peut pas se retirer son propre rôle', $s === 403);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

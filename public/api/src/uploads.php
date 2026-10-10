@@ -15,36 +15,75 @@ function upload_url(string $name): string
     return rtrim(config()['upload_url'] ?? 'https://supercity.fr/uploads', '/') . '/' . $name;
 }
 
+/** Une image arrive dans le corps de la requête. */
+function has_received_image(): bool
+{
+    if (is_multipart()) {
+        return isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE;
+    }
+    return is_string(body()['photo_base64'] ?? null) && body()['photo_base64'] !== '';
+}
+
+function is_multipart(): bool
+{
+    return str_starts_with((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data');
+}
+
 /**
- * Lit l'image envoyée dans le champ `photo` (multipart/form-data), la recadre en carré
+ * Chemin du fichier reçu : champ `photo` d'un envoi multipart/form-data, ou champ JSON
+ * `photo_base64` (ce que fait l'appli sur téléphone, plus fiable que le multipart).
+ */
+function received_image_path(): string
+{
+    if (!has_received_image()) {
+        throw new HttpError(422, 'validation_failed', 'Aucune image reçue.', ['photo' => 'Choisis une image.']);
+    }
+    $tooBig = new HttpError(422, 'validation_failed', 'Image trop lourde.', ['photo' => 'Image trop lourde (6 Mo maximum).']);
+    if (is_multipart()) {
+        $f = $_FILES['photo'];
+        if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE || $f['size'] > UPLOAD_MAX_BYTES) {
+            throw $tooBig;
+        }
+        if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+            throw new HttpError(400, 'upload_failed', "L'envoi de l'image a échoué.");
+        }
+        return $f['tmp_name'];
+    }
+    $b64 = preg_replace('/^data:[^,]*,/', '', body()['photo_base64']);
+    if (strlen($b64) > intdiv(UPLOAD_MAX_BYTES * 4, 3) + 16) {
+        throw $tooBig;
+    }
+    $bin = base64_decode($b64, true);
+    if ($bin === false || $bin === '') {
+        throw new HttpError(422, 'validation_failed', 'Image illisible.', ['photo' => 'Image illisible.']);
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'sc-img');
+    file_put_contents($tmp, $bin);
+    register_shutdown_function(fn() => @unlink($tmp));
+    return $tmp;
+}
+
+/**
+ * Lit l'image reçue (voir received_image_path), la recadre en carré
  * IMAGE_SIZE px et l'enregistre. `$mode` : 'cover' (photo, rognée, JPEG), 'contain'
  * (logo, entier sur fond transparent, PNG) ou 'fit' (publication, proportions gardées,
  * 1080 px au plus, JPEG). Renvoie l'adresse publique.
  */
 function save_uploaded_image(string $prefix, string $mode): string
 {
-    $f = $_FILES['photo'] ?? null;
-    if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        throw new HttpError(422, 'validation_failed', 'Aucune image reçue.', ['photo' => 'Choisis une image.']);
-    }
-    if ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE || $f['size'] > UPLOAD_MAX_BYTES) {
-        throw new HttpError(422, 'validation_failed', 'Image trop lourde.', ['photo' => 'Image trop lourde (6 Mo maximum).']);
-    }
-    if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
-        throw new HttpError(400, 'upload_failed', "L'envoi de l'image a échoué.");
-    }
-    $info = @getimagesize($f['tmp_name']);
+    $tmp = received_image_path();
+    $info = @getimagesize($tmp);
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_GIF], true)) {
         throw new HttpError(422, 'validation_failed', 'Format non accepté.', ['photo' => 'Envoie une image JPEG, PNG ou WebP.']);
     }
     if ($info[0] * $info[1] > 40_000_000) {
         throw new HttpError(422, 'validation_failed', 'Image trop grande.', ['photo' => 'Image trop grande.']);
     }
-    $src = @imagecreatefromstring((string)file_get_contents($f['tmp_name']));
+    $src = @imagecreatefromstring((string)file_get_contents($tmp));
     if (!$src) {
         throw new HttpError(422, 'validation_failed', 'Image illisible.', ['photo' => 'Image illisible.']);
     }
-    $src = orient($src, $f['tmp_name'], $info[2]);
+    $src = orient($src, $tmp, $info[2]);
     [$w, $h] = [imagesx($src), imagesy($src)];
     if ($mode === 'fit') {
         $scale = min(1, 1080 / max($w, $h));

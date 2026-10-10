@@ -123,3 +123,16 @@ Statuts : `pending`, `accepted`, `declined`, `cancelled`, et `expired` (en atten
 | POST | `/posts/{id}/report` | `reason` facultatif | Signale : la publication disparaît pour celui qui signale, et pour tous à 3 signalements |
 
 Chaque publication renvoie `author`, `team`, `match` (pour les défis relevés, publiés automatiquement), `likes_count`, `comments_count`, `liked` et `is_mine`.
+
+## Modération
+
+Chaque joueur porte un `site_role` : `user`, `moderator` ou `admin` (à ne pas confondre avec `role` dans une équipe : `captain` ou `player`). Un modérateur peut supprimer n'importe quelle publication ou commentaire (`can_delete` vaut alors `true`). Un compte suspendu peut lire mais reçoit `403 suspended` sur toute écriture ; `GET /me` renvoie `suspended_until` et `suspended_reason`.
+
+| Méthode | Chemin | Corps | Rôle | Effet |
+|---|---|---|---|---|
+| GET | `/mod/reports` | | modérateur | Publications signalées : `post`, `reports`, `reasons`, `hidden` |
+| POST | `/mod/posts/{id}/keep` | | modérateur | Garde la publication et efface ses signalements |
+| GET | `/mod/users?q=` | | modérateur | Recherche par pseudo ou e-mail (2 caractères min.) |
+| POST | `/mod/users/{id}/suspend` | `days` (1 à 365), `reason` facultatif | modérateur | Suspend un joueur de rang inférieur |
+| DELETE | `/mod/users/{id}/suspend` | | modérateur | Lève la suspension |
+| POST | `/admin/users/{id}/role` | `role` : user, moderator, admin | admin | Change le rôle (pas le sien) |

@@ -11,7 +11,7 @@ import { ApiError, del, Foot, get, Match, Me, Position, PublicProfile, uploadIma
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
-import { GradeBadge, GradeCard } from '../../components/Grade';
+import { GradeBadge, GradeCard, RoleBadge } from '../../components/Grade';
 
 export default function Profile() {
   const { user, updateProfile, logout, setUser } = useAuth();
@@ -115,7 +115,10 @@ export default function Profile() {
             <Text style={st.name} numberOfLines={2}>
               {user.display_name}
             </Text>
-            <GradeBadge grade={user.grade ?? pub?.grade} size="md" />
+            <View style={[s.row, { gap: 6 }]}>
+              <GradeBadge grade={user.grade ?? pub?.grade} size="md" />
+              <RoleBadge role={user.site_role} />
+            </View>
             {user.bio ? <Text style={st.bio}>{user.bio}</Text> : <Text style={[st.bio, { opacity: 0.7 }]}>Ajoute une bio pour te présenter.</Text>}
           </View>
           {user.shirt_number != null ? (
@@ -168,6 +171,9 @@ export default function Profile() {
         </>
       ) : null}
 
+      {user.suspended_until ? (
+        <ErrorText>{`Ton compte est suspendu jusqu'au ${new Date(user.suspended_until).toLocaleDateString('fr-FR')}${user.suspended_reason ? ` (${user.suspended_reason})` : ''}. Tu peux consulter l'appli, mais pas publier ni organiser.`}</ErrorText>
+      ) : null}
       <GradeCard grade={user.grade ?? pub?.grade} />
 
       <Kicker>Mes prochains matchs</Kicker>
@@ -214,6 +220,13 @@ export default function Profile() {
       <Success>{msg}</Success>
       <Button title="Enregistrer" onPress={save} loading={saving} />
       <Button title="Voir mon profil public" variant="ghost" icon="eye-outline" onPress={() => router.push(`/user/${user.id}`)} />
+
+      {user.site_role === 'moderator' || user.site_role === 'admin' ? (
+        <>
+          <Kicker>{user.site_role === 'admin' ? 'Administration' : 'Modération'}</Kicker>
+          <Button title="Ouvrir la modération" icon="shield-checkmark-outline" variant="dark" onPress={() => router.push('/moderation')} />
+        </>
+      ) : null}
 
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />

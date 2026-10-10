@@ -8,7 +8,7 @@ import { Avatar, Card, colors, ErrorText, font, Kicker, Loading, Pill, s, Screen
 import { ApiError, get, Post, PublicProfile } from '../../lib/api';
 import { PostCard } from '../../components/PostCard';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
-import { GradeBadge, GradeCard } from '../../components/Grade';
+import { GradeBadge, GradeCard, RoleBadge } from '../../components/Grade';
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
@@ -46,7 +46,10 @@ export default function UserProfile() {
           <Avatar name={p.display_name} uri={p.avatar_url} size={88} tone="night" ring />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={st.name}>{p.display_name}</Text>
-            <GradeBadge grade={p.grade} size="md" />
+            <View style={[s.row, { gap: 6 }]}>
+              <GradeBadge grade={p.grade} size="md" />
+              <RoleBadge role={p.site_role} />
+            </View>
             {p.bio ? <Text style={st.bio}>{p.bio}</Text> : null}
           </View>
           {p.shirt_number != null ? (

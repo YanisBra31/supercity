@@ -3,17 +3,17 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-export type PickedImage = { uri: string; width: number; height: number; mimeType: string; fileName: string };
+export type PickedImage = { uri: string; width: number; height: number; mimeType: string; fileName: string; base64?: string };
 
 async function convert(asset: ImagePicker.ImagePickerAsset, maxSide: number, png: boolean): Promise<PickedImage> {
   const scale = Math.min(1, maxSide / Math.max(asset.width || maxSide, asset.height || maxSide));
   const ctx = ImageManipulator.manipulate(asset.uri);
   if (scale < 1) ctx.resize({ width: Math.round(asset.width * scale) });
   const ref = await ctx.renderAsync();
-  const out = await ref.saveAsync(png ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.85 });
+  const out = await ref.saveAsync(png ? { format: SaveFormat.PNG, base64: true } : { format: SaveFormat.JPEG, compress: 0.85, base64: true });
   return png
-    ? { uri: out.uri, width: out.width, height: out.height, mimeType: 'image/png', fileName: 'logo.png' }
-    : { uri: out.uri, width: out.width, height: out.height, mimeType: 'image/jpeg', fileName: 'photo.jpg' };
+    ? { uri: out.uri, width: out.width, height: out.height, mimeType: 'image/png', fileName: 'logo.png', base64: out.base64 }
+    : { uri: out.uri, width: out.width, height: out.height, mimeType: 'image/jpeg', fileName: 'photo.jpg', base64: out.base64 };
 }
 
 async function pick(options: ImagePicker.ImagePickerOptions, maxSide: number, png = false): Promise<PickedImage | null> {

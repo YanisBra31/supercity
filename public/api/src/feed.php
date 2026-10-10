@@ -36,6 +36,7 @@ function post_views(array $rows, int $viewerId): array
             'comments_count' => (int)($comments[$p['id']] ?? 0),
             'liked' => isset($mine[$p['id']]),
             'is_mine' => (int)$p['author_id'] === $viewerId,
+            'can_delete' => (int)$p['author_id'] === $viewerId || is_moderator(current_user() ?? []),
             'created_at' => iso($p['created_at']),
         ];
     }, $rows);
@@ -49,7 +50,7 @@ function comment_view(array $c, int $viewerId, int $postAuthorId): array
         'author' => public_user($author),
         'body' => $c['body'],
         'created_at' => iso($c['created_at']),
-        'can_delete' => (int)$c['author_id'] === $viewerId || $postAuthorId === $viewerId,
+        'can_delete' => (int)$c['author_id'] === $viewerId || $postAuthorId === $viewerId || is_moderator(current_user() ?? []),
     ];
 }
 
@@ -93,17 +94,17 @@ function register_feed_routes(Router $r): void
         respond(200, ['items' => post_views($rows, $uid)]);
     });
 
-    // Corps JSON {body, team_id} ou multipart (champs body, team_id et photo).
+    // Corps JSON {body, team_id, photo_base64} ou multipart (champs body, team_id et photo).
     $r->post('/posts', function () {
         $user = require_user();
         $uid = (int)$user['id'];
-        $multipart = str_starts_with((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data');
+        $multipart = is_multipart();
         $data = $multipart ? $_POST : body();
         if (isset($data['team_id']) && is_string($data['team_id'])) {
             $data['team_id'] = $data['team_id'] === '' ? null : (int)$data['team_id'];
         }
         $in = validate($data)->string('body', 1, 1000, false)->int('team_id', 1, PHP_INT_MAX, false)->check();
-        $hasPhoto = $multipart && isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE;
+        $hasPhoto = has_received_image();
         if (!isset($in['body']) && !$hasPhoto) {
             throw new HttpError(422, 'validation_failed', 'Publication vide.', ['body' => 'Écris quelque chose ou ajoute une photo.']);
         }
@@ -127,7 +128,7 @@ function register_feed_routes(Router $r): void
     $r->delete('/posts/(\d+)', function (string $id) {
         $user = require_user();
         $p = load_post((int)$id);
-        if ((int)$p['author_id'] !== (int)$user['id']) {
+        if ((int)$p['author_id'] !== (int)$user['id'] && !is_moderator($user)) {
             forbidden('Tu ne peux supprimer que tes publications.');
         }
         delete_upload($p['image_url']);
@@ -168,7 +169,7 @@ function register_feed_routes(Router $r): void
     $r->delete('/comments/(\d+)', function (string $id) {
         $user = require_user();
         $c = one('SELECT c.*, p.author_id AS post_author FROM post_comments c JOIN posts p ON p.id = c.post_id WHERE c.id = ?', [(int)$id]) ?? not_found('Commentaire');
-        if ((int)$c['author_id'] !== (int)$user['id'] && (int)$c['post_author'] !== (int)$user['id']) {
+        if ((int)$c['author_id'] !== (int)$user['id'] && (int)$c['post_author'] !== (int)$user['id'] && !is_moderator($user)) {
             forbidden('Tu ne peux pas supprimer ce commentaire.');
         }
         query('DELETE FROM post_comments WHERE id = ?', [$c['id']]);
