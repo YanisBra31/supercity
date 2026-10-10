@@ -93,17 +93,17 @@ function register_feed_routes(Router $r): void
         respond(200, ['items' => post_views($rows, $uid)]);
     });
 
-    // Corps JSON {body, team_id} ou multipart (champs body, team_id et photo).
+    // Corps JSON {body, team_id, photo_base64} ou multipart (champs body, team_id et photo).
     $r->post('/posts', function () {
         $user = require_user();
         $uid = (int)$user['id'];
-        $multipart = str_starts_with((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data');
+        $multipart = is_multipart();
         $data = $multipart ? $_POST : body();
         if (isset($data['team_id']) && is_string($data['team_id'])) {
             $data['team_id'] = $data['team_id'] === '' ? null : (int)$data['team_id'];
         }
         $in = validate($data)->string('body', 1, 1000, false)->int('team_id', 1, PHP_INT_MAX, false)->check();
-        $hasPhoto = $multipart && isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE;
+        $hasPhoto = has_received_image();
         if (!isset($in['body']) && !$hasPhoto) {
             throw new HttpError(422, 'validation_failed', 'Publication vide.', ['body' => 'Écris quelque chose ou ajoute une photo.']);
         }

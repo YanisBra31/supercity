@@ -240,6 +240,11 @@ check('photo de profil recadrée en carré 512 px', $s === 200 && $size && $size
 check('refuse un faux fichier image', $s === 422 && isset($r['fields']['photo']), $r);
 [$s, $r] = upload('/me/avatar', "$tmp/sc-photo.jpg", 'image/jpeg', $yassin);
 check('nouvelle photo : l\'ancienne est supprimée', $s === 200 && @file_get_contents($avatar) === false, $r);
+[$s, $r] = api('POST', '/me/avatar', ['photo_base64' => base64_encode(file_get_contents("$tmp/sc-photo.jpg"))], $yassin);
+$size = !empty($r['avatar_url']) ? getimagesize($r['avatar_url']) : false;
+check('photo de profil envoyée en base64 (appli téléphone)', $s === 200 && $size && $size[0] === 512, $r);
+[$s, $r] = api('POST', '/me/avatar', ['photo_base64' => 'data:image/jpeg;base64,' . base64_encode('pas une image')], $yassin);
+check('base64 qui n\'est pas une image : refusé', $s === 422 && isset($r['fields']['photo']), $r);
 
 [$s, $r] = api('PATCH', "/teams/$teamId", ['description' => 'Le city du dimanche matin.', 'color_primary' => '#1E88E5', 'color_secondary' => '#ffffff', 'founded_year' => 2019, 'recruiting' => true], $yassin);
 check('équipe : description, couleurs, année, recrutement', $s === 200 && $r['color_primary'] === '#1e88e5' && $r['recruiting'] === true && $r['founded_year'] === 2019, $r);
@@ -380,6 +385,8 @@ check('impossible de citer une équipe dont on ne fait pas partie', $s === 422 &
 check('publie un texte avec son équipe', $s === 201 && $p1['team']['id'] === $teamId && $p1['is_mine'] === true, $p1);
 [$s, $p2] = post_with_photo('Le terrain est refait à neuf !', "$tmp/sc-photo.jpg", $lea);
 check('publie une photo (proportions gardées)', $s === 201 && $p2['image_url'] && getimagesize($p2['image_url'])[0] === 900, $p2);
+[$s, $r] = api('POST', '/posts', ['body' => 'Photo depuis le téléphone', 'photo_base64' => base64_encode(file_get_contents("$tmp/sc-photo.jpg"))], $lea);
+check('publie une photo envoyée en base64', $s === 201 && $r['image_url'] && $r['body'] === 'Photo depuis le téléphone', $r);
 [$s, $r] = api('POST', "/posts/{$p1['id']}/like", null, $lea);
 api('POST', "/posts/{$p1['id']}/like", null, $lea);
 check('aime une publication (une seule fois)', $s === 200 && $r['liked'] === true && $r['likes_count'] === 1, $r);
@@ -393,7 +400,7 @@ check('l\'auteur voit le commentaire et peut le supprimer', count($r['items']) =
 $ids = array_column($r['items'], 'id');
 check('fil « mes équipes » : coéquipiers oui, inconnus non', in_array($p1['id'], $ids) && !in_array($p2['id'], $ids), $ids);
 [$s, $r] = api('GET', "/feed?author_id=$leaId", null, $yassin);
-check('publications d\'un joueur', count($r['items']) === 1 && $r['items'][0]['id'] === $p2['id'], $r);
+check('publications d\'un joueur', count($r['items']) === 2 && $r['items'][1]['id'] === $p2['id'] && count(array_filter($r['items'], fn($x) => $x['author']['id'] !== $leaId)) === 0, $r);
 [$s] = api('DELETE', "/posts/{$p1['id']}", null, $lea);
 check('impossible de supprimer la publication d\'un autre', $s === 403);
 [$s] = api('POST', "/posts/{$p2['id']}/report", ['reason' => 'Spam'], $yassin);

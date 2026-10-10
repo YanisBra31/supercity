@@ -160,7 +160,12 @@ export const patch = <T>(path: string, body: unknown) => api<T>('PATCH', path, {
 export const del = <T>(path: string) => api<T>('DELETE', path);
 
 // Envoie une image choisie dans la galerie (champ `photo`).
-export async function uploadImage<T>(path: string, image: { uri: string; mimeType?: string | null; fileName?: string | null }): Promise<T> {
+type UploadImage = { uri: string; mimeType?: string | null; fileName?: string | null; base64?: string };
+
+// L'image part en base64 dans du JSON quand on l'a (photos converties par l'appli) : le multipart
+// échoue sur certains téléphones et hébergeurs (« Pas de connexion »).
+export async function uploadImage<T>(path: string, image: UploadImage): Promise<T> {
+  if (image.base64) return api<T>('POST', path, { body: { photo_base64: image.base64 } });
   const body = new FormData();
   const type = image.mimeType ?? 'image/jpeg';
   const name = image.fileName ?? `photo.${type.split('/')[1] ?? 'jpg'}`;
@@ -214,8 +219,8 @@ export type Post = {
 export type Comment = { id: number; author: PublicUser; body: string; created_at: string; can_delete: boolean };
 
 // Publier : JSON pour du texte seul, multipart dès qu'il y a une photo.
-export async function createPost(data: { body: string; team_id: number | null }, image?: { uri: string; mimeType?: string | null; fileName?: string | null } | null): Promise<Post> {
-  if (!image) return post<Post>('/posts', { body: data.body || null, team_id: data.team_id });
+export async function createPost(data: { body: string; team_id: number | null }, image?: UploadImage | null): Promise<Post> {
+  if (!image || image.base64) return post<Post>('/posts', { body: data.body || null, team_id: data.team_id, photo_base64: image?.base64 });
   const form = new FormData();
   if (data.body) form.append('body', data.body);
   if (data.team_id) form.append('team_id', String(data.team_id));
