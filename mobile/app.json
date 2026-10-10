@@ -32,7 +32,8 @@
         {
           "locationWhenInUsePermission": "Supercity utilise ta position pour trouver les matchs et les terrains autour de toi."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "supercity",
     "splash": {

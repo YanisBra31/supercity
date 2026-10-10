@@ -3,7 +3,8 @@ import * as Clipboard from 'expo-clipboard';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
-import { Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen } from '../../components/ui';
+import { Gradient, Hero } from '../../components/brand';
+import { Avatar, Button, Card, ErrorText, Kicker, Label, Loading, Pill, Screen, colors, font, s } from '../../components/ui';
 import { ApiError, del, get, post, Team } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { formatLabel, levelLabel, POSITIONS } from '../../lib/format';
@@ -52,24 +53,24 @@ export default function TeamDetail() {
   return (
     <Screen>
       <Stack.Screen options={{ title: team.name }} />
-      <Text style={s.sub}>
-        {team.members_count} joueur{team.members_count > 1 ? 's' : ''}
-        {team.city ? ` · ${team.city}` : ''}
-        {team.usual_format ? ` · ${formatLabel(team.usual_format)}` : ''}
-      </Text>
+      <Hero
+        kicker={captain ? 'Tu es capitaine' : 'Ton équipe'}
+        title={team.name}
+        sub={`${team.members_count} joueur${team.members_count > 1 ? 's' : ''}${team.city ? ` · ${team.city}` : ''}${team.usual_format ? ` · ${formatLabel(team.usual_format)}` : ''}`}
+      />
 
       {team.invite_code ? (
-        <Card style={{ backgroundColor: colors.night, borderColor: colors.night }}>
-          <Text style={{ color: colors.white, opacity: 0.8, fontWeight: '600' }}>Code d'invitation</Text>
+        <Gradient tone="night" style={{ borderRadius: 20, padding: 18, gap: 10 }}>
+          <Kicker color={colors.orange1}>Code d'invitation</Kicker>
           <Pressable
             onPress={async () => {
               await Clipboard.setStringAsync(team.invite_code!);
               setCopied(true);
             }}
           >
-            <Text style={{ color: colors.orange1, fontSize: 32, fontWeight: '900', letterSpacing: 4 }}>{team.invite_code}</Text>
+            <Text style={{ color: colors.orange1, fontSize: 32, ...font.black, letterSpacing: 4 }}>{team.invite_code}</Text>
           </Pressable>
-          <Text style={{ color: colors.white, opacity: 0.8 }}>{copied ? 'Copié !' : 'Touche le code pour le copier.'}</Text>
+          <Text style={{ ...font.regular, color: colors.chalk, opacity: 0.8 }}>{copied ? 'Copié !' : 'Touche le code pour le copier.'}</Text>
           <Button
             title="Inviter des joueurs"
             icon="share-social-outline"
@@ -78,18 +79,19 @@ export default function TeamDetail() {
             }
           />
           {captain ? (
-            <Text style={{ color: colors.white, opacity: 0.7, textAlign: 'center' }} onPress={() => act(() => post(`/teams/${team.id}/invite-code`))}>
+            <Text style={{ ...font.semibold, color: colors.chalk, opacity: 0.7, textAlign: 'center' }} onPress={() => act(() => post(`/teams/${team.id}/invite-code`))}>
               Générer un nouveau code
             </Text>
           ) : null}
-        </Card>
+        </Gradient>
       ) : null}
 
-      <Label>Joueurs</Label>
-      {team.members?.map((m) => (
-        <Card key={m.id} style={{ paddingVertical: 12 }}>
+      <Kicker>Effectif</Kicker>
+      {team.members?.map((m, i) => (
+        <Card key={m.id} index={i} style={{ paddingVertical: 12 }}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
-            <Text style={{ fontWeight: '700', fontSize: 16, flex: 1 }}>{m.display_name}</Text>
+            <Avatar name={m.display_name} size={36} tone={m.role === 'captain' ? 'orange' : 'night'} />
+            <Text style={{ ...font.bold, fontSize: 16, flex: 1, color: colors.ink }}>{m.display_name}</Text>
             {m.role === 'captain' ? <Pill text="Capitaine" /> : null}
           </View>
           <Text style={s.sub}>
@@ -98,7 +100,7 @@ export default function TeamDetail() {
           {captain && m.id !== user?.id ? (
             <View style={[s.row, { gap: 16 }]}>
               <Text
-                style={{ color: colors.orange2, fontWeight: '600' }}
+                style={{ color: colors.orange2, ...font.semibold }}
                 onPress={async () => {
                   if (await ask('Passer le brassard ?', `${m.display_name} deviendra capitaine.`)) act(() => post(`/teams/${team.id}/captain`, { user_id: m.id }));
                 }}
@@ -106,7 +108,7 @@ export default function TeamDetail() {
                 Nommer capitaine
               </Text>
               <Text
-                style={{ color: colors.danger, fontWeight: '600' }}
+                style={{ color: colors.danger, ...font.semibold }}
                 onPress={async () => {
                   if (await ask('Retirer ce joueur ?', `${m.display_name} ne fera plus partie de l'équipe.`)) act(() => del(`/teams/${team.id}/members/${m.id}`));
                 }}

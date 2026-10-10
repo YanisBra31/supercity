@@ -4,7 +4,8 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Share, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
-import { Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen } from '../../components/ui';
+import { Gradient, Hero } from '../../components/brand';
+import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, font } from '../../components/ui';
 import { ApiError, del, get, Match, post, Team } from '../../lib/api';
 import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, whenLabel } from '../../lib/format';
 
@@ -61,27 +62,37 @@ export default function MatchDetail() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: `${formatLabel(m.format)} · ${formatShort(m.format)}` }} />
-      <View style={{ gap: 8 }}>
-        {statusPill(m)}
-        <Text style={{ fontSize: 26, fontWeight: '800', color: colors.ink }}>{whenLabel(m.starts_at)}</Text>
-        <Text style={s.sub}>
-          {m.duration_min} min · {levelLabel(m.level)} · organisé par {m.organizer.display_name}
-        </Text>
-      </View>
+      <Stack.Screen options={{ title: m.venue.name }} />
+      <Hero kicker={`${formatLabel(m.format)} · ${formatShort(m.format)}`} title={whenLabel(m.starts_at)} sub={`${m.duration_min} min · ${levelLabel(m.level)} · organisé par ${m.organizer.display_name}`}>
+        <View style={{ marginTop: 8 }}>{statusPill(m)}</View>
+        <View style={{ marginTop: 12, gap: 6 }}>
+          <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(31,26,23,.25)', overflow: 'hidden' }}>
+            <View style={{ width: `${Math.min(1, m.players_count / m.max_players) * 100}%`, height: 8, backgroundColor: colors.night }} />
+          </View>
+          <Text style={{ ...font.semibold, fontSize: 12, color: colors.chalk }}>
+            {m.players_count}/{m.max_players} joueurs{m.spots_left > 0 ? ` · ${m.spots_left} place${m.spots_left > 1 ? 's' : ''} libre${m.spots_left > 1 ? 's' : ''}` : ''}
+          </Text>
+        </View>
+      </Hero>
 
       {m.home_team || m.away_team ? (
-        <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' }}>
-          <Text style={{ fontWeight: '800', fontSize: 16, flex: 1, textAlign: 'center' }}>{m.home_team?.name ?? 'Joueurs libres'}</Text>
-          <Text style={{ color: colors.orange2, fontWeight: '900' }}>VS</Text>
-          <Text style={{ fontWeight: '800', fontSize: 16, flex: 1, textAlign: 'center' }}>{m.away_team?.name ?? 'Adversaire à trouver'}</Text>
-        </Card>
+        <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+            <Avatar name={m.home_team?.name ?? '?'} size={46} />
+            <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.home_team?.name ?? 'Joueurs libres'}</Text>
+          </View>
+          <Text style={{ ...font.black, fontSize: 22, color: colors.orange1 }}>VS</Text>
+          <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+            <Avatar name={m.away_team?.name ?? '?'} size={46} tone="night" />
+            <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.away_team?.name ?? 'Adversaire à trouver'}</Text>
+          </View>
+        </Gradient>
       ) : null}
 
       <Card>
         <View style={s.row}>
           <Ionicons name="location" size={18} color={colors.orange2} />
-          <Text style={{ fontWeight: '700', fontSize: 16, flex: 1 }}>{m.venue.name}</Text>
+          <Text style={{ ...font.bold, fontSize: 16, flex: 1, color: colors.ink }}>{m.venue.name}</Text>
         </View>
         <Text style={s.sub}>{m.venue.address}</Text>
         <Text style={s.sub}>
@@ -129,10 +140,8 @@ export default function MatchDetail() {
         </Label>
         {registered.map((p) => (
           <View key={p.id} style={[s.row, { paddingVertical: 4 }]}>
-            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontWeight: '800', color: colors.orange2 }}>{p.display_name.slice(0, 1).toUpperCase()}</Text>
-            </View>
-            <Text style={{ flex: 1, fontWeight: '600' }}>{p.display_name}</Text>
+            <Avatar name={p.display_name} size={36} />
+            <Text style={{ flex: 1, ...font.semibold, color: colors.ink }}>{p.display_name}</Text>
             {p.position ? <Pill text={POSITIONS.find((x) => x.value === p.position)?.label ?? ''} tone="grey" /> : null}
           </View>
         ))}
