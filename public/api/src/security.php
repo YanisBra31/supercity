@@ -109,8 +109,82 @@ function send_mail(string $to, string $subject, string $text): void
         return;
     }
     $from = $c['mail_from'] ?? 'Supercity <contact@supercity.fr>';
-    $headers = "From: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit";
-    @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $text, $headers);
+    $address = preg_match('/<([^>]+)>/', $from, $m) ? $m[1] : $from;
+    $encoded = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $headers = [
+        "From: $from",
+        "Reply-To: $address",
+        'Date: ' . date(DATE_RFC2822),
+        'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . substr(strrchr($address, '@'), 1) . '>',
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+    ];
+    $body = chunk_split(base64_encode($text));
+    if (!empty($c['smtp']['host'])) {
+        try {
+            smtp_send($c['smtp'], $address, $to, array_merge(["To: $to", "Subject: $encoded"], $headers), $body);
+        } catch (Throwable $e) {
+            error_log('Supercity SMTP : ' . $e->getMessage());
+        }
+        return;
+    }
+    // Sans SMTP : mail() de PHP, avec l'expéditeur aussi en enveloppe (-f) pour ne pas finir en spam.
+    if (!@mail($to, $encoded, $body, implode("\r\n", $headers), '-f' . $address)) {
+        error_log("Supercity : mail() n'a pas pu envoyer à $to");
+    }
+}
+
+/** Envoi par SMTP authentifié (ex. Hostinger : smtp.hostinger.com, port 465, ssl). */
+function smtp_send(array $s, string $from, string $to, array $headers, string $body): void
+{
+    $secure = $s['secure'] ?? 'ssl';
+    $port = (int)($s['port'] ?? ($secure === 'ssl' ? 465 : 587));
+    $sock = @stream_socket_client(($secure === 'ssl' ? 'ssl://' : 'tcp://') . $s['host'] . ':' . $port, $errno, $errstr, 15);
+    if (!$sock) {
+        throw new RuntimeException("connexion impossible : $errstr");
+    }
+    stream_set_timeout($sock, 15);
+    $read = function (int $expect) use ($sock): void {
+        $line = '';
+        do {
+            $l = fgets($sock, 1024);
+            if ($l === false) {
+                throw new RuntimeException('connexion coupée');
+            }
+            $line .= $l;
+        } while (isset($l[3]) && $l[3] === '-');
+        if ((int)substr($l, 0, 3) !== $expect) {
+            throw new RuntimeException('réponse inattendue : ' . trim($line));
+        }
+    };
+    $cmd = function (string $c, int $expect) use ($sock, $read): void {
+        fwrite($sock, $c . "\r\n");
+        $read($expect);
+    };
+    $host = gethostname() ?: 'localhost';
+    $read(220);
+    $cmd("EHLO $host", 250);
+    if ($secure === 'tls') {
+        $cmd('STARTTLS', 220);
+        if (!stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            throw new RuntimeException('STARTTLS impossible');
+        }
+        $cmd("EHLO $host", 250);
+    }
+    if (!empty($s['user'])) {
+        $cmd('AUTH LOGIN', 334);
+        $cmd(base64_encode($s['user']), 334);
+        $cmd(base64_encode((string)($s['password'] ?? '')), 235);
+    }
+    $cmd("MAIL FROM:<$from>", 250);
+    $cmd("RCPT TO:<$to>", 250);
+    $cmd('DATA', 354);
+    // Une ligne qui commence par un point est doublée (règle SMTP).
+    $data = implode("\r\n", $headers) . "\r\n\r\n" . preg_replace('/^\./m', '..', str_replace("\n", "\r\n", rtrim($body)));
+    $cmd($data . "\r\n.", 250);
+    fwrite($sock, "QUIT\r\n");
+    fclose($sock);
 }
 
 /** Crée un code à 6 chiffres (remplace le précédent) et l'envoie par e-mail. */
