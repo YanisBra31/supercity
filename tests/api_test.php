@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['payments', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -453,6 +453,113 @@ check('impossible de suspendre un admin', $s === 403);
 check('fin de la suspension', $s === 200 && $s2 === 201, $r);
 [$s] = api('POST', "/admin/users/$yassinId/role", ['role' => 'user'], $yassin);
 check('l\'admin ne peut pas se retirer son propre rôle', $s === 403);
+
+echo "Paiement de la place\n";
+$stripeBase = 'http://127.0.0.1:8097';
+function mock(string $method, string $path): array
+{
+    global $stripeBase;
+    $ch = curl_init($stripeBase . $path);
+    curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true]);
+    return json_decode((string)curl_exec($ch), true) ?? [];
+}
+/** Envoie un événement Stripe signé au webhook. */
+function webhook(string $type, array $object, ?string $secret = null): int
+{
+    global $base, $config;
+    $payload = json_encode(['id' => 'evt_' . mt_rand(), 'type' => $type, 'data' => ['object' => $object]]);
+    $t = time();
+    $sig = hash_hmac('sha256', "$t.$payload", $secret ?? $config['stripe']['webhook_secret']);
+    $ch = curl_init("$base/stripe/webhook");
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', "Stripe-Signature: t=$t,v1=$sig"]]);
+    curl_exec($ch);
+    return curl_getinfo($ch, CURLINFO_HTTP_CODE);
+}
+$lastSession = function (): array {
+    $st = mock('GET', '/test/state');
+    return end($st['sessions']) ?: [];
+};
+$back = 'exp://192.168.1.20:8081/--/match';
+$in3days = gmdate('Y-m-d\TH:i:s\Z', time() + 3 * 86400);
+
+[$s, $r] = api('GET', '/me/payouts', null, $karim);
+check('paiements disponibles, compte organisateur pas encore relié, frais de 0,50 €', $s === 200 && $r['enabled'] && !$r['connected'] && !$r['ready'] && $r['fee_cents'] === 50, $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 500], $karim);
+check('fixer un prix exige un compte Stripe prêt', $s === 409 && $r['error'] === 'payouts_not_ready', $r);
+[$s, $r] = api('POST', '/me/payouts/onboard', ['return_url' => "$back/payouts"], $karim);
+$st = mock('GET', '/test/state');
+$link = end($st['requests']);
+check('activer les paiements : compte Express créé et lien Stripe renvoyé', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+    && $link['path'] === '/v1/account_links' && str_contains($link['params']['return_url'], '/pay/back?to=exp'), [$r, $link]);
+$acct = array_key_last($st['accounts']);
+mock('POST', "/test/accounts/$acct/ready");
+[$s, $r] = api('GET', '/me/payouts', null, $karim);
+check('compte vérifié chez Stripe : prêt à encaisser', $s === 200 && $r['connected'] && $r['ready'], $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 50], $karim);
+check('prix minimum 1 €', $s === 422 && isset($r['fields']['price_cents']), $r);
+[$s, $pm] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 500, 'max_players' => 3], $karim);
+check('match à 5 € : l\'organisateur est inscrit sans payer', $s === 201 && $pm['price_cents'] === 500 && $pm['fee_cents'] === 50 && $pm['my_status'] === 'registered' && $pm['spots_left'] === 2, $pm);
+$pid = $pm['id'];
+
+[$s, $r] = api('POST', "/matches/$pid/join", ['return_url' => $back], $lea);
+$sess = $lastSession();
+$pi = $sess['params']['payment_intent_data'] ?? [];
+check('rejoindre un match payant : place réservée et page de paiement', $s === 200 && $r['my_status'] === 'pending' && $r['my_hold_until'] && $r['spots_left'] === 1
+    && str_starts_with((string)$r['checkout_url'], 'https://checkout.stripe.test/'), $r);
+check('Stripe : 5 € de place + 0,50 € de frais, frais gardés par Supercity, le reste à l\'organisateur',
+    $sess['params']['line_items'][0]['price_data']['unit_amount'] === '500' && $sess['params']['line_items'][1]['price_data']['unit_amount'] === '50'
+    && $pi['application_fee_amount'] === '50' && $pi['transfer_data']['destination'] === $acct, $sess['params'] ?? null);
+[$s, $r] = api('POST', "/matches/$pid/pay/confirm", null, $lea);
+check('pas encore payé : la place reste réservée', $s === 200 && $r['my_status'] === 'pending', $r);
+check('webhook mal signé refusé', webhook('checkout.session.completed', $sess, 'whsec_faux') === 400);
+$paidSess = mock('POST', "/test/sessions/{$sess['id']}/pay");
+check('webhook signé accepté', webhook('checkout.session.completed', $paidSess) === 200);
+[$s, $r] = api('GET', "/matches/$pid", null, $lea);
+check('paiement validé : inscrite', $r['my_status'] === 'registered' && $r['my_paid'] === true && $r['players_count'] === 2, $r);
+webhook('checkout.session.completed', $paidSess);
+api('POST', "/matches/$pid/pay/confirm", null, $lea);
+$n = $pdo->query("SELECT COUNT(*) FROM payments WHERE match_id = $pid AND status = 'paid'")->fetchColumn();
+check('événement reçu deux fois : un seul paiement compté', (int)$n === 1);
+
+[$s, $r] = api('POST', "/matches/$pid/join", ['return_url' => $back], $sam);
+$samSess = $lastSession();
+[$s2, $r2] = api('POST', "/matches/$pid/join", ['return_url' => $back], $nina2);
+check('dernière place réservée, la suivante part en liste d\'attente sans payer', $r['my_status'] === 'pending' && $r2['my_status'] === 'waitlist' && $r2['checkout_url'] === null, [$r, $r2]);
+$pdo->exec("UPDATE match_participants SET hold_until = UTC_TIMESTAMP() - INTERVAL 1 MINUTE WHERE match_id = $pid AND user_id = $samId");
+[$s, $r] = api('GET', "/matches/$pid", null, $nina2);
+check('place non payée à temps : elle passe au premier de la liste d\'attente', $r['my_status'] === 'pending' && strtotime($r['my_hold_until']) > time() + 3600, $r);
+$paidLate = mock('POST', "/test/sessions/{$samSess['id']}/pay");
+webhook('checkout.session.completed', $paidLate);
+$st = mock('GET', '/test/state');
+$ref = end($st['refunds']);
+[$s, $r] = api('GET', "/matches/$pid", null, $sam);
+check('paiement arrivé trop tard, match complet : remboursé en entier', $r['my_status'] === 'withdrawn' && $ref['amount'] === '550' && $ref['refund_application_fee'] === 'true', [$r, $ref]);
+[$s, $r] = api('POST', "/matches/$pid/pay", ['return_url' => $back], $nina2);
+check('sortie de liste d\'attente : page de paiement à la demande', $s === 200 && str_starts_with($r['checkout_url'], 'https://checkout.stripe.test/'), $r);
+[$s, $r] = api('POST', "/matches/$pid/pay", ['return_url' => $back], $sam);
+check('rien à payer sans place réservée', $s === 409, $r);
+[$s, $r] = api('PATCH', "/matches/$pid", ['price_cents' => 800], $karim);
+check('prix bloqué une fois que des joueurs ont payé', $s === 409 && $r['error'] === 'price_locked', $r);
+
+[$s, $r] = api('DELETE', "/matches/$pid/join", null, $lea);
+$st = mock('GET', '/test/state');
+$ref = end($st['refunds']);
+check('désistement plus de 24 h avant : place remboursée, frais gardés', $s === 200 && $r['refunded_cents'] === 500 && $ref['amount'] === '500'
+    && $ref['refund_application_fee'] === 'false' && $ref['reverse_transfer'] === 'true', [$r, $ref]);
+
+$in10h = gmdate('Y-m-d\TH:i:s\Z', time() + 10 * 3600);
+[$s, $late] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in10h, 'price_cents' => 400], $karim);
+api('POST', "/matches/{$late['id']}/join", ['return_url' => $back], $lea);
+webhook('checkout.session.completed', mock('POST', '/test/sessions/' . $lastSession()['id'] . '/pay'));
+[$s, $r] = api('DELETE', "/matches/{$late['id']}/join", null, $lea);
+check('désistement moins de 24 h avant : pas de remboursement', $s === 200 && $r['refunded_cents'] === null, $r);
+[$s, $r] = api('POST', "/matches/{$late['id']}/join", ['return_url' => $back], $lea);
+check('revenir après un désistement non remboursé : pas de second paiement', $r['my_status'] === 'registered' && $r['checkout_url'] === null, $r);
+[$s, $r] = api('POST', "/matches/{$late['id']}/cancel", null, $karim);
+$st = mock('GET', '/test/state');
+$ref = end($st['refunds']);
+check('match annulé : remboursé en entier, frais compris', $s === 200 && $ref['amount'] === '450' && $ref['refund_application_fee'] === 'true', $ref);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

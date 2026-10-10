@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
-import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, TeamCrest, font } from '../../components/ui';
-import { ApiError, del, get, Match, post, Rival, Team } from '../../lib/api';
+import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
+import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../../lib/api';
+import { euros, openStripe, returnUrl } from '../../lib/pay';
 import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
 import { GradeBadge, RoleBadge } from '../../components/Grade';
 
@@ -27,10 +28,13 @@ export default function MatchDetail() {
   const [rivals, setRivals] = useState<Rival[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const match = await get<Match>(`/matches/${id}`);
+      let match = await get<Match>(`/matches/${id}`);
+      // Retour de la page de paiement (ou webhook en retard) : on vérifie le paiement chez Stripe.
+      if (match.my_status === 'pending') match = await post<Match>(`/matches/${id}/pay/confirm`).catch(() => match);
       setM(match);
       setTeams((await get<{ items: Team[] }>('/me/teams')).items);
       if (match.home_team && !match.away_team) {
@@ -48,6 +52,7 @@ export default function MatchDetail() {
   const act = async (fn: () => Promise<Match>) => {
     setBusy(true);
     setError('');
+    setMsg('');
     try {
       setM(await fn());
     } catch (e) {
@@ -57,10 +62,30 @@ export default function MatchDetail() {
     }
   };
 
+  // Paiement de la place : page Stripe, puis vérification au retour.
+  const pay = async (checkoutUrl: string | null | undefined, current: Match): Promise<Match> => {
+    if (!checkoutUrl) return current;
+    await openStripe(checkoutUrl, returnUrl(`match/${current.id}`));
+    const after = await post<Match>(`/matches/${current.id}/pay/confirm`);
+    if (after.my_status === 'registered') setMsg('Paiement reçu, ta place est confirmée !');
+    return after;
+  };
+
   if (!m) return error ? <Screen><ErrorText>{error}</ErrorText></Screen> : <Loading />;
 
   const closed = m.status === 'cancelled' || m.status === 'played';
-  const inMatch = m.my_status === 'registered' || m.my_status === 'waitlist';
+  const inMatch = m.my_status === 'registered' || m.my_status === 'waitlist' || m.my_status === 'pending';
+  const paid = m.price_cents > 0 && !m.is_organizer;
+  const total = m.price_cents + m.fee_cents;
+  const refundable = new Date(m.starts_at).getTime() - Date.now() > 24 * 3600 * 1000;
+  const leaveText =
+    m.my_status === 'pending'
+      ? 'Ta place réservée sera libérée.'
+      : m.my_paid
+        ? refundable
+          ? `Ta place ira au premier joueur en liste d'attente et tu seras remboursé de ${euros(m.price_cents)} (les frais de service restent dus).`
+          : "À moins de 24 h du match, ta place n'est pas remboursée."
+        : "Ta place ira au premier joueur en liste d'attente."
   const myTeamIds = new Set(teams.map((t) => t.id));
   const teamForMatch = [m.home_team, m.away_team].find((t) => t && myTeamIds.has(t.id));
   const seekOpponent = !closed && !!m.home_team && !m.away_team && teams.some((t) => t.id === m.home_team!.id && t.my_role === 'captain');
@@ -133,24 +158,64 @@ export default function MatchDetail() {
         </Text>
       </Card>
 
+      {m.price_cents > 0 ? (
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Ionicons name="card-outline" size={22} color={colors.orange2} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...font.bold, fontSize: 16, color: colors.ink }}>{euros(m.price_cents)} la place</Text>
+            <Text style={s.sub}>
+              {m.is_organizer
+                ? `Chaque joueur paie ${euros(total)}, frais de service Supercity compris. Tu reçois ${euros(m.price_cents)} par joueur.`
+                : `+ ${euros(m.fee_cents)} de frais de service. Remboursé si tu te désistes plus de 24 h avant.`}
+            </Text>
+          </View>
+          {m.my_paid ? <Pill text="Payé" tone="green" /> : null}
+        </Card>
+      ) : null}
+
+      {m.my_status === 'pending' && !closed ? (
+        <Card style={{ gap: 10, borderColor: colors.orange2, borderWidth: 2 }}>
+          <Text style={{ ...font.bold, fontSize: 15, color: colors.ink }}>Ta place est réservée jusqu'à {m.my_hold_until ? timeLabel(new Date(m.my_hold_until)) : 'bientôt'}</Text>
+          <Text style={s.sub}>Paie-la pour confirmer ton inscription, sinon elle passera au joueur suivant.</Text>
+          <Button
+            title={`Payer ma place · ${euros(total)}`}
+            icon="card-outline"
+            loading={busy}
+            onPress={() => act(async () => pay((await post<{ checkout_url: string }>(`/matches/${m.id}/pay`, { return_url: returnUrl(`match/${m.id}`) })).checkout_url, m))}
+          />
+        </Card>
+      ) : null}
+
       {m.description ? <Text style={[s.sub, { color: colors.ink }]}>{m.description}</Text> : null}
 
       <ErrorText>{error}</ErrorText>
+      <Success>{msg}</Success>
       {!closed && !inMatch ? (
         <Button
-          title={m.spots_left > 0 ? 'Je joue' : "Rejoindre la liste d'attente"}
+          title={m.spots_left > 0 ? (paid && !m.my_paid ? `Je joue · ${euros(total)}` : 'Je joue') : "Rejoindre la liste d'attente"}
           icon="football"
           loading={busy}
-          onPress={() => act(() => post<Match>(`/matches/${m.id}/join`, teamForMatch ? { team_id: teamForMatch.id } : {}))}
+          onPress={() =>
+            act(async () => {
+              const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
+              return pay(r.checkout_url, r);
+            })
+          }
         />
       ) : null}
+      {!closed && !inMatch && paid && m.spots_left === 0 ? <Text style={s.sub}>Si une place se libère, tu auras quelques heures pour la payer.</Text> : null}
       {!closed && inMatch ? (
         <Button
           title="Me désister"
           variant="ghost"
           loading={busy}
           onPress={async () => {
-            if (await confirm('Te désister ?', 'Ta place ira au premier joueur en liste d\'attente.')) act(() => del<Match>(`/matches/${m.id}/join`));
+            if (await confirm('Te désister ?', leaveText))
+              act(async () => {
+                const r = await del<JoinResult>(`/matches/${m.id}/join`);
+                if (r.refunded_cents) setMsg(`Remboursement de ${euros(r.refunded_cents)} en route vers ta carte.`);
+                return r;
+              });
           }}
         />
       ) : null}
@@ -195,7 +260,7 @@ export default function MatchDetail() {
           title="Annuler le match"
           variant="danger"
           onPress={async () => {
-            if (await confirm('Annuler le match ?', 'Les joueurs inscrits verront le match comme annulé.')) act(() => post<Match>(`/matches/${m.id}/cancel`));
+            if (await confirm('Annuler le match ?', m.price_cents > 0 ? 'Les joueurs inscrits seront prévenus et remboursés en entier.' : 'Les joueurs inscrits verront le match comme annulé.')) act(() => post<Match>(`/matches/${m.id}/cancel`));
           }}
         />
       ) : null}
