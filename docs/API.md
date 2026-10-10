@@ -37,6 +37,8 @@ Les listes acceptent `?limit=` (20 par défaut, 50 au plus) et `?offset=`, et re
 
 Mot de passe : 10 caractères minimum, au moins une lettre et un chiffre, pas un mot de passe courant, sans le pseudo ni le début de l'e-mail. Les codes e-mail ont 6 chiffres, valent 30 minutes et 5 essais ; 3 e-mails au plus par compte et par heure. `/me` renvoie aussi `email_verified` et `birth_date`.
 
+Chaque joueur renvoyé par l'API porte un `grade` : `key` (rookie, espoir, titulaire, cadre, star, legende), `label`, `level` (1 à 6), `points` (1 par match joué, 2 par match organisé), `min`, `next_label` et `next_at` (`null` au grade maximum).
+
 Champs de profil en plus : `bio` (160 car.), `shirt_number` (0 à 99), `favorite_club`, `accent` (`orange`, `nuit`, `rouge`, `bleu`, `vert`, `violet`, couleur de la carte du joueur).
 
 Valeurs : `position` = `gardien`, `defenseur`, `milieu`, `attaquant` ; `level` = 1 à 5 ; `strong_foot` = `droit`, `gauche`, `les_deux`.
