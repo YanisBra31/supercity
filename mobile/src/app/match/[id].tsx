@@ -5,9 +5,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
-import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, font } from '../../components/ui';
-import { ApiError, del, get, Match, post, Team } from '../../lib/api';
-import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, whenLabel } from '../../lib/format';
+import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, TeamCrest, font } from '../../components/ui';
+import { ApiError, del, get, Match, post, Rival, Team } from '../../lib/api';
+import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -23,13 +23,18 @@ export default function MatchDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [m, setM] = useState<Match | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [rivals, setRivals] = useState<Rival[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setM(await get<Match>(`/matches/${id}`));
+      const match = await get<Match>(`/matches/${id}`);
+      setM(match);
       setTeams((await get<{ items: Team[] }>('/me/teams')).items);
+      if (match.home_team && !match.away_team) {
+        get<{ items: Rival[] }>(`/matches/${id}/rivals`).then((r) => setRivals(r.items)).catch(() => setRivals([]));
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Match introuvable.');
     }
@@ -57,6 +62,7 @@ export default function MatchDetail() {
   const inMatch = m.my_status === 'registered' || m.my_status === 'waitlist';
   const myTeamIds = new Set(teams.map((t) => t.id));
   const teamForMatch = [m.home_team, m.away_team].find((t) => t && myTeamIds.has(t.id));
+  const seekOpponent = !closed && !!m.home_team && !m.away_team && teams.some((t) => t.id === m.home_team!.id && t.my_role === 'captain');
   const registered = m.players?.filter((p) => p.status === 'registered') ?? [];
   const waiting = m.players?.filter((p) => p.status === 'waitlist') ?? [];
 
@@ -78,15 +84,39 @@ export default function MatchDetail() {
       {m.home_team || m.away_team ? (
         <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-            <Avatar name={m.home_team?.name ?? '?'} uri={m.home_team?.logo_url} size={46} />
+            {m.home_team ? <TeamCrest name={m.home_team.name} logo={m.home_team.logo_url} primary={m.home_team.color_primary} secondary={m.home_team.color_secondary} size={52} /> : <Avatar name="?" size={52} />}
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.home_team?.name ?? 'Joueurs libres'}</Text>
           </View>
           <Text style={{ ...font.black, fontSize: 22, color: colors.orange1 }}>VS</Text>
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-            <Avatar name={m.away_team?.name ?? '?'} uri={m.away_team?.logo_url} size={46} tone="night" />
+            {m.away_team ? <TeamCrest name={m.away_team.name} logo={m.away_team.logo_url} primary={m.away_team.color_primary} secondary={m.away_team.color_secondary} size={52} /> : <Avatar name="?" size={52} tone="night" />}
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.away_team?.name ?? 'Adversaire à trouver'}</Text>
           </View>
         </Gradient>
+      ) : null}
+
+      {seekOpponent ? (
+        <Card style={{ gap: 10, borderColor: colors.orange1, borderWidth: 2 }}>
+          <Text style={{ ...font.semibold, fontSize: 11, letterSpacing: 1.6, color: colors.orange2 }}>CHERCHE ADVERSAIRE</Text>
+          {rivals.length ? (
+            <>
+              <Text style={[s.sub, { color: colors.ink }]}>Ces équipes jouent sur ce terrain à quelques heures près. Défie-les !</Text>
+              {rivals.map((r) => (
+                <View key={r.team.id} style={[s.row, { gap: 10 }]}>
+                  <TeamCrest name={r.team.name} logo={r.team.logo_url} primary={r.team.color_primary} secondary={r.team.color_secondary} size={40} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ ...font.bold, color: colors.ink }}>{r.team.name}</Text>
+                    <Text style={s.sub}>Joue ici à {timeLabel(new Date(r.starts_at))}</Text>
+                  </View>
+                  <Button title="Défier" icon="flash" onPress={() => router.push({ pathname: '/challenge/new', params: { to: String(r.team.id), match: String(m.id) } })} />
+                </View>
+              ))}
+            </>
+          ) : (
+            <Text style={[s.sub, { color: colors.ink }]}>Ton équipe n'a pas encore d'adversaire pour ce match.</Text>
+          )}
+          <Button title="Chercher une équipe" variant="ghost" icon="search" onPress={() => router.push({ pathname: '/team/find', params: { match: String(m.id) } })} />
+        </Card>
       ) : null}
 
       <Card>

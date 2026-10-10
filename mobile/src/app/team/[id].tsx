@@ -81,6 +81,9 @@ export default function TeamDetail() {
           </View>
         ) : null}
       </Hero>
+      {!team.my_role ? (
+        <Button title="Défier cette équipe" icon="flash" onPress={() => router.push({ pathname: '/challenge/new', params: { to: String(team.id) } })} />
+      ) : null}
       {captain ? (
         <Button title="Personnaliser l'équipe" icon="color-palette-outline" variant="dark" onPress={() => router.push(`/team/edit/${team.id}`)} />
       ) : null}

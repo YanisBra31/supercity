@@ -10,6 +10,7 @@ require __DIR__ . '/src/auth.php';
 require __DIR__ . '/src/teams.php';
 require __DIR__ . '/src/venues.php';
 require __DIR__ . '/src/matches.php';
+require __DIR__ . '/src/challenges.php';
 
 date_default_timezone_set('UTC');
 
@@ -37,6 +38,7 @@ try {
     register_team_routes($router);
     register_venue_routes($router);
     register_match_routes($router);
+    register_challenge_routes($router);
     $router->dispatch($method, $path);
 } catch (HttpError $e) {
     $payload = ['error' => $e->errorCode, 'message' => $e->getMessage()];

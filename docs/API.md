@@ -90,3 +90,19 @@ Règles :
 - Un match `private` n'apparaît pas dans la recherche mais s'ouvre avec son lien (`/matches/{id}`).
 - Statuts : `open`, `full`, `cancelled`, et `played` une fois l'heure de fin passée.
 - Si l'organisateur réduit les places, les derniers inscrits repassent en liste d'attente ; s'il en ajoute, la liste d'attente monte.
+
+## Défis entre équipes
+
+Un capitaine invite une autre équipe à l'affronter, soit sur un match de son équipe qui n'a pas encore d'adversaire (`match_id`), soit sur un nouveau créneau (`venue_id`, `format`, `starts_at`). Le capitaine de l'équipe défiée accepte ou refuse.
+
+| Méthode | Adresse | Corps | Effet |
+| --- | --- | --- | --- |
+| POST | `/challenges` | `from_team_id`, `to_team_id`, `message` facultatif, et `match_id` **ou** `venue_id` + `format` + `starts_at` (+ `duration_min`) | Envoie le défi (capitaine de `from_team_id`) |
+| GET | `/me/challenges` | | `{received: [...], sent: [...]}` pour toutes mes équipes ; chaque défi indique `can_respond` et `can_cancel` |
+| GET | `/challenges/{id}` | | Détail (membres des deux équipes) |
+| POST | `/challenges/{id}/accept` | `message` facultatif | Le match visé reçoit son adversaire, ou un match est créé ; les deux capitaines y sont inscrits avec leur équipe |
+| POST | `/challenges/{id}/decline` | `message` facultatif | Refuse |
+| POST | `/challenges/{id}/cancel` | | Le capitaine qui a défié retire son défi |
+| GET | `/matches/{id}/rivals` | | Équipes qui jouent sur le même terrain à 3 h près : adversaires à défier |
+
+Statuts : `pending`, `accepted`, `declined`, `cancelled`, et `expired` (en attente mais créneau passé).

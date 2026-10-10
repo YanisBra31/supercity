@@ -51,7 +51,11 @@ export function MatchCard({ match: m, index }: { match: Match; index?: number })
           {m.venue.name}
         </Text>
         <Meta icon="location-outline">{[m.venue.city, dist].filter(Boolean).join(' · ') || m.venue.address}</Meta>
-        <Meta icon="stats-chart-outline">{levelLabel(m.level)}</Meta>
+        {m.home_team ? (
+          <Meta icon="shield-outline">{`${m.home_team.name} vs ${m.away_team?.name ?? 'adversaire à trouver'}`}</Meta>
+        ) : (
+          <Meta icon="stats-chart-outline">{levelLabel(m.level)}</Meta>
+        )}
         <View style={st.bar}>
           <Gradient style={{ width: `${fill * 100}%`, height: 6, borderRadius: 3 }} />
         </View>

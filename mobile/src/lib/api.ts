@@ -75,12 +75,14 @@ export type Match = {
   description: string | null;
   venue: Venue;
   organizer: PublicUser;
-  home_team: { id: number; name: string; logo_url: string | null } | null;
-  away_team: { id: number; name: string; logo_url: string | null } | null;
+  home_team: MatchTeam | null;
+  away_team: MatchTeam | null;
   my_status: 'registered' | 'waitlist' | 'withdrawn' | null;
   is_organizer: boolean;
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
 };
+
+export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string };
 
 export class ApiError extends Error {
   constructor(
@@ -159,3 +161,26 @@ export async function uploadImage<T>(path: string, image: { uri: string; mimeTyp
   }
   return api<T>('POST', path, { body });
 }
+
+export type TeamBrief = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; city: string | null };
+
+export type Challenge = {
+  id: number;
+  from_team: TeamBrief;
+  to_team: TeamBrief;
+  created_by: PublicUser | null;
+  match_id: number | null;
+  starts_at: string | null;
+  duration_min: number;
+  format: Format | null;
+  venue: Venue | null;
+  message: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired';
+  response_message: string | null;
+  created_at: string;
+  responded_at: string | null;
+  can_respond: boolean;
+  can_cancel: boolean;
+};
+
+export type Rival = { team: TeamBrief; match_id: number; starts_at: string };

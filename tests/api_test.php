@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -302,6 +302,53 @@ check('un match annulé sort de la recherche', !in_array($matchId, array_column(
 
 [$s, $r] = api('GET', "/users/$yassinId", null, $lea);
 check('profil public : stats et équipes, sans e-mail', $s === 200 && isset($r['stats']['played'], $r['stats']['organized']) && count($r['teams']) >= 1 && !isset($r['email']) && $r['bio'] !== null, $r);
+
+echo "Défis entre équipes\n";
+// Yassin capitaine du Cartel, Sam crée les Lions ; les deux jouent au même city stade le même soir.
+[$s, $lions] = api('POST', '/teams', ['name' => 'Les Lions', 'city' => 'Toulouse'], $sam);
+$lionsId = $lions['id'];
+$soir = gmdate('Y-m-d\TH:i:s\Z', strtotime('+3 days 18:00'));
+$soir2 = gmdate('Y-m-d\TH:i:s\Z', strtotime('+3 days 19:00'));
+[$s, $mCartel] = api('POST', '/matches', ['venue_id' => $v1["id"], 'format' => 'city5', 'starts_at' => $soir, 'home_team_id' => $teamId], $yassin);
+[$s, $mLions] = api('POST', '/matches', ['venue_id' => $v1["id"], 'format' => 'city5', 'starts_at' => $soir2, 'home_team_id' => $lionsId], $sam);
+[$s, $r] = api('GET', "/matches/{$mCartel['id']}/rivals", null, $yassin);
+check('propose les équipes qui jouent au même terrain à la même heure', $s === 200 && ($r['items'][0]['team']['id'] ?? 0) === $lionsId, $r);
+[$s, $r] = api('POST', '/challenges', ['from_team_id' => $teamId, 'to_team_id' => $lionsId, 'match_id' => $mCartel['id']], $karim);
+check('seul le capitaine lance un défi', $s === 403, $r);
+[$s, $r] = api('POST', '/challenges', ['from_team_id' => $teamId, 'to_team_id' => $teamId, 'match_id' => $mCartel['id']], $yassin);
+check('pas de défi contre soi-même', $s === 422, $r);
+[$s, $ch] = api('POST', '/challenges', ['from_team_id' => $teamId, 'to_team_id' => $lionsId, 'match_id' => $mCartel['id'], 'message' => 'Même terrain, même soir : on se fait un match ?'], $yassin);
+check('le Cartel défie les Lions sur son match', $s === 201 && $ch['status'] === 'pending' && $ch['can_cancel'] === true, $ch);
+[$s, $r] = api('POST', '/challenges', ['from_team_id' => $teamId, 'to_team_id' => $lionsId, 'match_id' => $mCartel['id']], $yassin);
+check('pas de défi en double', $s === 409, $r);
+[$s, $r] = api('GET', '/me/challenges', null, $sam);
+check('les Lions voient le défi reçu', $s === 200 && ($r['received'][0]['id'] ?? 0) === $ch['id'] && $r['received'][0]['can_respond'] === true, $r);
+[$s, $r] = api('POST', "/challenges/{$ch['id']}/accept", null, $yassin);
+check('l\'équipe qui défie ne peut pas accepter à la place des autres', $s === 403, $r);
+[$s, $r] = api('POST', "/challenges/{$ch['id']}/accept", ['message' => 'Chaud !'], $sam);
+check('les Lions acceptent', $s === 200 && $r['status'] === 'accepted' && $r['match_id'] === $mCartel['id'], $r);
+[$s, $r] = api('GET', "/matches/{$mCartel['id']}", null, $sam);
+$samIn = array_values(array_filter($r['players'] ?? [], fn($p) => $p['id'] === $samId));
+check('le match a son adversaire et le capitaine adverse est inscrit', ($r['away_team']['id'] ?? 0) === $lionsId && ($samIn[0]['team_id'] ?? 0) === $lionsId, $r);
+[$s, $r] = api('POST', '/challenges', ['from_team_id' => $lionsId, 'to_team_id' => $teamId, 'match_id' => $mCartel['id']], $sam);
+check('un match qui a déjà un adversaire ne peut plus être défié', $s === 409, $r);
+
+// Nouveau créneau proposé : refus, puis acceptation qui crée le match.
+$dim = gmdate('Y-m-d\TH:i:s\Z', strtotime('+6 days 10:00'));
+[$s, $ch2] = api('POST', '/challenges', ['from_team_id' => $lionsId, 'to_team_id' => $teamId, 'venue_id' => $v1["id"], 'format' => 'futsal', 'starts_at' => $dim], $sam);
+check('défi sur un nouveau créneau', $s === 201 && $ch2['format'] === 'futsal' && $ch2['match_id'] === null, $ch2);
+[$s, $r] = api('POST', "/challenges/{$ch2['id']}/decline", ['message' => 'Pas dispo dimanche'], $yassin);
+check('refus avec un mot', $s === 200 && $r['status'] === 'declined' && $r['response_message'] === 'Pas dispo dimanche', $r);
+[$s, $r] = api('POST', "/challenges/{$ch2['id']}/accept", null, $yassin);
+check('un défi refusé ne peut plus être accepté', $s === 409, $r);
+$sam2 = gmdate('Y-m-d\TH:i:s\Z', strtotime('+7 days 10:00'));
+[$s, $ch3] = api('POST', '/challenges', ['from_team_id' => $lionsId, 'to_team_id' => $teamId, 'venue_id' => $v1["id"], 'format' => 'city5', 'starts_at' => $sam2], $sam);
+[$s, $r] = api('POST', "/challenges/{$ch3['id']}/accept", null, $yassin);
+[$s2, $m3] = api('GET', "/matches/{$r['match_id']}", null, $yassin);
+check('accepter un nouveau créneau crée le match Lions contre Cartel', $s === 200 && $m3['home_team']['id'] === $lionsId && $m3['away_team']['id'] === $teamId && $m3['players_count'] === 2, $m3);
+[$s, $ch4] = api('POST', '/challenges', ['from_team_id' => $lionsId, 'to_team_id' => $teamId, 'venue_id' => $v1["id"], 'format' => 'city5', 'starts_at' => $dim], $sam);
+[$s, $r] = api('POST', "/challenges/{$ch4['id']}/cancel", null, $sam);
+check('le capitaine peut retirer son défi', $s === 200 && $r['status'] === 'cancelled', $r);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);
