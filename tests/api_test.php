@@ -490,8 +490,13 @@ check('fixer un prix exige un compte Stripe prêt', $s === 409 && $r['error'] ==
 [$s, $r] = api('POST', '/me/payouts/onboard', ['return_url' => "$back/payouts"], $karim);
 $st = mock('GET', '/test/state');
 $link = end($st['requests']);
-check('activer les paiements : compte Express créé et lien Stripe renvoyé', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
-    && $link['path'] === '/v1/account_links' && str_contains($link['params']['return_url'], '/pay/back?to=exp'), [$r, $link]);
+$create = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'))[0] ?? [];
+check('activer les paiements : compte Accounts v2 (destinataire, Express) et lien Stripe renvoyé', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+    && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['recipient']
+    && str_contains($link['params']['use_case']['account_onboarding']['return_url'], '/pay/back?to=exp')
+    && $create['params']['dashboard'] === 'express' && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
+    && $create['params']['defaults']['responsibilities'] === ['fees_collector' => 'application', 'losses_collector' => 'application']
+    && str_ends_with((string)$create['version'], '.endive'), [$r, $link, $create]);
 $acct = array_key_last($st['accounts']);
 [$sc] = user('Sans Connect', 'sansconnect@example.fr');
 [$s, $r] = api('POST', '/me/payouts/onboard', [], $sc);

@@ -19,7 +19,10 @@ function service_fee(): int
     return (int)(stripe_config()['fee_cents'] ?? 50);
 }
 
-/** Appel à l'API Stripe (formulaire encodé, sans bibliothèque). */
+/** Version de l'API Stripe v2 (comptes organisateurs), fixée pour que les réponses ne changent pas. */
+const STRIPE_V2_VERSION = '2026-09-30.endive';
+
+/** Appel à l'API Stripe, sans bibliothèque : v1 en formulaire encodé, v2 (chemins « /v2/… ») en JSON. */
 function stripe(string $method, string $path, array $params = [], ?string $idempotencyKey = null): array
 {
     $s = stripe_config() ?? throw new HttpError(503, 'payments_disabled', "Le paiement en ligne n'est pas encore activé.");
@@ -29,9 +32,13 @@ function stripe(string $method, string $path, array $params = [], ?string $idemp
         }
         return $a;
     };
-    $url = rtrim($s['api_base'] ?? 'https://api.stripe.com', '/') . '/v1' . $path;
-    $query = http_build_query($flat($params));
-    $headers = ['Authorization: Bearer ' . $s['secret_key'], 'Stripe-Version: 2024-06-20'];
+    $v2 = str_starts_with($path, '/v2/');
+    $url = rtrim($s['api_base'] ?? 'https://api.stripe.com', '/') . ($v2 ? '' : '/v1') . $path;
+    $query = $v2 ? '' : http_build_query($flat($params));
+    $headers = ['Authorization: Bearer ' . $s['secret_key'], 'Stripe-Version: ' . ($v2 ? ($s['api_version_v2'] ?? STRIPE_V2_VERSION) : '2024-06-20')];
+    if ($v2) {
+        $headers[] = 'Content-Type: application/json';
+    }
     if ($idempotencyKey) {
         $headers[] = "Idempotency-Key: $idempotencyKey";
     }
@@ -41,27 +48,30 @@ function stripe(string $method, string $path, array $params = [], ?string $idemp
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => 20,
-        CURLOPT_POSTFIELDS => $method === 'GET' ? null : $query,
+        CURLOPT_POSTFIELDS => $method === 'GET' ? null : ($v2 ? json_encode($params, JSON_UNESCAPED_SLASHES) : $query),
     ]);
     $raw = curl_exec($ch);
     $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $data = json_decode((string)$raw, true);
     if ($raw === false || $status >= 400 || !is_array($data)) {
         error_log("supercity stripe $method $path: $status " . ($raw === false ? curl_error($ch) : $raw));
-        throw new HttpError(502, 'payment_error', stripe_problem($status, $raw === false ? null : ($data['error']['message'] ?? null)));
+        throw new HttpError(502, 'payment_error', stripe_problem($status, $raw === false ? null : ($data['error']['message'] ?? ''), $data['error']['code'] ?? null));
     }
     return $data;
 }
 
 /** Explique un refus de Stripe : les erreurs de réglage du compte Supercity sont dites clairement. */
-function stripe_problem(int $status, ?string $message): string
+function stripe_problem(int $status, ?string $message, ?string $code = null): string
 {
     $m = strtolower((string)$message);
     return match (true) {
         $message === null => 'Le service de paiement ne répond pas, réessaie dans un instant.',
         $status === 401 => 'Clé Stripe refusée : vérifie secret_key dans supercity-config.php.',
+        in_array($code, ['platform_registration_required', 'non_connect_platform_accounts_v2_access_blocked'], true),
         str_contains($m, 'signed up for connect') => "Stripe Connect n'est pas encore activé sur le compte Stripe de Supercity.",
-        str_contains($m, 'platform profile') || str_contains($m, 'responsibilities') => 'Termine le profil de plateforme dans Stripe (Connect > Paramètres).',
+        $code === 'connect_profile_not_submitted',
+        str_contains($m, 'platform profile') || str_contains($m, 'questionnaire') => 'Termine le profil de plateforme dans Stripe (Connect > Paramètres).',
+        in_array($code, ['account_create_activation_required', 'connect_identity_not_verified'], true) => "Le compte Stripe de Supercity doit d'abord être activé (identité et RIB dans Stripe).",
         str_contains($m, 'test mode') || str_contains($m, 'livemode') => "Clés Stripe de test et de production mélangées : utilise le même mode partout.",
         default => "Paiement refusé par Stripe : $message",
     };
@@ -107,6 +117,12 @@ function payout_view(array $user): array
     ];
 }
 
+/** Prêt à recevoir le prix des places : virements Stripe actifs (vue v1 du compte). */
+function account_ready(array $acct): bool
+{
+    return ($acct['capabilities']['transfers'] ?? '') === 'active' || (!empty($acct['charges_enabled']) && !empty($acct['payouts_enabled']));
+}
+
 /** Met à jour « prêt à encaisser » depuis Stripe. */
 function sync_account(array $user): array
 {
@@ -114,7 +130,7 @@ function sync_account(array $user): array
         return $user;
     }
     $acct = stripe('GET', '/accounts/' . rawurlencode($user['stripe_account_id']));
-    $ready = !empty($acct['charges_enabled']) && !empty($acct['payouts_enabled']) ? 1 : 0;
+    $ready = account_ready($acct) ? 1 : 0;
     if ($ready !== (int)$user['stripe_ready']) {
         query('UPDATE users SET stripe_ready = ? WHERE id = ?', [$ready, $user['id']]);
         $user['stripe_ready'] = $ready;
@@ -322,23 +338,34 @@ function register_payment_routes(Router $r): void
         $in = validate(body())->string('return_url', 1, 500, false)->check();
         $back = app_return($in['return_url'] ?? null);
         if (!$user['stripe_account_id']) {
-            $acct = stripe('POST', '/accounts', [
-                'type' => 'express',
-                'country' => 'FR',
-                'email' => $user['email'],
-                'business_type' => 'individual',
-                'capabilities' => ['card_payments' => ['requested' => true], 'transfers' => ['requested' => true]],
-                'business_profile' => ['product_description' => 'Organisation de matchs de foot amateur sur Supercity', 'mcc' => '7941'],
-                'metadata' => ['user_id' => $user['id']],
-            ], "account-{$user['id']}");
+            // Compte Accounts v2 « destinataire » : il reçoit le prix des places (paiements à destination),
+            // avec le tableau de bord Express. Supercity porte les frais Stripe et les litiges.
+            $acct = stripe('POST', '/v2/core/accounts', [
+                'contact_email' => $user['email'],
+                'display_name' => $user['display_name'],
+                'dashboard' => 'express',
+                'identity' => ['country' => 'fr', 'entity_type' => 'individual'],
+                'configuration' => ['recipient' => ['capabilities' => ['stripe_balance' => ['stripe_transfers' => ['requested' => true]]]]],
+                'defaults' => [
+                    'currency' => 'eur',
+                    'locales' => ['fr-FR'],
+                    'responsibilities' => ['fees_collector' => 'application', 'losses_collector' => 'application'],
+                ],
+                'metadata' => ['user_id' => (string)$user['id']],
+            ], "account-v2-{$user['id']}");
             query('UPDATE users SET stripe_account_id = ? WHERE id = ?', [$acct['id'], $user['id']]);
             $user['stripe_account_id'] = $acct['id'];
         }
-        $link = stripe('POST', '/account_links', [
+        $link = stripe('POST', '/v2/core/account_links', [
             'account' => $user['stripe_account_id'],
-            'type' => 'account_onboarding',
-            'refresh_url' => bounce_url($back, ['onboard' => 'retry']),
-            'return_url' => bounce_url($back, ['onboard' => 'done']),
+            'use_case' => [
+                'type' => 'account_onboarding',
+                'account_onboarding' => [
+                    'configurations' => ['recipient'],
+                    'refresh_url' => bounce_url($back, ['onboard' => 'retry']),
+                    'return_url' => bounce_url($back, ['onboard' => 'done']),
+                ],
+            ],
         ]);
         respond(200, ['url' => $link['url']]);
     });
@@ -410,7 +437,7 @@ function register_payment_routes(Router $r): void
                 finalize_session($obj);
                 break;
             case 'account.updated':
-                $ready = !empty($obj['charges_enabled']) && !empty($obj['payouts_enabled']) ? 1 : 0;
+                $ready = account_ready($obj) ? 1 : 0;
                 query('UPDATE users SET stripe_ready = ? WHERE stripe_account_id = ?', [$ready, $obj['id'] ?? '']);
                 break;
         }
