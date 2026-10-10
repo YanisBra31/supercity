@@ -493,6 +493,9 @@ $link = end($st['requests']);
 check('activer les paiements : compte Express créé et lien Stripe renvoyé', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
     && $link['path'] === '/v1/account_links' && str_contains($link['params']['return_url'], '/pay/back?to=exp'), [$r, $link]);
 $acct = array_key_last($st['accounts']);
+[$sc] = user('Sans Connect', 'sansconnect@example.fr');
+[$s, $r] = api('POST', '/me/payouts/onboard', [], $sc);
+check('Connect pas activé chez Stripe : message clair', $s === 502 && str_contains($r['message'], 'Connect'), $r);
 mock('POST', "/test/accounts/$acct/ready");
 [$s, $r] = api('GET', '/me/payouts', null, $karim);
 check('compte vérifié chez Stripe : prêt à encaisser', $s === 200 && $r['connected'] && $r['ready'], $r);
