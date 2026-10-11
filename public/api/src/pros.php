@@ -120,15 +120,16 @@ function register_pro_routes(Router $r): void
             // Compte Accounts v2 : il reçoit le prix des places (paiements à destination), avec le tableau de bord
             // Express. Pour un compte français, Stripe exige la capacité carte (merchant) en plus des virements
             // (recipient). Supercity porte les frais Stripe et les litiges.
-            // Plateforme française : l'identité (e-mail, nom, pays) passe par un jeton de compte, créé avec la clé
-            // publiable en production. Le reste (forme juridique, SIRET, RIB) est demandé par l'inscription Stripe.
+            // Plateforme française : l'e-mail et le nom passent par un jeton de compte, créé avec la clé publiable en
+            // production. Le pays se donne à part, sur le compte. Le reste (forme juridique, SIRET, RIB) est demandé
+            // par l'inscription Stripe.
             $token = stripe('POST', '/v2/core/account_tokens', [
                 'contact_email' => $user['email'],
                 'display_name' => $o['name'],
-                'identity' => ['country' => 'fr'],
             ], null, publishable_key());
             $acct = stripe('POST', '/v2/core/accounts', [
                 'account_token' => $token['id'],
+                'identity' => ['country' => 'fr'],
                 'dashboard' => 'express',
                 'configuration' => [
                     'merchant' => ['capabilities' => ['card_payments' => ['requested' => true]]],

@@ -509,12 +509,12 @@ $link = end($st['requests']);
 $create = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'))[0] ?? [];
 $token = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/account_tokens'))[0] ?? [];
 $tokenId = array_key_first($st['tokens'] ?? []);
-check('activer les paiements : compte Accounts v2 (carte + virements, Express), identité passée par un jeton de compte (plateforme française) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+check('activer les paiements : compte Accounts v2 (carte + virements, Express), e-mail et nom par jeton de compte, pays sur le compte (plateforme française) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
     && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['merchant', 'recipient']
     && $create['params']['configuration']['merchant']['capabilities']['card_payments']['requested'] === true
     && str_contains($link['params']['use_case']['account_onboarding']['return_url'], '/pay/back?to=exp')
-    && $create['params']['dashboard'] === 'express' && !isset($create['params']['identity']) && !isset($create['params']['contact_email'])
-    && $token['params'] === ['contact_email' => 'karim@example.fr', 'display_name' => 'Five Toulouse Nord', 'identity' => ['country' => 'fr']]
+    && $create['params']['dashboard'] === 'express' && $create['params']['identity'] === ['country' => 'fr'] && !isset($create['params']['contact_email'])
+    && $token['params'] === ['contact_email' => 'karim@example.fr', 'display_name' => 'Five Toulouse Nord']
     && $create['params']['account_token'] === $tokenId
     && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
     && $create['params']['defaults']['responsibilities'] === ['fees_collector' => 'application', 'losses_collector' => 'application']
