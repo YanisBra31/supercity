@@ -120,11 +120,13 @@ function register_pro_routes(Router $r): void
             // Compte Accounts v2 : il reçoit le prix des places (paiements à destination), avec le tableau de bord
             // Express. Pour un compte français, Stripe exige la capacité carte (merchant) en plus des virements
             // (recipient). Supercity porte les frais Stripe et les litiges.
-            $acct = stripe('POST', '/v2/core/accounts', [
+            // Une plateforme française ne peut pas déclarer l'identité du pro elle-même (forme juridique…) :
+            // c'est l'inscription Stripe qui la demande. On n'envoie que le pays, et rien si Stripe le refuse aussi.
+            $params = [
                 'contact_email' => $user['email'],
                 'display_name' => $o['name'],
                 'dashboard' => 'express',
-                'identity' => ['country' => 'fr', 'entity_type' => $o['legal_form']],
+                'identity' => ['country' => 'fr'],
                 'configuration' => [
                     'merchant' => ['capabilities' => ['card_payments' => ['requested' => true]]],
                     'recipient' => ['capabilities' => ['stripe_balance' => ['stripe_transfers' => ['requested' => true]]]],
@@ -135,7 +137,17 @@ function register_pro_routes(Router $r): void
                     'responsibilities' => ['fees_collector' => 'application', 'losses_collector' => 'application'],
                 ],
                 'metadata' => ['organization_id' => (string)$o['id'], 'user_id' => (string)$user['id']],
-            ], "org-account-{$o['id']}");
+            ];
+            $create = fn(array $p) => stripe('POST', '/v2/core/accounts', $p, "org-account-{$o['id']}-" . substr(md5(json_encode($p)), 0, 10));
+            try {
+                $acct = $create($params);
+            } catch (HttpError $e) {
+                if (!str_contains(strtolower($e->getMessage()), 'account token')) {
+                    throw $e;
+                }
+                unset($params['identity']);
+                $acct = $create($params);
+            }
             query('UPDATE organizations SET stripe_account_id = ? WHERE id = ?', [$acct['id'], $o['id']]);
             $o['stripe_account_id'] = $acct['id'];
         }
