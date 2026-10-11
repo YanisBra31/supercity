@@ -39,16 +39,20 @@ if (str_starts_with($path, '/v1/') || str_starts_with($path, '/v2/')) {
 switch (true) {
     case $method === 'POST' && $path === '/v1/accounts':
         out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Stripe no longer recommends Accounts v1 for new Connect integrations.']]);
-    case $method === 'POST' && $path === '/v2/core/accounts' && str_starts_with($in['contact_email'] ?? '', 'sansconnect'):
+    case $method === 'POST' && $path === '/v2/core/account_tokens' && str_starts_with($in['contact_email'] ?? '', 'sansconnect'):
         out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'platform_registration_required', 'message' => 'The direct merchant has not signed up for Connect and cannot create connected accounts.']]);
+    case $method === 'POST' && $path === '/v2/core/account_tokens':
+        $t = 'accttok_' . (++$state['n']);
+        $state['tokens'][$t] = $in;
+        out(200, ['id' => $t, 'object' => 'v2.core.account_token', 'used' => false]);
+    case $method === 'POST' && $path === '/v2/core/accounts' && empty($in['account_token']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'account_token_required', 'message' => 'Connect platforms based in FR can only update certain identity information on a v2 Account with a merchant configuration via account tokens.']]);
+    case $method === 'POST' && $path === '/v2/core/accounts' && array_intersect(array_keys($in), ['identity', 'contact_email', 'display_name']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'param_alongside_account_token', 'message' => 'Parameter cannot be passed alongside account_token.']]);
     case $method === 'POST' && $path === '/v2/core/accounts' && empty($in['configuration']['merchant']['capabilities']['card_payments']['requested']):
         out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'The stripe_balance.stripe_transfers capability cannot be requested without the configuration.merchant.capabilities.card_payments capability.']]);
-    case $method === 'POST' && $path === '/v2/core/accounts' && array_diff(array_keys($in['identity'] ?? []), ['country']):
-        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Connect platforms based in FR can only update certain identity information on a v2 Account with a merchant configuration via account tokens.']]);
-    case $method === 'POST' && $path === '/v2/core/accounts' && str_starts_with($in['contact_email'] ?? '', 'paysrefuse') && isset($in['identity']):
-        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Connect platforms based in FR can only update identity information via account tokens.']]);
     case $method === 'POST' && $path === '/v2/core/accounts':
-        $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'capabilities' => ['transfers' => 'inactive'], 'email' => $in['contact_email'] ?? null];
+        $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'capabilities' => ['transfers' => 'inactive'], 'email' => $state['tokens'][$in['account_token']]['contact_email'] ?? null];
         $state['accounts'][$a['id']] = $a;
         out(200, ['id' => $a['id'], 'object' => 'v2.core.account', 'dashboard' => $in['dashboard'] ?? null]);
     case $method === 'POST' && $path === '/v2/core/account_links':

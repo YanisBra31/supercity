@@ -507,11 +507,15 @@ check('fixer un prix exige un compte Stripe prêt', $s === 409 && $r['error'] ==
 $st = mock('GET', '/test/state');
 $link = end($st['requests']);
 $create = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'))[0] ?? [];
-check('activer les paiements : compte Accounts v2 (carte + virements, Express), identité laissée à l\'inscription Stripe et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+$token = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/account_tokens'))[0] ?? [];
+$tokenId = array_key_first($st['tokens'] ?? []);
+check('activer les paiements : compte Accounts v2 (carte + virements, Express), identité passée par un jeton de compte (plateforme française) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
     && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['merchant', 'recipient']
     && $create['params']['configuration']['merchant']['capabilities']['card_payments']['requested'] === true
     && str_contains($link['params']['use_case']['account_onboarding']['return_url'], '/pay/back?to=exp')
-    && $create['params']['dashboard'] === 'express' && $create['params']['identity'] === ['country' => 'fr'] && $create['params']['display_name'] === 'Five Toulouse Nord'
+    && $create['params']['dashboard'] === 'express' && !isset($create['params']['identity']) && !isset($create['params']['contact_email'])
+    && $token['params'] === ['contact_email' => 'karim@example.fr', 'display_name' => 'Five Toulouse Nord', 'identity' => ['country' => 'fr']]
+    && $create['params']['account_token'] === $tokenId
     && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
     && $create['params']['defaults']['responsibilities'] === ['fees_collector' => 'application', 'losses_collector' => 'application']
     && str_ends_with((string)$create['version'], '.endive'), [$r, $link, $create]);
@@ -522,12 +526,6 @@ check('forme juridique bloquée une fois le compte Stripe créé', $s === 409 &&
 api('POST', '/me/organization', ['name' => 'Asso Sans Connect', 'kind' => 'association', 'legal_form' => 'non_profit'], $sc);
 [$s, $r] = api('POST', '/me/organization/onboard', [], $sc);
 check('Connect pas activé chez Stripe : message clair', $s === 502 && str_contains($r['message'], 'Connect'), $r);
-[$pr] = user('Pays Refuse', 'paysrefuse@example.fr');
-api('POST', '/me/organization', ['name' => 'Club Pays', 'kind' => 'club', 'legal_form' => 'non_profit'], $pr);
-[$s, $r] = api('POST', '/me/organization/onboard', [], $pr);
-$st = mock('GET', '/test/state');
-$last = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'));
-check('Stripe refuse même le pays : compte créé sans identité', $s === 200 && !isset(end($last)['params']['identity']), [$r, end($last)]);
 mock('POST', "/test/accounts/$acct/ready");
 [$s, $r] = api('GET', '/me/organization', null, $karim);
 check('compte vérifié chez Stripe : prêt à encaisser', $s === 200 && $r['organization']['payouts']['connected'] && $r['organization']['payouts']['ready'], $r);
