@@ -82,6 +82,9 @@ export type Venue = {
 
 export type Match = {
   id: number;
+  kind: 'match' | 'tournament';
+  /** Nom du tournoi ou de l'événement (espace pro). */
+  title: string | null;
   format: Format;
   starts_at: string;
   duration_min: number;
@@ -95,6 +98,8 @@ export type Match = {
   description: string | null;
   venue: Venue;
   organizer: PublicUser;
+  /** Espace pro qui publie le match, s'il y en a un. */
+  organization: OrgSummary | null;
   home_team: MatchTeam | null;
   away_team: MatchTeam | null;
   my_status: 'registered' | 'waitlist' | 'withdrawn' | 'pending' | null;
@@ -105,14 +110,27 @@ export type Match = {
   price_cents: number;
   fee_cents: number;
   is_organizer: boolean;
+  /** Ce que l'organisation touche par place, commission Supercity déduite (organisateur seulement). */
+  payout_cents: number | null;
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
 };
 
 /** Réponse d'inscription ou de désistement d'un match. */
 export type JoinResult = Match & { checkout_url?: string | null; refunded_cents?: number | null };
 
-/** Paiements de l'organisateur (compte Stripe relié). */
-export type Payouts = { enabled: boolean; connected: boolean; ready: boolean; fee_cents: number; refund_hours: number };
+export type OrgKind = 'five' | 'club' | 'association' | 'coach' | 'autre';
+export type LegalForm = 'company' | 'non_profit' | 'individual';
+export type OrgSummary = { id: number; name: string; kind: OrgKind; city: string | null; description: string | null };
+
+/** Paiements d'un espace pro (compte Stripe relié). */
+export type Payouts = { enabled: boolean; connected: boolean; ready: boolean; fee_cents: number; commission_percent: number; refund_hours: number };
+
+/** Mon espace pro : paiements et chiffres. */
+export type MyOrganization = OrgSummary & {
+  legal_form: LegalForm;
+  payouts: Payouts;
+  stats: { upcoming: number; places_sold: number; gross_cents: number; commission_cents: number; net_cents: number };
+};
 
 export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string };
 

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 // Places par défaut selon le format (modifiables à la création).
 const DEFAULT_PLAYERS = ['city5' => 10, 'futsal' => 10, 'foot8' => 16, 'foot11' => 22];
+// Un tournoi (espace pro) accueille plus de joueurs et dure plus longtemps qu'un match.
+const MATCH_MAX_PLAYERS = 30;
+const TOURNAMENT_MAX_PLAYERS = 200;
+const MATCH_MAX_MINUTES = 240;
+const TOURNAMENT_MAX_MINUTES = 720;
 
 function load_match(int $id, bool $lock = false): array
 {
@@ -76,9 +81,13 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'], 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary']]
         : null) : null;
     $organizer = one('SELECT * FROM users WHERE id = ?', [$m['organizer_id']]);
+    $org = $m['organization_id'] ? one('SELECT * FROM organizations WHERE id = ?', [$m['organization_id']]) : null;
+    $isOrganizer = $viewerId !== null && (int)$m['organizer_id'] === $viewerId;
 
     $out = [
         'id' => $id,
+        'kind' => $m['kind'],
+        'title' => $m['title'],
         'format' => $m['format'],
         'starts_at' => iso($m['starts_at']),
         'duration_min' => (int)$m['duration_min'],
@@ -94,12 +103,15 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'description' => $m['description'],
         'venue' => venue_view($venue),
         'organizer' => public_user($organizer),
+        'organization' => $org ? org_public_view($org) : null,
         'home_team' => $team($m['home_team_id']),
         'away_team' => $team($m['away_team_id']),
         'my_status' => $mine['status'] ?? null,
         'my_hold_until' => ($mine['status'] ?? null) === 'pending' ? iso($mine['hold_until']) : null,
         'my_paid' => $price > 0 && $viewerId !== null && paid_payment($id, $viewerId) !== null,
-        'is_organizer' => $viewerId !== null && (int)$m['organizer_id'] === $viewerId,
+        'is_organizer' => $isOrganizer,
+        // Ce que l'organisation touche par place, commission Supercity déduite (vu par l'organisateur seulement).
+        'payout_cents' => $isOrganizer && $price > 0 ? $price - commission_cents($price, $org) : null,
     ];
     if ($withPlayers) {
         $rows = query(
@@ -128,18 +140,54 @@ function match_validator(array $data, bool $partial): Validator
         ->int('venue_id', 1, PHP_INT_MAX)
         ->enum('format', FORMATS)
         ->datetime('starts_at')
-        ->int('duration_min', 20, 240, false)
-        ->int('max_players', 2, 30, false)
+        ->int('duration_min', 20, TOURNAMENT_MAX_MINUTES, false)
+        ->int('max_players', 2, TOURNAMENT_MAX_PLAYERS, false)
         ->int('level', 1, 5, false)
         ->int('home_team_id', 1, PHP_INT_MAX, false)
         ->int('away_team_id', 1, PHP_INT_MAX, false)
         ->enum('visibility', ['public', 'private'], false)
         ->string('description', 1, 500, false)
-        ->int('price_cents', 0, PRICE_MAX_CENTS, false);
+        ->int('price_cents', 0, PRICE_MAX_CENTS, false)
+        ->int('organization_id', 1, PHP_INT_MAX, false)
+        ->enum('kind', ['match', 'tournament'], false)
+        ->string('title', 3, 80, false);
 }
 
-/** Un match payant demande un compte Stripe prêt à encaisser, et un prix d'au moins 1 €. */
-function check_price(array $in, array $user): void
+/** Organisation au nom de laquelle on publie : forcément la sienne. */
+function event_organization(?int $orgId, array $user): ?array
+{
+    if ($orgId === null) {
+        return null;
+    }
+    $o = my_organization((int)$user['id']);
+    if (!$o || (int)$o['id'] !== $orgId) {
+        forbidden('Tu ne peux publier que pour ton propre espace pro.');
+    }
+    return $o;
+}
+
+/** Tournoi : réservé aux pros, avec un nom. Les grands effectifs et les longues durées sont réservés aux tournois. */
+function check_event(string $kind, ?array $org, ?string $title, ?int $players, ?int $minutes): void
+{
+    if ($kind === 'tournament') {
+        if (!$org) {
+            throw new HttpError(409, 'pro_only', 'Les tournois sont réservés aux espaces pro.', ['kind' => 'Réservé aux pros.']);
+        }
+        if ($title === null) {
+            throw new HttpError(422, 'validation_failed', 'Donne un nom au tournoi.', ['title' => 'Obligatoire pour un tournoi.']);
+        }
+        return;
+    }
+    if ($players !== null && $players > MATCH_MAX_PLAYERS) {
+        throw new HttpError(422, 'validation_failed', 'Un match accueille ' . MATCH_MAX_PLAYERS . ' joueurs au plus.', ['max_players' => 'Au plus ' . MATCH_MAX_PLAYERS . '.']);
+    }
+    if ($minutes !== null && $minutes > MATCH_MAX_MINUTES) {
+        throw new HttpError(422, 'validation_failed', 'Un match dure 4 h au plus.', ['duration_min' => 'Au plus 4 h.']);
+    }
+}
+
+/** Un match payant est publié par un espace pro prêt à encaisser, avec un prix d'au moins 1 €. */
+function check_price(array $in, ?array $org): void
 {
     $price = $in['price_cents'] ?? 0;
     if ($price === null || $price === 0) {
@@ -151,8 +199,11 @@ function check_price(array $in, array $user): void
     if (!stripe_config()) {
         throw new HttpError(503, 'payments_disabled', "Le paiement en ligne n'est pas encore activé.");
     }
-    if (!$user['stripe_ready']) {
-        throw new HttpError(409, 'payouts_not_ready', 'Active les paiements dans ton profil pour fixer un prix.');
+    if (!$org) {
+        throw new HttpError(409, 'pro_only', 'Les matchs payants sont réservés aux espaces pro.', ['price_cents' => 'Réservé aux pros.']);
+    }
+    if (!$org['stripe_ready']) {
+        throw new HttpError(409, 'payouts_not_ready', 'Active les paiements dans ton espace pro pour fixer un prix.');
     }
 }
 
@@ -163,7 +214,10 @@ function register_match_routes(Router $r): void
         $uid = (int)$user['id'];
         $data = body();
         $in = match_validator($data, false)->check();
-        check_price($in, $user);
+        $org = event_organization($in['organization_id'] ?? null, $user);
+        $kind = $in['kind'] ?? 'match';
+        check_event($kind, $org, $in['title'] ?? null, $in['max_players'] ?? null, $in['duration_min'] ?? null);
+        check_price($in, $org);
         if (strtotime($in['starts_at'] . ' UTC') < time()) {
             throw new HttpError(422, 'validation_failed', 'Le match doit être dans le futur.', ['starts_at' => 'Date passée.']);
         }
@@ -172,15 +226,17 @@ function register_match_routes(Router $r): void
         if (isset($in['away_team_id'])) {
             load_team($in['away_team_id']);
         }
-        $join = ($data['join'] ?? true) !== false; // l'organisateur est inscrit d'office, sauf "join": false
+        // L'organisateur est inscrit d'office, sauf "join": false, ou s'il publie pour son espace pro.
+        $join = ($data['join'] ?? !$org) !== false;
 
-        $id = transaction(function () use ($in, $uid, $join) {
+        $id = transaction(function () use ($in, $uid, $join, $org, $kind) {
             query(
-                'INSERT INTO matches (organizer_id, venue_id, format, starts_at, duration_min, max_players, level,
+                'INSERT INTO matches (organizer_id, organization_id, kind, title, venue_id, format, starts_at, duration_min, max_players, level,
                    home_team_id, away_team_id, visibility, description, price_cents)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
-                    $uid, $in['venue_id'], $in['format'], $in['starts_at'], $in['duration_min'] ?? 60,
+                    $uid, $org['id'] ?? null, $kind, $in['title'] ?? null,
+                    $in['venue_id'], $in['format'], $in['starts_at'], $in['duration_min'] ?? ($kind === 'tournament' ? 240 : 60),
                     $in['max_players'] ?? DEFAULT_PLAYERS[$in['format']], $in['level'] ?? null,
                     $in['home_team_id'] ?? null, $in['away_team_id'] ?? null, $in['visibility'] ?? 'public',
                     $in['description'] ?? null, $in['price_cents'] ?? 0,
@@ -208,6 +264,7 @@ function register_match_routes(Router $r): void
             ->datetime('from', false)
             ->datetime('to', false)
             ->int('level', 1, 5, false)
+            ->enum('kind', ['match', 'tournament'], false)
             ->check();
         $select = 'm.*';
         $params = [];
@@ -226,6 +283,10 @@ function register_match_routes(Router $r): void
             // Matchs sans niveau imposé, ou à un cran près du niveau demandé.
             $where[] = '(m.level IS NULL OR ABS(m.level - ?) <= 1)';
             $whereParams[] = $f['level'];
+        }
+        if (!empty($f['kind'])) {
+            $where[] = 'm.kind = ?';
+            $whereParams[] = $f['kind'];
         }
         if (($_GET['spots'] ?? '') === '1') {
             $where[] = 'm.status = "open"';
@@ -283,14 +344,22 @@ function register_match_routes(Router $r): void
             throw new HttpError(409, 'match_closed', 'Ce match est terminé ou annulé.');
         }
         $in = match_validator(body(), true)->check();
-        unset($in['format']); // le format fixe les places : on ne le change pas après coup
+        unset($in['format'], $in['organization_id'], $in['kind']); // fixés à la création
+        $org = $m['organization_id'] ? one('SELECT * FROM organizations WHERE id = ?', [$m['organization_id']]) : null;
+        check_event(
+            $m['kind'],
+            $org,
+            array_key_exists('title', $in) ? $in['title'] : $m['title'],
+            $in['max_players'] ?? null,
+            $in['duration_min'] ?? null
+        );
         if (array_key_exists('price_cents', $in)) {
             $in['price_cents'] ??= 0;
             if ($in['price_cents'] !== (int)$m['price_cents']) {
                 if (one('SELECT id FROM payments WHERE match_id = ? AND status IN ("open", "paid") LIMIT 1', [$m['id']])) {
                     throw new HttpError(409, 'price_locked', 'Des joueurs ont déjà payé : le prix ne peut plus changer.', ['price_cents' => 'Déjà payé par des joueurs.']);
                 }
-                check_price($in, $user);
+                check_price($in, $org);
             }
         }
         if (isset($in['starts_at']) && strtotime($in['starts_at'] . ' UTC') < time()) {
@@ -364,7 +433,7 @@ function register_match_routes(Router $r): void
                 }
                 return $current['status'] === 'pending' ? $m : null;
             }
-            if ($paid && !one('SELECT stripe_ready FROM users WHERE id = ? AND stripe_ready = 1', [$m['organizer_id']])) {
+            if ($paid && !payee($m)['stripe_ready']) {
                 throw new HttpError(409, 'organizer_not_ready', "L'organisateur ne peut pas encore encaisser. Réessaie plus tard.");
             }
             $free = registered_count((int)$m['id']) < (int)$m['max_players'];

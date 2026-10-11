@@ -25,6 +25,7 @@ return [
     'stripe' => [
         'secret_key' => '',            // sk_live_... (ou sk_test_... pour essayer sans vrai argent)
         'webhook_secret' => '',        // whsec_... affiché à la création du webhook
-        'fee_cents' => 50,             // frais de service Supercity par place, en centimes
+        'fee_cents' => 50,             // frais de service Supercity par place, en centimes, payés par le joueur
+        'commission_percent' => 10,    // commission Supercity sur le prix des places des espaces pro
     ],
 ];

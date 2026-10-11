@@ -1,11 +1,11 @@
-// Organiser un match : format, date, terrain, puis options.
+// Organiser un match : format, date, terrain, puis options. Un espace pro publie aussi des tournois et fixe un prix.
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { Hero } from '../../components/brand';
 import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
-import { ApiError, Format, get, Match, Payouts, post, Team, Venue } from '../../lib/api';
+import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
 import { Place } from '../../lib/address';
@@ -13,6 +13,7 @@ import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 import { takeLastVenue } from '../../lib/venueStore';
 
 const TIMES = Array.from({ length: 32 }, (_, i) => 8 * 60 + i * 30); // 8h00 → 23h30
+const TOURNAMENT_HOURS = [2, 3, 4, 6, 8, 10];
 
 function HScroll({ children }: { children: React.ReactNode }) {
   return (
@@ -40,7 +41,11 @@ export default function CreateMatch() {
   const [level, setLevel] = useState<number | null>(null);
   const [maxPlayers, setMaxPlayers] = useState<number | null>(null);
   const [price, setPrice] = useState(0);
-  const [payouts, setPayouts] = useState<Payouts | null>(null);
+  const [org, setOrg] = useState<MyOrganization | null>(null);
+  const [asOrg, setAsOrg] = useState(true);
+  const [tournament, setTournament] = useState(false);
+  const [title, setTitle] = useState('');
+  const [hours, setHours] = useState(4);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState<number | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -48,7 +53,16 @@ export default function CreateMatch() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const players = maxPlayers ?? FORMATS.find((f) => f.value === format)!.players;
+  const pro = !!org && asOrg;
+  const isTournament = pro && tournament;
+  const formatPlayers = FORMATS.find((f) => f.value === format)!.players;
+  const teamSize = formatPlayers / 2;
+  // Tournoi : on compte par équipes (8 équipes par défaut), jusqu'à 200 joueurs.
+  const players = maxPlayers ?? (isTournament ? teamSize * 8 : formatPlayers);
+  const maxAllowed = isTournament ? 200 : 30;
+  const step = isTournament ? teamSize : 1;
+  const payouts = pro ? org!.payouts : null;
+  const payout = payouts ? price - Math.round((price * payouts.commission_percent) / 100) : 0;
 
   const loadVenues = useCallback(async (search: string) => {
     const c = await getSearchCenter();
@@ -70,7 +84,7 @@ export default function CreateMatch() {
       if (created) setVenue(created);
       loadVenues('');
       get<{ items: Team[] }>('/me/teams').then((r) => setTeams(r.items)).catch(() => undefined);
-      get<Payouts>('/me/payouts').then(setPayouts).catch(() => undefined);
+      get<{ organization: MyOrganization | null }>('/me/organization').then((r) => setOrg(r.organization)).catch(() => undefined);
     }, [loadVenues])
   );
 
@@ -84,7 +98,8 @@ export default function CreateMatch() {
     setError('');
     if (minutes === null) return setError("Choisis l'heure du match.");
     if (!venue) return setError('Choisis un terrain.');
-    if (price > 0 && !payouts?.ready) return setError('Active les paiements dans ton profil pour fixer un prix.');
+    if (isTournament && title.trim().length < 3) return setError('Donne un nom au tournoi.');
+    if (price > 0 && !payouts?.ready) return setError('Active les paiements dans ton espace pro pour fixer un prix.');
     const start = new Date(days[day]);
     start.setMinutes(minutes);
     setLoading(true);
@@ -95,13 +110,16 @@ export default function CreateMatch() {
         venue_id: venue.id,
         level,
         max_players: players,
-        home_team_id: teamId,
+        home_team_id: pro ? null : teamId,
         visibility: isPrivate ? 'private' : 'public',
         description: description.trim() || null,
-        price_cents: price,
+        price_cents: pro ? price : 0,
+        ...(pro ? { organization_id: org!.id, kind: isTournament ? 'tournament' : 'match', title: title.trim() || null } : {}),
+        ...(isTournament ? { duration_min: hours * 60 } : {}),
       });
       setMinutes(null);
       setDescription('');
+      setTitle('');
       router.push(`/match/${m.id}`);
     } catch (e) {
       setError(e instanceof ApiError ? Object.values(e.fields)[0] ?? e.message : 'Création impossible.');
@@ -112,7 +130,34 @@ export default function CreateMatch() {
 
   return (
     <Screen top>
-      <Hero kicker="Coup d'envoi" title="Organise ton match" sub="Publie-le, les joueurs du coin s'inscrivent." />
+      <Hero kicker="Coup d'envoi" title={isTournament ? 'Organise ton tournoi' : 'Organise ton match'} sub="Publie-le, les joueurs du coin s'inscrivent." />
+
+      {org ? (
+        <>
+          <Label>Publier</Label>
+          <Chips
+            options={[{ value: 'org', label: org.name }, { value: 'me', label: 'En mon nom' }]}
+            value={asOrg ? 'org' : 'me'}
+            onChange={(v) => { setAsOrg(v === 'org'); setMaxPlayers(null); }}
+          />
+          {pro ? (
+            <>
+              <Chips
+                options={[{ value: 'match', label: 'Match / créneau' }, { value: 'tournament', label: 'Tournoi' }]}
+                value={tournament ? 'tournament' : 'match'}
+                onChange={(v) => { setTournament(v === 'tournament'); setMaxPlayers(null); }}
+              />
+              <Field
+                label={isTournament ? 'Nom du tournoi' : 'Nom (facultatif)'}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={80}
+                placeholder={isTournament ? 'Tournoi de la Toussaint' : 'Foot du jeudi soir'}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
 
       <Label>Format</Label>
       <Chips options={FORMATS.map((f) => ({ value: f.value, label: `${f.label} · ${f.short}` }))} value={format} onChange={(v) => { if (v) { setFormat(v); setMaxPlayers(null); } }} />
@@ -171,12 +216,20 @@ export default function CreateMatch() {
       <Label>Niveau visé</Label>
       <Chips options={LEVELS.map((l, i) => ({ value: i + 1, label: l }))} value={level} onChange={setLevel} allowEmpty />
 
+      {isTournament ? (
+        <>
+          <Label>Durée</Label>
+          <Chips options={TOURNAMENT_HOURS.map((h) => ({ value: h, label: `${h} h` }))} value={hours} onChange={(v) => v && setHours(v)} />
+        </>
+      ) : null}
+
       <Label>Nombre de joueurs</Label>
       <View style={s.row}>
-        <Button title="−" variant="ghost" onPress={() => setMaxPlayers(Math.max(2, players - 1))} style={{ width: 54 }} />
+        <Button title="−" variant="ghost" onPress={() => setMaxPlayers(Math.max(2, players - step))} style={{ width: 54 }} />
         <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 50, textAlign: 'center' }}>{players}</Text>
-        <Button title="+" variant="ghost" onPress={() => setMaxPlayers(Math.min(30, players + 1))} style={{ width: 54 }} />
+        <Button title="+" variant="ghost" onPress={() => setMaxPlayers(Math.min(maxAllowed, players + step))} style={{ width: 54 }} />
       </View>
+      {isTournament ? <Text style={s.sub}>Soit {Math.floor(players / teamSize)} équipes de {teamSize}.</Text> : null}
 
       {payouts?.enabled ? (
         <>
@@ -189,20 +242,21 @@ export default function CreateMatch() {
           {price > 0 ? (
             payouts.ready ? (
               <Text style={s.sub}>
-                Chaque joueur paie {euros(price + payouts.fee_cents)} ({euros(payouts.fee_cents)} de frais de service). Tu reçois {euros(price * (players - 1))} si le match est complet.
+                Chaque joueur paie {euros(price + payouts.fee_cents)} ({euros(payouts.fee_cents)} de frais de service). Tu reçois {euros(payout)} par place
+                ({String(payouts.commission_percent).replace('.', ',')} % de commission Supercity), soit {euros(payout * players)} si c'est complet.
               </Text>
             ) : (
               <Card style={{ gap: 8, borderColor: colors.orange2, borderWidth: 2 }}>
                 <Text style={{ ...font.bold, color: colors.ink }}>Active les paiements pour encaisser</Text>
-                <Text style={s.sub}>Relie ton compte bancaire via Stripe, une seule fois.</Text>
-                <Button title="Activer les paiements" icon="card-outline" onPress={() => router.push('/payouts')} />
+                <Text style={s.sub}>Stripe vérifie ta structure et son RIB, une seule fois.</Text>
+                <Button title="Activer les paiements" icon="card-outline" onPress={() => router.push('/pro')} />
               </Card>
             )
           ) : null}
         </>
       ) : null}
 
-      {teams.length ? (
+      {teams.length && !pro ? (
         <>
           <Label>Avec mon équipe</Label>
           <Chips options={teams.map((t) => ({ value: t.id, label: t.name }))} value={teamId} onChange={setTeamId} allowEmpty />
@@ -219,7 +273,10 @@ export default function CreateMatch() {
       <Field label="Infos pour les joueurs" value={description} onChangeText={setDescription} placeholder="Chasubles fournies, rendez-vous 10 min avant…" multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
 
       <ErrorText>{error}</ErrorText>
-      <Button title="Publier le match" icon="megaphone-outline" onPress={submit} loading={loading} />
+      <Button title={isTournament ? 'Publier le tournoi' : 'Publier le match'} icon="megaphone-outline" onPress={submit} loading={loading} />
+      {!org ? (
+        <Button title="Tu gères un five ou une asso ? Espace pro" variant="ghost" icon="briefcase-outline" onPress={() => router.push('/pro')} />
+      ) : null}
     </Screen>
   );
 }

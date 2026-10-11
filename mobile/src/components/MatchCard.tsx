@@ -45,14 +45,15 @@ export function MatchCard({ match: m, index }: { match: Match; index?: number })
       <View style={st.body}>
         <View style={st.head}>
           <Text style={st.format}>
-            {formatLabel(m.format)} <Text style={{ color: colors.dim }}>· {formatShort(m.format)}</Text>
+            {m.kind === 'tournament' ? 'Tournoi' : formatLabel(m.format)} <Text style={{ color: colors.dim }}>· {formatShort(m.format)}</Text>
           </Text>
           {statusPill(m)}
         </View>
         <Text style={st.venue} numberOfLines={1}>
-          {m.venue.name}
+          {m.title ?? m.venue.name}
         </Text>
-        <Meta icon="location-outline">{[m.venue.city, dist].filter(Boolean).join(' · ') || m.venue.address}</Meta>
+        <Meta icon="location-outline">{[m.title ? m.venue.name : null, m.venue.city, dist].filter(Boolean).join(' · ') || m.venue.address}</Meta>
+        {m.organization ? <Meta icon="briefcase-outline">{m.organization.name}</Meta> : null}
         {m.home_team ? (
           <Meta icon="shield-outline">{`${m.home_team.name} vs ${m.away_team?.name ?? 'adversaire à trouver'}`}</Meta>
         ) : (

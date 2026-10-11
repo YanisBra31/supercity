@@ -1,5 +1,5 @@
 <?php
-// Faux Stripe pour les tests (serveur PHP intégré) : comptes, sessions de paiement, remboursements.
+// Faux Stripe pour les tests (serveur PHP intégré) : comptes, sessions de paiement, remboursements, retours de virement.
 // Usage : STRIPE_MOCK_STATE=/tmp/stripe.json php -S 127.0.0.1:8097 tests/stripe_mock.php
 // Routes de test : POST /test/accounts/{id}/ready, POST /test/sessions/{id}/pay, GET /test/state.
 declare(strict_types=1);
@@ -67,6 +67,12 @@ switch (true) {
         }
         $state['sessions'][$m[1]]['status'] = 'expired';
         out(200, $state['sessions'][$m[1]]);
+    case $method === 'GET' && preg_match('#^/v1/payment_intents/(\w+)$#', $path, $m) === 1:
+        out(200, ['id' => $m[1], 'object' => 'payment_intent', 'latest_charge' => ['id' => "ch_{$m[1]}", 'transfer' => "tr_{$m[1]}"]]);
+    case $method === 'POST' && preg_match('#^/v1/transfers/(\w+)/reversals$#', $path, $m) === 1:
+        $r = ['id' => $id('trr'), 'object' => 'transfer_reversal', 'transfer' => $m[1]] + $in;
+        $state['reversals'][] = $r;
+        out(200, $r);
     case $method === 'POST' && $path === '/v1/refunds':
         $r = ['id' => $id('re'), 'object' => 'refund', 'status' => 'succeeded'] + $in;
         $state['refunds'][] = $r;

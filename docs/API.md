@@ -137,15 +137,20 @@ Chaque joueur porte un `site_role` : `user`, `moderator` ou `admin` (à ne pas c
 | DELETE | `/mod/users/{id}/suspend` | | modérateur | Lève la suspension |
 | POST | `/admin/users/{id}/role` | `role` : user, moderator, admin | admin | Change le rôle (pas le sien) |
 
-## Paiement de la place
+## Espace pro et paiement de la place
 
-Un match peut avoir un prix par joueur (`price_cents`, de 100 à 5000, 0 = gratuit). Le joueur paie ce prix plus les frais de service Supercity (`fee_cents`, 50 par défaut) par Stripe Checkout. Le prix part à l'organisateur (compte Stripe Connect Express), les frais restent à Supercity. L'organisateur joue sans payer. Sans bloc `stripe` dans la configuration, les matchs restent gratuits (`503 payments_disabled` si on fixe un prix).
+Un five, un club, une association ou un coach crée son espace pro (une organisation par compte). Les matchs payants et les tournois sont publiés au nom de cette organisation (`organization_id` à la création) ; un joueur seul ne publie que des matchs gratuits (`409 pro_only`).
+
+Le joueur paie le prix (`price_cents`, de 100 à 5000) plus les frais de service Supercity (`fee_cents`, 50 par défaut) par Stripe Checkout, qui propose la carte, Apple Pay et Google Pay. L'organisation reçoit le prix moins la commission Supercity (`commission_percent` de la config, 10 % par défaut, ou le taux négocié dans `organizations.commission_percent`). Sans bloc `stripe` dans la configuration, les matchs restent gratuits (`503 payments_disabled` si on fixe un prix).
 
 | Méthode | Chemin | Corps | Effet |
 |---|---|---|---|
-| GET | `/me/payouts` | | `enabled`, `connected`, `ready`, `fee_cents`, `refund_hours` ; met à jour `ready` depuis Stripe |
-| POST | `/me/payouts/onboard` | `return_url` facultatif | Crée le compte Stripe au besoin, renvoie `url` (inscription Stripe) |
-| POST | `/me/payouts/dashboard` | | Renvoie `url` du tableau de bord Stripe (virements) |
+| GET | `/me/organization` | | `organization` (ou null) : `name`, `kind`, `legal_form`, `payouts` (`enabled`, `connected`, `ready`, `fee_cents`, `commission_percent`, `refund_hours`), `stats` (`upcoming`, `places_sold`, `gross_cents`, `commission_cents`, `net_cents`) |
+| POST | `/me/organization` | `name`, `kind` (five, club, association, coach, autre), `legal_form` (company, non_profit, individual), `city`, `description` | Crée l'espace pro |
+| PATCH | `/me/organization` | mêmes champs | `legal_form` bloquée une fois le compte Stripe créé |
+| POST | `/me/organization/onboard` | `return_url` facultatif | Crée le compte Stripe de l'organisation au besoin, renvoie `url` (inscription Stripe) |
+| POST | `/me/organization/dashboard` | | Renvoie `url` du tableau de bord Stripe (virements) |
+| GET | `/organizations/{id}` | | Page publique et `matches` publics à venir |
 | POST | `/matches/{id}/join` | `return_url` facultatif | Match payant : place réservée 30 min (`my_status: pending`), renvoie `checkout_url` |
 | POST | `/matches/{id}/pay` | `return_url` facultatif | Nouvelle page de paiement pour une place réservée |
 | POST | `/matches/{id}/pay/confirm` | | Vérifie chez Stripe et valide le paiement sans attendre le webhook |
@@ -153,9 +158,11 @@ Un match peut avoir un prix par joueur (`price_cents`, de 100 à 5000, 0 = gratu
 | GET | `/pay/back?to=` | | Page de retour Stripe qui renvoie vers l'appli (`supercity://`, `exp://` ou une origine de `cors_origins`) |
 
 Règles :
-- Les vues de match ajoutent `price_cents`, `fee_cents`, `my_hold_until` et `my_paid`.
+- Les vues de match ajoutent `kind` (match, tournament), `title`, `organization`, `price_cents`, `fee_cents`, `my_hold_until`, `my_paid`, et pour l'organisateur `payout_cents` (prix moins commission).
+- Tournoi (`kind: tournament`) : espace pro seulement, `title` obligatoire, jusqu'à 200 joueurs et 12 h. Un match reste à 30 joueurs et 4 h au plus. `GET /matches?kind=tournament` ne liste que les tournois.
+- Publié pour un espace pro, l'organisateur n'est pas inscrit d'office.
 - Place non payée à temps : elle passe au premier de la liste d'attente, qui a 6 h (au plus jusqu'au coup d'envoi) pour payer.
 - Paiement arrivé après la fin de la réservation et match complet : remboursé en entier.
-- Désistement plus de 24 h avant : prix remboursé, frais gardés (`refunded_cents` dans la réponse). Moins de 24 h : pas de remboursement, et pas de second paiement si le joueur revient.
+- Désistement plus de 24 h avant : prix remboursé, frais gardés (`refunded_cents` dans la réponse). L'organisation rend ce qu'elle a reçu (retour de virement), Supercity rend sa commission. Moins de 24 h : pas de remboursement, et pas de second paiement si le joueur revient.
 - Match annulé : tout le monde est remboursé, frais compris.
 - Le prix ne change plus une fois qu'un joueur a payé (`409 price_locked`). Les défis entre équipes se font sur des matchs gratuits.

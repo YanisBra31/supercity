@@ -38,7 +38,8 @@ function RootStack() {
         <Stack.Screen name="verify" options={{ title: 'Confirmation' }} />
         <Stack.Screen name="password" options={{ title: 'Mot de passe', presentation: 'modal' }} />
         <Stack.Screen name="moderation" options={{ title: 'Modération' }} />
-        <Stack.Screen name="payouts" options={{ title: 'Paiements' }} />
+        <Stack.Screen name="pro" options={{ title: 'Espace pro' }} />
+        <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
       </Stack.Protected>
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
     </Stack>

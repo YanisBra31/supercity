@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['payments', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -483,31 +483,52 @@ $lastSession = function (): array {
 $back = 'exp://192.168.1.20:8081/--/match';
 $in3days = gmdate('Y-m-d\TH:i:s\Z', time() + 3 * 86400);
 
-[$s, $r] = api('GET', '/me/payouts', null, $karim);
-check('paiements disponibles, compte organisateur pas encore relié, frais de 0,50 €', $s === 200 && $r['enabled'] && !$r['connected'] && !$r['ready'] && $r['fee_cents'] === 50, $r);
 [$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 500], $karim);
+check('match payant sans espace pro : refusé', $s === 409 && $r['error'] === 'pro_only', $r);
+[$s, $r] = api('GET', '/me/organization', null, $karim);
+check('pas encore d\'espace pro', $s === 200 && $r['organization'] === null, $r);
+[$s, $r] = api('POST', '/me/organization', ['name' => 'X', 'kind' => 'five', 'legal_form' => 'company'], $karim);
+check('espace pro : nom trop court refusé', $s === 422 && isset($r['fields']['name']), $r);
+[$s, $r] = api('POST', '/me/organization', ['name' => 'Five Toulouse Nord', 'kind' => 'five', 'legal_form' => 'company', 'city' => 'Toulouse'], $karim);
+$org = $r['organization'] ?? [];
+check('espace pro créé : paiements pas encore reliés, commission de 10 %', $s === 201 && $org['name'] === 'Five Toulouse Nord' && !$org['payouts']['connected']
+    && $org['payouts']['enabled'] && $org['payouts']['fee_cents'] === 50 && $org['payouts']['commission_percent'] == 10 && $org['stats']['places_sold'] === 0, $r);
+[$s, $r] = api('POST', '/me/organization', ['name' => 'Deuxième', 'kind' => 'club', 'legal_form' => 'company'], $karim);
+check('un seul espace pro par compte', $s === 409, $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'organization_id' => $org['id']], $lea);
+check('publier pour l\'espace pro d\'un autre : interdit', $s === 403, $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'kind' => 'tournament', 'title' => 'Tournoi', 'max_players' => 40], $lea);
+check('tournoi sans espace pro : refusé', $s === 409 && $r['error'] === 'pro_only', $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'max_players' => 40], $lea);
+check('match de plus de 30 joueurs : refusé', $s === 422 && isset($r['fields']['max_players']), $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'price_cents' => 500], $karim);
 check('fixer un prix exige un compte Stripe prêt', $s === 409 && $r['error'] === 'payouts_not_ready', $r);
-[$s, $r] = api('POST', '/me/payouts/onboard', ['return_url' => "$back/payouts"], $karim);
+[$s, $r] = api('POST', '/me/organization/onboard', ['return_url' => "$back/pro"], $karim);
 $st = mock('GET', '/test/state');
 $link = end($st['requests']);
 $create = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'))[0] ?? [];
-check('activer les paiements : compte Accounts v2 (destinataire, Express) et lien Stripe renvoyé', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+check('activer les paiements : compte Accounts v2 de la société (destinataire, Express) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
     && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['recipient']
     && str_contains($link['params']['use_case']['account_onboarding']['return_url'], '/pay/back?to=exp')
-    && $create['params']['dashboard'] === 'express' && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
+    && $create['params']['dashboard'] === 'express' && $create['params']['identity']['entity_type'] === 'company' && $create['params']['display_name'] === 'Five Toulouse Nord'
+    && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
     && $create['params']['defaults']['responsibilities'] === ['fees_collector' => 'application', 'losses_collector' => 'application']
     && str_ends_with((string)$create['version'], '.endive'), [$r, $link, $create]);
 $acct = array_key_last($st['accounts']);
+[$s, $r] = api('PATCH', '/me/organization', ['legal_form' => 'non_profit'], $karim);
+check('forme juridique bloquée une fois le compte Stripe créé', $s === 409 && $r['error'] === 'legal_form_locked', $r);
 [$sc] = user('Sans Connect', 'sansconnect@example.fr');
-[$s, $r] = api('POST', '/me/payouts/onboard', [], $sc);
+api('POST', '/me/organization', ['name' => 'Asso Sans Connect', 'kind' => 'association', 'legal_form' => 'non_profit'], $sc);
+[$s, $r] = api('POST', '/me/organization/onboard', [], $sc);
 check('Connect pas activé chez Stripe : message clair', $s === 502 && str_contains($r['message'], 'Connect'), $r);
 mock('POST', "/test/accounts/$acct/ready");
-[$s, $r] = api('GET', '/me/payouts', null, $karim);
-check('compte vérifié chez Stripe : prêt à encaisser', $s === 200 && $r['connected'] && $r['ready'], $r);
-[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 50], $karim);
+[$s, $r] = api('GET', '/me/organization', null, $karim);
+check('compte vérifié chez Stripe : prêt à encaisser', $s === 200 && $r['organization']['payouts']['connected'] && $r['organization']['payouts']['ready'], $r);
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'price_cents' => 50], $karim);
 check('prix minimum 1 €', $s === 422 && isset($r['fields']['price_cents']), $r);
-[$s, $pm] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'price_cents' => 500, 'max_players' => 3], $karim);
-check('match à 5 € : l\'organisateur est inscrit sans payer', $s === 201 && $pm['price_cents'] === 500 && $pm['fee_cents'] === 50 && $pm['my_status'] === 'registered' && $pm['spots_left'] === 2, $pm);
+[$s, $pm] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'price_cents' => 500, 'max_players' => 2], $karim);
+check('match pro à 5 € : publié au nom du five, sans y inscrire le gérant, 4,50 € reversés par place', $s === 201 && $pm['price_cents'] === 500 && $pm['fee_cents'] === 50
+    && $pm['organization']['name'] === 'Five Toulouse Nord' && $pm['my_status'] === null && $pm['spots_left'] === 2 && $pm['payout_cents'] === 450, $pm);
 $pid = $pm['id'];
 
 [$s, $r] = api('POST', "/matches/$pid/join", ['return_url' => $back], $lea);
@@ -515,16 +536,18 @@ $sess = $lastSession();
 $pi = $sess['params']['payment_intent_data'] ?? [];
 check('rejoindre un match payant : place réservée et page de paiement', $s === 200 && $r['my_status'] === 'pending' && $r['my_hold_until'] && $r['spots_left'] === 1
     && str_starts_with((string)$r['checkout_url'], 'https://checkout.stripe.test/'), $r);
-check('Stripe : 5 € de place + 0,50 € de frais, frais gardés par Supercity, le reste à l\'organisateur',
+check('Stripe : 5 € de place + 0,50 € de frais ; Supercity garde frais et commission (1 €), le reste au five',
     $sess['params']['line_items'][0]['price_data']['unit_amount'] === '500' && $sess['params']['line_items'][1]['price_data']['unit_amount'] === '50'
-    && $pi['application_fee_amount'] === '50' && $pi['transfer_data']['destination'] === $acct, $sess['params'] ?? null);
+    && $pi['application_fee_amount'] === '100' && $pi['transfer_data']['destination'] === $acct, $sess['params'] ?? null);
+[$s, $r] = api('GET', "/matches/$pid", null, $lea);
+check('un joueur ne voit pas ce que touche le five', $r['payout_cents'] === null, $r);
 [$s, $r] = api('POST', "/matches/$pid/pay/confirm", null, $lea);
 check('pas encore payé : la place reste réservée', $s === 200 && $r['my_status'] === 'pending', $r);
 check('webhook mal signé refusé', webhook('checkout.session.completed', $sess, 'whsec_faux') === 400);
 $paidSess = mock('POST', "/test/sessions/{$sess['id']}/pay");
 check('webhook signé accepté', webhook('checkout.session.completed', $paidSess) === 200);
 [$s, $r] = api('GET', "/matches/$pid", null, $lea);
-check('paiement validé : inscrite', $r['my_status'] === 'registered' && $r['my_paid'] === true && $r['players_count'] === 2, $r);
+check('paiement validé : inscrite', $r['my_status'] === 'registered' && $r['my_paid'] === true && $r['players_count'] === 1, $r);
 webhook('checkout.session.completed', $paidSess);
 api('POST', "/matches/$pid/pay/confirm", null, $lea);
 $n = $pdo->query("SELECT COUNT(*) FROM payments WHERE match_id = $pid AND status = 'paid'")->fetchColumn();
@@ -553,11 +576,13 @@ check('prix bloqué une fois que des joueurs ont payé', $s === 409 && $r['error
 [$s, $r] = api('DELETE', "/matches/$pid/join", null, $lea);
 $st = mock('GET', '/test/state');
 $ref = end($st['refunds']);
+$rev = end($st['reversals']);
 check('désistement plus de 24 h avant : place remboursée, frais gardés', $s === 200 && $r['refunded_cents'] === 500 && $ref['amount'] === '500'
-    && $ref['refund_application_fee'] === 'false' && $ref['reverse_transfer'] === 'true', [$r, $ref]);
+    && $ref['refund_application_fee'] === 'false' && $ref['reverse_transfer'] === 'false', [$r, $ref]);
+check('le five rend ce qu\'il a reçu (4,50 €), Supercity rend sa commission', $rev['amount'] === '450' && str_starts_with($rev['transfer'], 'tr_pi'), $rev);
 
 $in10h = gmdate('Y-m-d\TH:i:s\Z', time() + 10 * 3600);
-[$s, $late] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in10h, 'price_cents' => 400], $karim);
+[$s, $late] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in10h, 'price_cents' => 400, 'organization_id' => $org['id']], $karim);
 api('POST', "/matches/{$late['id']}/join", ['return_url' => $back], $lea);
 webhook('checkout.session.completed', mock('POST', '/test/sessions/' . $lastSession()['id'] . '/pay'));
 [$s, $r] = api('DELETE', "/matches/{$late['id']}/join", null, $lea);
@@ -567,7 +592,32 @@ check('revenir après un désistement non remboursé : pas de second paiement', 
 [$s, $r] = api('POST', "/matches/{$late['id']}/cancel", null, $karim);
 $st = mock('GET', '/test/state');
 $ref = end($st['refunds']);
-check('match annulé : remboursé en entier, frais compris', $s === 200 && $ref['amount'] === '450' && $ref['refund_application_fee'] === 'true', $ref);
+check('match annulé : remboursé en entier, frais compris', $s === 200 && $ref['amount'] === '450' && $ref['refund_application_fee'] === 'true' && $ref['reverse_transfer'] === 'true', $ref);
+
+echo "Espace pro\n";
+[$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'foot8', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'kind' => 'tournament', 'max_players' => 64], $karim);
+check('tournoi sans nom : refusé', $s === 422 && isset($r['fields']['title']), $r);
+[$s, $t] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'foot8', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'kind' => 'tournament',
+    'title' => 'Tournoi de la Toussaint', 'max_players' => 64, 'duration_min' => 480, 'price_cents' => 1000], $karim);
+check('tournoi pro : 64 joueurs, 8 h, 10 €', $s === 201 && $t['kind'] === 'tournament' && $t['title'] === 'Tournoi de la Toussaint' && $t['max_players'] === 64 && $t['duration_min'] === 480 && $t['payout_cents'] === 900, $t);
+[$s, $r] = api('PATCH', "/matches/{$t['id']}", ['title' => null], $karim);
+check('un tournoi garde son nom', $s === 422 && isset($r['fields']['title']), $r);
+api('POST', "/matches/{$t['id']}/join", ['return_url' => $back], $lea);
+$sess = $lastSession();
+check('inscription au tournoi : libellé du tournoi sur la page de paiement, commission de 1 €', str_starts_with($sess['params']['line_items'][0]['price_data']['product_data']['name'], 'Inscription · Tournoi de la Toussaint')
+    && $sess['params']['payment_intent_data']['application_fee_amount'] === '150', $sess['params']);
+webhook('checkout.session.completed', mock('POST', "/test/sessions/{$sess['id']}/pay"));
+[$s, $r] = api('GET', '/me/organization', null, $karim);
+$stats = $r['organization']['stats'] ?? [];
+check('chiffres du five : places vendues, commission déduite, remboursements exclus', $stats['places_sold'] === 1 && $stats['gross_cents'] === 1000
+    && $stats['commission_cents'] === 100 && $stats['net_cents'] === 900 && $stats['upcoming'] === 2, $stats);
+[$s, $r] = api('GET', '/matches?kind=tournament', null, $lea);
+check('recherche des tournois seulement', $s === 200 && array_column($r['items'], 'id') === [$t['id']], $r);
+[$s, $r] = api('GET', "/organizations/{$org['id']}", null, $lea);
+check('page publique du five avec ses matchs à venir', $s === 200 && $r['name'] === 'Five Toulouse Nord' && !isset($r['payouts']) && in_array($t['id'], array_column($r['matches'], 'id')), $r);
+$pdo->exec("UPDATE organizations SET commission_percent = 5 WHERE id = {$org['id']}");
+[$s, $r] = api('GET', "/matches/{$t['id']}", null, $karim);
+check('taux de commission négocié pour une organisation', $r['payout_cents'] === 950, $r);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);
