@@ -150,7 +150,6 @@ function register_pro_routes(Router $r): void
             'use_case' => [
                 'type' => 'account_onboarding',
                 'account_onboarding' => [
-                    'configurations' => ['merchant', 'recipient'],
                     'refresh_url' => bounce_url($back, ['onboard' => 'retry']),
                     'return_url' => bounce_url($back, ['onboard' => 'done']),
                 ],
