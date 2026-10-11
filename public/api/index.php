@@ -14,6 +14,7 @@ require __DIR__ . '/src/challenges.php';
 require __DIR__ . '/src/feed.php';
 require __DIR__ . '/src/moderation.php';
 require __DIR__ . '/src/payments.php';
+require __DIR__ . '/src/pros.php';
 
 date_default_timezone_set('UTC');
 
@@ -45,6 +46,7 @@ try {
     register_feed_routes($router);
     register_moderation_routes($router);
     register_payment_routes($router);
+    register_pro_routes($router);
     $router->dispatch($method, $path);
 } catch (HttpError $e) {
     $payload = ['error' => $e->errorCode, 'message' => $e->getMessage()];

@@ -1,6 +1,6 @@
 <?php
-// Paiement de la place (Stripe Connect) : l'organisateur relie son compte Stripe, le joueur paie le prix
-// de la place plus les frais de service Supercity, l'argent part à l'organisateur et les frais restent à Supercity.
+// Paiement de la place (Stripe Connect) : l'organisation pro relie son compte Stripe, le joueur paie le prix
+// de la place plus les frais de service Supercity. L'organisation reçoit le prix moins la commission Supercity.
 declare(strict_types=1);
 
 const HOLD_MINUTES = 30;          // place réservée pendant le paiement (minimum imposé par Stripe Checkout)
@@ -17,6 +17,17 @@ function stripe_config(): ?array
 function service_fee(): int
 {
     return (int)(stripe_config()['fee_cents'] ?? 50);
+}
+
+/** Commission Supercity sur le prix de la place, en % : taux négocié de l'organisation, sinon celui de la config. */
+function commission_percent(?array $org): float
+{
+    return (float)($org['commission_percent'] ?? stripe_config()['commission_percent'] ?? 10);
+}
+
+function commission_cents(int $price, ?array $org): int
+{
+    return (int)round($price * commission_percent($org) / 100);
 }
 
 /** Version de l'API Stripe v2 (comptes organisateurs), fixée pour que les réponses ne changent pas. */
@@ -106,13 +117,15 @@ function bounce_url(string $returnUrl, array $extra = []): string
     return api_url('/pay/back?' . http_build_query(['to' => $returnUrl] + $extra));
 }
 
-function payout_view(array $user): array
+/** État des paiements d'une organisation. */
+function payout_view(array $org): array
 {
     return [
         'enabled' => stripe_config() !== null,
-        'connected' => $user['stripe_account_id'] !== null,
-        'ready' => (bool)$user['stripe_ready'],
+        'connected' => $org['stripe_account_id'] !== null,
+        'ready' => (bool)$org['stripe_ready'],
         'fee_cents' => service_fee(),
+        'commission_percent' => commission_percent($org),
         'refund_hours' => REFUND_HOURS_BEFORE,
     ];
 }
@@ -123,19 +136,26 @@ function account_ready(array $acct): bool
     return ($acct['capabilities']['transfers'] ?? '') === 'active' || (!empty($acct['charges_enabled']) && !empty($acct['payouts_enabled']));
 }
 
-/** Met à jour « prêt à encaisser » depuis Stripe. */
-function sync_account(array $user): array
+/** Met à jour « prêt à encaisser » depuis Stripe (organisation). */
+function sync_account(array $org): array
 {
-    if ($user['stripe_account_id'] === null) {
-        return $user;
+    if ($org['stripe_account_id'] === null) {
+        return $org;
     }
-    $acct = stripe('GET', '/accounts/' . rawurlencode($user['stripe_account_id']));
+    $acct = stripe('GET', '/accounts/' . rawurlencode($org['stripe_account_id']));
     $ready = account_ready($acct) ? 1 : 0;
-    if ($ready !== (int)$user['stripe_ready']) {
-        query('UPDATE users SET stripe_ready = ? WHERE id = ?', [$ready, $user['id']]);
-        $user['stripe_ready'] = $ready;
+    if ($ready !== (int)$org['stripe_ready']) {
+        query('UPDATE organizations SET stripe_ready = ? WHERE id = ?', [$ready, $org['id']]);
+        $org['stripe_ready'] = $ready;
     }
-    return $user;
+    return $org;
+}
+
+/** L'organisation qui encaisse un match payant. */
+function payee(array $m): array
+{
+    return ($m['organization_id'] ? one('SELECT * FROM organizations WHERE id = ?', [$m['organization_id']]) : null)
+        ?? ['stripe_account_id' => null, 'stripe_ready' => 0, 'commission_percent' => null];
 }
 
 // ───── Places réservées ─────
@@ -162,13 +182,14 @@ function promoted_hold(array $m): string
 /** Ouvre une page de paiement Stripe pour la place réservée de ce joueur. */
 function create_checkout(array $m, array $user, string $returnUrl): string
 {
-    $organizer = one('SELECT * FROM users WHERE id = ?', [$m['organizer_id']]);
-    if (!$organizer['stripe_ready'] || !$organizer['stripe_account_id']) {
+    $payee = payee($m);
+    if (!$payee['stripe_ready'] || !$payee['stripe_account_id']) {
         throw new HttpError(409, 'organizer_not_ready', "L'organisateur ne peut pas encore encaisser. Réessaie plus tard.");
     }
     $venue = one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']]);
     $price = (int)$m['price_cents'];
     $fee = service_fee();
+    $commission = commission_cents($price, $payee);
     $when = (new DateTimeImmutable($m['starts_at'], new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('Europe/Paris'))->format('d/m à H\hi');
     $session = stripe('POST', '/checkout/sessions', [
         'mode' => 'payment',
@@ -177,12 +198,15 @@ function create_checkout(array $m, array $user, string $returnUrl): string
         'client_reference_id' => "{$m['id']}-{$user['id']}",
         'expires_at' => time() + HOLD_MINUTES * 60 + 60,
         'line_items' => [
-            ['quantity' => 1, 'price_data' => ['currency' => 'eur', 'unit_amount' => $price, 'product_data' => ['name' => "Place · {$venue['name']} · $when"]]],
+            ['quantity' => 1, 'price_data' => ['currency' => 'eur', 'unit_amount' => $price, 'product_data' => [
+                'name' => ($m['kind'] === 'tournament' ? "Inscription · {$m['title']}" : 'Place') . " · {$venue['name']} · $when",
+            ]]],
             ['quantity' => 1, 'price_data' => ['currency' => 'eur', 'unit_amount' => $fee, 'product_data' => ['name' => 'Frais de service Supercity']]],
         ],
         'payment_intent_data' => [
-            'application_fee_amount' => $fee,
-            'transfer_data' => ['destination' => $organizer['stripe_account_id']],
+            // Supercity garde les frais de service et sa commission, le reste va à l'organisation.
+            'application_fee_amount' => $fee + $commission,
+            'transfer_data' => ['destination' => $payee['stripe_account_id']],
             'description' => "Supercity match {$m['id']}",
             'metadata' => ['match_id' => $m['id'], 'user_id' => $user['id']],
         ],
@@ -191,8 +215,8 @@ function create_checkout(array $m, array $user, string $returnUrl): string
         'cancel_url' => bounce_url($returnUrl, ['paid' => 0]),
     ]);
     query(
-        'INSERT INTO payments (match_id, user_id, session_id, amount_cents, fee_cents) VALUES (?, ?, ?, ?, ?)',
-        [$m['id'], $user['id'], $session['id'], $price + $fee, $fee]
+        'INSERT INTO payments (match_id, user_id, session_id, amount_cents, fee_cents, commission_cents) VALUES (?, ?, ?, ?, ?, ?)',
+        [$m['id'], $user['id'], $session['id'], $price + $fee, $fee, $commission]
     );
     return $session['url'];
 }
@@ -237,23 +261,40 @@ function finalize_session(array $session): void
     }
 }
 
-/** Rembourse un paiement : le prix seul (désistement), ou tout, frais compris (match annulé, place perdue). */
+/**
+ * Rembourse un paiement : tout, frais compris (match annulé, place perdue), ou le prix seul (désistement).
+ * Désistement avec commission : l'organisation rend ce qu'elle a reçu (prix moins commission), Supercity rend la
+ * commission et garde ses frais de service. Stripe ne sait pas faire ce partage tout seul, d'où le retour de virement.
+ */
 function refund_payment(array $p, bool $withFee): void
 {
     $amount = $withFee ? (int)$p['amount_cents'] : (int)$p['amount_cents'] - (int)$p['fee_cents'];
     if ($amount <= 0 || !$p['payment_intent']) {
         return;
     }
+    $split = !$withFee && (int)$p['commission_cents'] > 0;
     stripe('POST', '/refunds', [
         'payment_intent' => $p['payment_intent'],
         'amount' => $amount,
-        'reverse_transfer' => true,
+        'reverse_transfer' => !$split,
         'refund_application_fee' => $withFee,
     ], "refund-{$p['id']}");
     query(
         'UPDATE payments SET status = "refunded", refund_cents = ?, refunded_at = UTC_TIMESTAMP() WHERE id = ?',
         [$amount, $p['id']]
     );
+    if ($split) {
+        $pi = stripe('GET', '/payment_intents/' . rawurlencode($p['payment_intent']), ['expand' => ['latest_charge']]);
+        $transfer = $pi['latest_charge']['transfer'] ?? null;
+        if (!$transfer) {
+            error_log("supercity: virement introuvable pour le paiement {$p['id']}, retour de virement à faire depuis Stripe");
+            return;
+        }
+        stripe('POST', '/transfers/' . rawurlencode(is_array($transfer) ? $transfer['id'] : $transfer) . '/reversals', [
+            'amount' => $amount - (int)$p['commission_cents'],
+            'metadata' => ['payment_id' => $p['id']],
+        ], "reversal-{$p['id']}");
+    }
 }
 
 /** Paiement validé de ce joueur pour ce match, s'il y en a un. */
@@ -323,63 +364,6 @@ function verify_stripe_signature(string $payload, string $header, string $secret
 
 function register_payment_routes(Router $r): void
 {
-    // État des paiements de l'organisateur.
-    $r->get('/me/payouts', function () {
-        $user = require_user();
-        if (stripe_config() && $user['stripe_account_id']) {
-            $user = sync_account($user);
-        }
-        respond(200, payout_view($user));
-    });
-
-    // Activer les paiements : crée le compte Stripe au besoin et renvoie le lien d'inscription Stripe.
-    $r->post('/me/payouts/onboard', function () {
-        $user = require_user();
-        $in = validate(body())->string('return_url', 1, 500, false)->check();
-        $back = app_return($in['return_url'] ?? null);
-        if (!$user['stripe_account_id']) {
-            // Compte Accounts v2 « destinataire » : il reçoit le prix des places (paiements à destination),
-            // avec le tableau de bord Express. Supercity porte les frais Stripe et les litiges.
-            $acct = stripe('POST', '/v2/core/accounts', [
-                'contact_email' => $user['email'],
-                'display_name' => $user['display_name'],
-                'dashboard' => 'express',
-                'identity' => ['country' => 'fr', 'entity_type' => 'individual'],
-                'configuration' => ['recipient' => ['capabilities' => ['stripe_balance' => ['stripe_transfers' => ['requested' => true]]]]],
-                'defaults' => [
-                    'currency' => 'eur',
-                    'locales' => ['fr-FR'],
-                    'responsibilities' => ['fees_collector' => 'application', 'losses_collector' => 'application'],
-                ],
-                'metadata' => ['user_id' => (string)$user['id']],
-            ], "account-v2-{$user['id']}");
-            query('UPDATE users SET stripe_account_id = ? WHERE id = ?', [$acct['id'], $user['id']]);
-            $user['stripe_account_id'] = $acct['id'];
-        }
-        $link = stripe('POST', '/v2/core/account_links', [
-            'account' => $user['stripe_account_id'],
-            'use_case' => [
-                'type' => 'account_onboarding',
-                'account_onboarding' => [
-                    'configurations' => ['recipient'],
-                    'refresh_url' => bounce_url($back, ['onboard' => 'retry']),
-                    'return_url' => bounce_url($back, ['onboard' => 'done']),
-                ],
-            ],
-        ]);
-        respond(200, ['url' => $link['url']]);
-    });
-
-    // Tableau de bord Stripe de l'organisateur (virements reçus, RIB).
-    $r->post('/me/payouts/dashboard', function () {
-        $user = require_user();
-        if (!$user['stripe_account_id']) {
-            throw new HttpError(409, 'not_connected', "Active d'abord les paiements.");
-        }
-        $link = stripe('POST', '/accounts/' . rawurlencode($user['stripe_account_id']) . '/login_links');
-        respond(200, ['url' => $link['url']]);
-    });
-
     // Payer sa place réservée (inscription d'un match payant, ou sortie de liste d'attente).
     $r->post('/matches/(\d+)/pay', function (string $id) {
         $user = require_user();
@@ -416,7 +400,7 @@ function register_payment_routes(Router $r): void
         exit;
     });
 
-    // Événements envoyés par Stripe (paiement validé, session expirée, compte organisateur mis à jour).
+    // Événements envoyés par Stripe (paiement validé, session expirée, compte d'une organisation mis à jour).
     $r->post('/stripe/webhook', function () {
         $s = stripe_config() ?? not_found();
         $payload = file_get_contents('php://input') ?: '';
@@ -438,7 +422,7 @@ function register_payment_routes(Router $r): void
                 break;
             case 'account.updated':
                 $ready = account_ready($obj) ? 1 : 0;
-                query('UPDATE users SET stripe_ready = ? WHERE stripe_account_id = ?', [$ready, $obj['id'] ?? '']);
+                query('UPDATE organizations SET stripe_ready = ? WHERE stripe_account_id = ?', [$ready, $obj['id'] ?? '']);
                 break;
         }
         respond(200, ['received' => true]);

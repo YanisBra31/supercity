@@ -228,8 +228,9 @@ export default function Profile() {
         </>
       ) : null}
 
-      <Kicker>Paiements</Kicker>
-      <Button title="Encaisser mes matchs payants" icon="card-outline" variant="dark" onPress={() => router.push('/payouts')} />
+      <Kicker>Espace pro</Kicker>
+      <Text style={s.sub}>Tu gères un five, un club, une association ? Publie des créneaux et des tournois payants.</Text>
+      <Button title="Ouvrir mon espace pro" icon="briefcase-outline" variant="dark" onPress={() => router.push('/pro')} />
 
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />

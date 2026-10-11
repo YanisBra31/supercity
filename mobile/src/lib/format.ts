@@ -1,5 +1,5 @@
 // Libellés et mises en forme en français.
-import { Foot, Format, Position, Surface } from './api';
+import { Foot, Format, LegalForm, OrgKind, Position, Surface } from './api';
 
 export const FORMATS: { value: Format; label: string; short: string; players: number }[] = [
   { value: 'city5', label: 'City', short: '5 vs 5', players: 10 },
@@ -66,3 +66,18 @@ export function timeAgo(iso: string): string {
   if (s < 7 * 86400) return `il y a ${Math.floor(s / 86400)} jours`;
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
+
+export const ORG_KINDS: { value: OrgKind; label: string }[] = [
+  { value: 'five', label: 'Five / complexe' },
+  { value: 'club', label: 'Club' },
+  { value: 'association', label: 'Association' },
+  { value: 'coach', label: 'Coach' },
+  { value: 'autre', label: 'Autre' },
+];
+export const orgKindLabel = (k: OrgKind) => ORG_KINDS.find((x) => x.value === k)?.label ?? k;
+
+export const LEGAL_FORMS: { value: LegalForm; label: string }[] = [
+  { value: 'company', label: 'Société' },
+  { value: 'non_profit', label: 'Association' },
+  { value: 'individual', label: 'Auto-entrepreneur' },
+];

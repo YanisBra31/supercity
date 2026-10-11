@@ -8,7 +8,13 @@ import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../../lib/api';
 import { euros, openStripe, returnUrl } from '../../lib/pay';
-import { distanceLabel, formatLabel, formatShort, levelLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
+import { distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
+
+/** 90 min, 4 h, 2 h 30 */
+function durationLabel(min: number): string {
+  if (min < 120) return `${min} min`;
+  return `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60}` : ''}`;
+}
 import { GradeBadge, RoleBadge } from '../../components/Grade';
 
 function confirm(title: string, message: string): Promise<boolean> {
@@ -94,8 +100,12 @@ export default function MatchDetail() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: m.venue.name }} />
-      <Hero kicker={`${formatLabel(m.format)} · ${formatShort(m.format)}`} title={whenLabel(m.starts_at)} sub={`${m.duration_min} min · ${levelLabel(m.level)} · organisé par ${m.organizer.display_name}`}>
+      <Stack.Screen options={{ title: m.title ?? m.venue.name }} />
+      <Hero
+        kicker={`${m.kind === 'tournament' ? 'Tournoi' : formatLabel(m.format)} · ${formatShort(m.format)}`}
+        title={m.title ?? whenLabel(m.starts_at)}
+        sub={[m.title ? whenLabel(m.starts_at) : null, durationLabel(m.duration_min), levelLabel(m.level), `organisé par ${m.organization?.name ?? m.organizer.display_name}`].filter(Boolean).join(' · ')}
+      >
         <View style={{ marginTop: 8 }}>{statusPill(m)}</View>
         <View style={{ marginTop: 12, gap: 6 }}>
           <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(31,26,23,.25)', overflow: 'hidden' }}>
@@ -158,6 +168,17 @@ export default function MatchDetail() {
         </Text>
       </Card>
 
+      {m.organization ? (
+        <Card onPress={() => router.push(`/org/${m.organization!.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Ionicons name="briefcase-outline" size={22} color={colors.orange2} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ ...font.bold, fontSize: 16, color: colors.ink }}>{m.organization.name}</Text>
+            <Text style={s.sub}>{orgKindLabel(m.organization.kind)}{m.organization.city ? ` · ${m.organization.city}` : ''} · voir ses autres créneaux</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.dim} />
+        </Card>
+      ) : null}
+
       {m.price_cents > 0 ? (
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Ionicons name="card-outline" size={22} color={colors.orange2} />
@@ -165,7 +186,7 @@ export default function MatchDetail() {
             <Text style={{ ...font.bold, fontSize: 16, color: colors.ink }}>{euros(m.price_cents)} la place</Text>
             <Text style={s.sub}>
               {m.is_organizer
-                ? `Chaque joueur paie ${euros(total)}, frais de service Supercity compris. Tu reçois ${euros(m.price_cents)} par joueur.`
+                ? `Chaque joueur paie ${euros(total)}, frais de service compris. Tu reçois ${euros(m.payout_cents ?? m.price_cents)} par joueur, commission Supercity déduite.`
                 : `+ ${euros(m.fee_cents)} de frais de service. Remboursé si tu te désistes plus de 24 h avant.`}
             </Text>
           </View>
@@ -225,7 +246,7 @@ export default function MatchDetail() {
         icon="share-outline"
         onPress={() =>
           Share.share({
-            message: `${formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
+            message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
           })
         }
       />
