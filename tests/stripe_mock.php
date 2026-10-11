@@ -41,13 +41,15 @@ switch (true) {
         out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Stripe no longer recommends Accounts v1 for new Connect integrations.']]);
     case $method === 'POST' && $path === '/v2/core/account_tokens' && str_starts_with($in['contact_email'] ?? '', 'sansconnect'):
         out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'platform_registration_required', 'message' => 'The direct merchant has not signed up for Connect and cannot create connected accounts.']]);
+    case $method === 'POST' && $path === '/v2/core/account_tokens' && isset($in['identity']['country']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Some fields in the request were invalid: identity.country: unknown field']]);
     case $method === 'POST' && $path === '/v2/core/account_tokens':
         $t = 'accttok_' . (++$state['n']);
         $state['tokens'][$t] = $in;
         out(200, ['id' => $t, 'object' => 'v2.core.account_token', 'used' => false]);
     case $method === 'POST' && $path === '/v2/core/accounts' && empty($in['account_token']):
         out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'account_token_required', 'message' => 'Connect platforms based in FR can only update certain identity information on a v2 Account with a merchant configuration via account tokens.']]);
-    case $method === 'POST' && $path === '/v2/core/accounts' && array_intersect(array_keys($in), ['identity', 'contact_email', 'display_name']):
+    case $method === 'POST' && $path === '/v2/core/accounts' && (array_intersect(array_keys($in), ['contact_email', 'display_name']) || array_diff(array_keys($in['identity'] ?? []), ['country'])):
         out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'param_alongside_account_token', 'message' => 'Parameter cannot be passed alongside account_token.']]);
     case $method === 'POST' && $path === '/v2/core/accounts' && empty($in['configuration']['merchant']['capabilities']['card_payments']['requested']):
         out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'The stripe_balance.stripe_transfers capability cannot be requested without the configuration.merchant.capabilities.card_payments capability.']]);
