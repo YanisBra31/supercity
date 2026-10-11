@@ -544,6 +544,7 @@ check('rejoindre un match payant : place réservée et page de paiement', $s ===
 check('Stripe : 5 € de place + 0,50 € de frais ; Supercity garde frais et commission (1 €), le reste au five',
     $sess['params']['line_items'][0]['price_data']['unit_amount'] === '500' && $sess['params']['line_items'][1]['price_data']['unit_amount'] === '50'
     && $pi['application_fee_amount'] === '100' && $pi['transfer_data']['destination'] === $acct, $sess['params'] ?? null);
+check('Stripe : Managed Payments coupé pour que la commission passe', ($sess['params']['managed_payments']['enabled'] ?? null) === 'false', $sess['params']);
 [$s, $r] = api('GET', "/matches/$pid", null, $lea);
 check('un joueur ne voit pas ce que touche le five', $r['payout_cents'] === null, $r);
 [$s, $r] = api('POST', "/matches/$pid/pay/confirm", null, $lea);
