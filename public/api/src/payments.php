@@ -216,6 +216,8 @@ function create_checkout(array $m, array $user, string $returnUrl): string
             ]]],
             ['quantity' => 1, 'price_data' => ['currency' => 'eur', 'unit_amount' => $fee, 'product_data' => ['name' => 'Frais de service Supercity']]],
         ],
+        // Managed Payments (activé par défaut sur les nouveaux comptes Stripe) refuse Connect : on le coupe ici.
+        'managed_payments' => ['enabled' => false],
         'payment_intent_data' => [
             // Supercity garde les frais de service et sa commission, le reste va à l'organisation.
             'application_fee_amount' => $fee + $commission,

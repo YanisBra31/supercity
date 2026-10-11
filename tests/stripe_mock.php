@@ -68,6 +68,9 @@ switch (true) {
     case $method === 'POST' && preg_match('#^/v1/accounts/(\w+)/login_links$#', $path, $m) === 1:
         out(200, ['object' => 'login_link', 'url' => "https://connect.stripe.test/express/{$m[1]}"]);
     case $method === 'POST' && $path === '/v1/checkout/sessions':
+        if (isset($in['payment_intent_data']['application_fee_amount']) && ($in['managed_payments']['enabled'] ?? 'true') !== 'false') {
+            out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Unsupported parameter payment_intent_data.application_fee_amount. Managed Payments, which is enabled by default on your account, does not support Connect.']]);
+        }
         $sid = $id('cs_test');
         $s = ['id' => $sid, 'object' => 'checkout.session', 'url' => "https://checkout.stripe.test/pay/$sid", 'status' => 'open',
             'payment_status' => 'unpaid', 'payment_intent' => null, 'metadata' => $in['metadata'] ?? [], 'params' => $in];
