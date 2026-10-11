@@ -43,6 +43,10 @@ switch (true) {
         out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'platform_registration_required', 'message' => 'The direct merchant has not signed up for Connect and cannot create connected accounts.']]);
     case $method === 'POST' && $path === '/v2/core/accounts' && empty($in['configuration']['merchant']['capabilities']['card_payments']['requested']):
         out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'The stripe_balance.stripe_transfers capability cannot be requested without the configuration.merchant.capabilities.card_payments capability.']]);
+    case $method === 'POST' && $path === '/v2/core/accounts' && array_diff(array_keys($in['identity'] ?? []), ['country']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Connect platforms based in FR can only update certain identity information on a v2 Account with a merchant configuration via account tokens.']]);
+    case $method === 'POST' && $path === '/v2/core/accounts' && str_starts_with($in['contact_email'] ?? '', 'paysrefuse') && isset($in['identity']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Connect platforms based in FR can only update identity information via account tokens.']]);
     case $method === 'POST' && $path === '/v2/core/accounts':
         $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'capabilities' => ['transfers' => 'inactive'], 'email' => $in['contact_email'] ?? null];
         $state['accounts'][$a['id']] = $a;
