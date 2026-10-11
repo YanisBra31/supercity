@@ -507,8 +507,9 @@ check('fixer un prix exige un compte Stripe prêt', $s === 409 && $r['error'] ==
 $st = mock('GET', '/test/state');
 $link = end($st['requests']);
 $create = array_values(array_filter($st['requests'], fn($q) => $q['path'] === '/v2/core/accounts'))[0] ?? [];
-check('activer les paiements : compte Accounts v2 de la société (destinataire, Express) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
-    && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['recipient']
+check('activer les paiements : compte Accounts v2 de la société (carte + virements, Express) et lien Stripe', $s === 200 && str_starts_with($r['url'], 'https://connect.stripe.test/onboard/acct_')
+    && $link['path'] === '/v2/core/account_links' && $link['params']['use_case']['account_onboarding']['configurations'] === ['merchant', 'recipient']
+    && $create['params']['configuration']['merchant']['capabilities']['card_payments']['requested'] === true
     && str_contains($link['params']['use_case']['account_onboarding']['return_url'], '/pay/back?to=exp')
     && $create['params']['dashboard'] === 'express' && $create['params']['identity']['entity_type'] === 'company' && $create['params']['display_name'] === 'Five Toulouse Nord'
     && $create['params']['configuration']['recipient']['capabilities']['stripe_balance']['stripe_transfers']['requested'] === true
