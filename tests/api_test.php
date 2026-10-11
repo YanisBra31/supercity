@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -624,6 +624,83 @@ check('page publique du five avec ses matchs à venir', $s === 200 && $r['name']
 $pdo->exec("UPDATE organizations SET commission_percent = 5 WHERE id = {$org['id']}");
 [$s, $r] = api('GET', "/matches/{$t['id']}", null, $karim);
 check('taux de commission négocié pour une organisation', $r['payout_cents'] === 950, $r);
+
+echo "Scores, séries et événements bonus\n";
+// Quatre matchs passés Cartel contre Lions (organisés par Sam), Yassin et Sam y ont joué avec leur équipe.
+[$s, $before] = api('GET', "/users/$yassinId", null, $lea);
+$past = [];
+foreach ([10, 8, 6, 4] as $d) {
+    $pdo->exec("INSERT INTO matches (organizer_id, venue_id, format, starts_at, duration_min, max_players, home_team_id, away_team_id, visibility)
+        VALUES ($samId, {$v1['id']}, 'city5', UTC_TIMESTAMP() - INTERVAL $d DAY, 60, 10, $teamId, $lionsId, 'public')");
+    $mid = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO match_participants (match_id, user_id, team_id, status) VALUES ($mid, $yassinId, $teamId, 'registered'), ($mid, $samId, $lionsId, 'registered')");
+    $past[] = $mid;
+}
+[$m1, $m2, $m3, $m4] = $past;
+[$s, $r] = api('POST', "/matches/{$mCartel['id']}/score", ['home_score' => 1, 'away_score' => 0], $yassin);
+check('pas de score avant la fin du match', $s === 409 && $r['error'] === 'match_not_played', $r);
+[$s, $r] = api('POST', "/matches/$m1/score", ['home_score' => 3, 'away_score' => 1], $lea);
+check('seuls les capitaines donnent le score', $s === 403, $r);
+[$s, $r] = api('POST', "/matches/$m1/score", ['home_score' => 3, 'away_score' => 1], $yassin);
+check('le capitaine du Cartel annonce 3-1', $s === 200 && $r['score']['status'] === 'reported' && $r['score']['home'] === 3 && $r['score']['can_confirm'] === false && $r['score']['winner_team_id'] === null, $r['score'] ?? $r);
+[$s, $r] = api('GET', "/matches/$m1", null, $sam);
+check('le capitaine des Lions peut confirmer', $r['score']['can_confirm'] === true, $r['score']);
+[$s, $r] = api('POST', "/matches/$m1/score/confirm", null, $yassin);
+check('on ne confirme pas son propre score', $s === 409, $r);
+[$s, $r] = api('POST', "/matches/$m1/score/confirm", null, $sam);
+check('les Lions confirment : victoire du Cartel', $s === 200 && $r['score']['status'] === 'confirmed' && $r['score']['winner_team_id'] === $teamId, $r['score'] ?? $r);
+[$s, $r] = api('POST', "/matches/$m1/score", ['home_score' => 9, 'away_score' => 1], $yassin);
+check('un score validé ne se change plus', $s === 409 && $r['error'] === 'score_locked', $r);
+api('POST', "/matches/$m2/score", ['home_score' => 2, 'away_score' => 0], $yassin);
+[$s, $r] = api('POST', "/matches/$m2/score", ['home_score' => 2, 'away_score' => 0], $sam);
+check('les deux capitaines annoncent le même score : validé', $r['score']['status'] === 'confirmed', $r['score']);
+api('POST', "/matches/$m3/score", ['home_score' => 4, 'away_score' => 2], $yassin);
+[$s, $r] = api('POST', "/matches/$m3/score", ['home_score' => 1, 'away_score' => 1], $sam);
+check('scores différents : contesté', $r['score']['status'] === 'disputed' && $r['score']['winner_team_id'] === null, $r['score']);
+[$s] = api('GET', '/mod/disputes', null, $karim);
+[$s2, $r] = api('GET', '/mod/disputes', null, $yassin);
+check('scores contestés : réservés à la modération', $s === 403 && array_column($r['items'], 'id') === [$m3], $r);
+[$s, $r] = api('POST', "/mod/matches/$m3/score", ['home_score' => 4, 'away_score' => 2], $yassin);
+check('la modération tranche', $s === 200 && $r['score']['status'] === 'confirmed' && $r['score']['winner_team_id'] === $teamId, $r['score'] ?? $r);
+api('POST', "/matches/$m4/score", ['home_score' => 5, 'away_score' => 0], $yassin);
+$pdo->exec("UPDATE matches SET score_at = UTC_TIMESTAMP() - INTERVAL 3 DAY WHERE id = $m4");
+[$s, $r] = api('GET', "/matches/$m4", null, $lea);
+check('score annoncé sans réponse depuis 48 h : validé', $r['score']['status'] === 'confirmed', $r['score']);
+[$s, $r] = api('GET', "/teams/$teamId", null, $lea);
+check('le Cartel est en feu : 4 victoires d\'affilée', $r['streak'] === ['current' => 4, 'best' => 4, 'on_fire' => true, 'form' => ['W', 'W', 'W', 'W']], $r['streak'] ?? $r);
+[$s, $r] = api('GET', "/teams/$lionsId/results", null, $lea);
+check('résultats des Lions : 4 défaites', $s === 200 && $r['streak']['current'] === 0 && $r['streak']['form'] === ['L', 'L', 'L', 'L'] && count($r['items']) === 4, $r);
+[$s, $r] = api('GET', "/venues/{$v1['id']}", null, $lea);
+check('roi du terrain : le Cartel', ($r['king']['team']['id'] ?? 0) === $teamId && $r['king']['streak'] === 4, $r);
+[$s, $r] = api('GET', "/matches/{$mCartel['id']}", null, $lea);
+check('la série s\'affiche sur le prochain match et le terrain', $r['home_team']['streak'] === 4 && $r['away_team']['streak'] === 0 && $r['venue']['king']['team']['id'] === $teamId, $r);
+[$s, $r] = api('GET', "/users/$yassinId", null, $lea);
+check('points de grade : +1 par match joué, +2 par victoire', $r['stats']['wins'] === 4 && $r['grade']['points'] - $before['grade']['points'] === 12, [$before['grade'], $r['grade'], $r['stats']]);
+$gained = $r['grade']['points'];
+
+$start = gmdate('Y-m-d\TH:i:s\Z', strtotime('-5 days'));
+$end = gmdate('Y-m-d\TH:i:s\Z', strtotime('+8 days'));
+$event = ['title' => 'Semaine en feu', 'multiplier' => 2, 'bonus_points' => 1, 'starts_at' => $start, 'ends_at' => $end];
+[$s] = api('POST', '/mod/bonus-events', $event, $karim);
+check('événement bonus : réservé à la modération', $s === 403);
+[$s, $r] = api('POST', '/mod/bonus-events', ['multiplier' => 1, 'bonus_points' => 0] + $event, $yassin);
+check('un événement qui ne rapporte rien est refusé', $s === 422 && isset($r['fields']['multiplier']), $r);
+[$s, $r] = api('POST', '/mod/bonus-events', ['ends_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('+40 days'))] + $event, $yassin);
+check('un événement dure un mois au plus', $s === 422, $r);
+[$s, $ev] = api('POST', '/mod/bonus-events', $event, $yassin);
+check('la modération crée « Semaine en feu » : points x2 et +1', $s === 201 && $ev['active'] === true && $ev['multiplier'] === 2, $ev);
+[$s, $r] = api('GET', '/bonus-events', null, $lea);
+check('tout le monde voit l\'événement en cours', $s === 200 && array_column($r['items'], 'id') === [$ev['id']], $r);
+[$s, $r] = api('GET', "/matches/{$mCartel['id']}", null, $lea);
+check('le match à venir affiche le bonus', ($r['bonus']['id'] ?? 0) === $ev['id'], $r['bonus'] ?? $r);
+[$s, $r] = api('GET', "/users/$yassinId", null, $lea);
+check('victoire pendant l\'événement : (1 + 2) x 2 + 1 = 7 points au lieu de 3', $r['grade']['points'] - $gained === 4, $r['grade']);
+[$s] = api('DELETE', "/mod/bonus-events/{$ev['id']}", null, $yassin);
+[$s2, $r] = api('GET', "/users/$yassinId", null, $lea);
+check('événement supprimé : les points reviennent', $s === 204 && $r['grade']['points'] === $gained, $r['grade']);
+[$s, $r] = api('DELETE', "/mod/matches/$m4/score", null, $yassin);
+[$s2, $t] = api('GET', "/teams/$teamId", null, $lea);
+check('la modération efface un score : la série redescend', $s === 200 && $r['score']['status'] === null && $t['streak']['current'] === 3, $t['streak'] ?? $t);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

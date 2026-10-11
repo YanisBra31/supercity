@@ -10,7 +10,8 @@ import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { ActiveFilters, activeCount, DEFAULT_FILTERS, FilterButton, Filters, FilterSheet, whenRange, WhenBar } from '../../components/MatchFilters';
 import { MatchMap } from '../../components/MatchMap';
 import { Banner, colors, Empty, ErrorText, font } from '../../components/ui';
-import { ApiError, get, Match, Venue } from '../../lib/api';
+import { ApiError, BonusEvent, get, Match, Venue } from '../../lib/api';
+import { BonusBanner } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
 import { Place } from '../../lib/address';
 import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
@@ -27,6 +28,7 @@ export default function Matches() {
   const [place, setPlace] = useState<Place | null>(null);
   const [items, setItems] = useState<Match[] | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [events, setEvents] = useState<BonusEvent[]>([]);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -48,6 +50,7 @@ export default function Matches() {
         limit: 50,
       });
       setItems(res.items);
+      get<{ items: BonusEvent[] }>('/bonus-events').then((r) => setEvents(r.items.slice(0, 2))).catch(() => setEvents([]));
       // Les terrains sans match apparaissent aussi sur la carte.
       if (pos) get<{ items: Venue[] }>('/venues', { ...geo, limit: 100 }).then((r) => setVenues(r.items)).catch(() => undefined);
     } catch (e) {
@@ -131,6 +134,9 @@ export default function Matches() {
             {user && !user.email_verified ? (
               <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
             ) : null}
+            {events.map((e) => (
+              <BonusBanner key={e.id} event={e} />
+            ))}
             {controls}
           </View>
         }

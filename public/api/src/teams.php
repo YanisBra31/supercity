@@ -45,6 +45,7 @@ function team_view(array $t, ?int $viewerId, bool $withMembers = false): array
         'members_count' => $count,
         'my_role' => $role,
         'created_at' => iso($t['created_at']),
+        'streak' => team_streak((int)$t['id']),
     ];
     // Le code d'invitation n'est visible que par les membres.
     if ($role !== null) {

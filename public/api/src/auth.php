@@ -52,7 +52,7 @@ function issue_token(int $userId): array
 }
 
 /** Profil public d'un joueur (sans e-mail). */
-// Grades de joueur : seuil de points (1 par match joué, 2 par match organisé).
+// Grades de joueur : seuil de points (1 par match joué, 2 de plus s'il est gagné, 2 par match organisé ; voir series.php pour les bonus).
 const GRADES = [
     ['key' => 'rookie', 'label' => 'Rookie', 'min' => 0],
     ['key' => 'espoir', 'label' => 'Espoir', 'min' => 5],
@@ -62,20 +62,26 @@ const GRADES = [
     ['key' => 'legende', 'label' => 'Légende', 'min' => 120],
 ];
 
-/** Matchs joués (terminés, non annulés) et organisés ; gardés en mémoire le temps de la requête. */
+/** Matchs joués (terminés, non annulés), gagnés et organisés, et points de grade ; gardés en mémoire le temps de la requête. */
 function user_stats(int $id): array
 {
     static $cache = [];
     if (!isset($cache[$id])) {
-        $row = one(
-            'SELECT
-               (SELECT COUNT(*) FROM match_participants p JOIN matches m ON m.id = p.match_id
-                 WHERE p.user_id = ? AND p.status = "registered" AND m.status <> "cancelled"
-                   AND m.starts_at + INTERVAL m.duration_min MINUTE < UTC_TIMESTAMP()) AS played,
-               (SELECT COUNT(*) FROM matches WHERE organizer_id = ? AND status <> "cancelled") AS organized',
-            [$id, $id]
-        );
-        $cache[$id] = ['played' => (int)$row['played'], 'organized' => (int)$row['organized']];
+        $played = query(
+            'SELECT m.*, p.team_id AS p_team FROM match_participants p JOIN matches m ON m.id = p.match_id
+             WHERE p.user_id = ? AND p.status = "registered" AND m.status <> "cancelled"
+               AND m.starts_at + INTERVAL m.duration_min MINUTE < UTC_TIMESTAMP()',
+            [$id]
+        )->fetchAll();
+        $organized = (int)one('SELECT COUNT(*) AS n FROM matches WHERE organizer_id = ? AND status <> "cancelled"', [$id])['n'];
+        $points = 2 * $organized;
+        $wins = 0;
+        foreach ($played as $m) {
+            [$p, $won] = match_points($m, $m['p_team'] === null ? null : (int)$m['p_team']);
+            $points += $p;
+            $wins += (int)$won;
+        }
+        $cache[$id] = ['played' => count($played), 'wins' => $wins, 'organized' => $organized, 'points' => $points];
     }
     return $cache[$id];
 }
@@ -83,7 +89,7 @@ function user_stats(int $id): array
 /** Grade atteint, avec le suivant pour afficher la progression. */
 function grade_for(array $stats): array
 {
-    $points = $stats['played'] + 2 * $stats['organized'];
+    $points = $stats['points'];
     $i = 0;
     foreach (GRADES as $k => $g) {
         if ($points >= $g['min']) {

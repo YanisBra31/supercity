@@ -166,3 +166,23 @@ Règles :
 - Désistement plus de 24 h avant : prix remboursé, frais gardés (`refunded_cents` dans la réponse). L'organisation rend ce qu'elle a reçu (retour de virement), Supercity rend sa commission. Moins de 24 h : pas de remboursement, et pas de second paiement si le joueur revient.
 - Match annulé : tout le monde est remboursé, frais compris.
 - Le prix ne change plus une fois qu'un joueur a payé (`409 price_locked`). Les défis entre équipes se font sur des matchs gratuits.
+
+## Scores, séries et événements bonus
+
+Sur un match entre deux équipes (`home_team` et `away_team`), une fois terminé, les capitaines donnent le score. Le match porte `score` : `home`, `away`, `status` (`reported` annoncé, `confirmed` validé, `disputed` contesté, ou `null`), `reported_by_team_id`, `winner_team_id` (0 pour un nul, `null` tant que ce n'est pas validé), `can_report` et `can_confirm` pour le joueur connecté.
+
+| Méthode | Adresse | Rôle |
+| --- | --- | --- |
+| POST | `/matches/{id}/score` | Un capitaine annonce `home_score` et `away_score`. Le même score que l'autre équipe : validé. Un autre : contesté. |
+| POST | `/matches/{id}/score/confirm` | Le capitaine de l'autre équipe confirme le score annoncé. |
+| POST | `/mod/matches/{id}/score` | La modération fixe le score (validé). |
+| DELETE | `/mod/matches/{id}/score` | La modération efface le score. |
+| GET | `/mod/disputes` | Matchs au score contesté. |
+| GET | `/teams/{id}/results` | `streak` et les 20 derniers matchs au score validé. |
+| GET | `/bonus-events` | Événements bonus en cours et à venir. |
+| POST | `/mod/bonus-events` | Crée un événement : `title`, `description`, `multiplier` (1 à 5), `bonus_points` (0 à 50), `starts_at`, `ends_at` (31 jours au plus), `venue_id` facultatif. |
+| DELETE | `/mod/bonus-events/{id}` | Supprime un événement (les points sont recalculés). |
+
+Un score annoncé sans réponse de l'autre capitaine est validé au bout de 48 h. Une équipe porte `streak` : `current` (victoires d'affilée), `best`, `on_fire` (3 d'affilée ou plus) et `form` (5 derniers résultats, `W`, `D`, `L`). Dans un match, `home_team.streak` et `away_team.streak` donnent la série en cours, `bonus` l'événement qui couvre le match, et le détail ajoute `venue.king` : l'équipe qui a la plus longue série en cours sur ce terrain (2 victoires au moins).
+
+Points de grade : 1 par match joué, 2 de plus par victoire de son équipe, 2 par match organisé. Pendant un événement, les points d'un match joué sont multipliés par `multiplier`, puis `bonus_points` s'ajoutent.

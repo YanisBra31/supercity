@@ -5,10 +5,11 @@ import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
 import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, ErrorText, Kicker, Loading, Pill, readableOn, Screen, TeamCrest, colors, font, s } from '../../components/ui';
-import { ApiError, del, get, post, Team } from '../../lib/api';
+import { ApiError, del, get, Match, post, Team } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { formatLabel, levelLabel, POSITIONS } from '../../lib/format';
+import { dayLabel, formatLabel, levelLabel, POSITIONS } from '../../lib/format';
 import { GradeBadge, RoleBadge } from '../../components/Grade';
+import { StreakBadge, StreakCard } from '../../components/Streak';
 
 function ask(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -26,10 +27,12 @@ export default function TeamDetail() {
   const [team, setTeam] = useState<Team | null>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [results, setResults] = useState<Match[]>([]);
 
   const load = useCallback(async () => {
     try {
       setTeam(await get<Team>(`/teams/${id}`));
+      get<{ items: Match[] }>(`/teams/${id}/results`).then((r) => setResults(r.items)).catch(() => setResults([]));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Équipe introuvable.');
     }
@@ -66,6 +69,7 @@ export default function TeamDetail() {
           <TeamCrest name={team.name} logo={team.logo_url} primary={team.color_secondary} secondary={team.color_primary} size={76} />
           <View style={{ flex: 1 }}>
             <Text style={{ ...font.extrabold, fontSize: 26, lineHeight: 32, color: readableOn(team.color_primary) }}>{team.name}</Text>
+            <StreakBadge count={team.streak?.current} size="md" onDark />
             <Text style={{ ...font.regular, fontSize: 13, color: readableOn(team.color_primary), opacity: 0.9 }}>
               {[`${team.members_count} joueur${team.members_count > 1 ? 's' : ''}`, team.city, team.usual_format ? formatLabel(team.usual_format) : null, team.founded_year ? `depuis ${team.founded_year}` : null]
                 .filter(Boolean)
@@ -87,6 +91,35 @@ export default function TeamDetail() {
       ) : null}
       {captain ? (
         <Button title="Personnaliser l'équipe" icon="color-palette-outline" variant="dark" onPress={() => router.push(`/team/edit/${team.id}`)} />
+      ) : null}
+
+      <StreakCard streak={team.streak} />
+      {results.length ? (
+        <View style={{ gap: 6 }}>
+          <Kicker>Derniers résultats</Kicker>
+          {results.slice(0, 5).map((r) => {
+            const home = r.home_team?.id === team.id;
+            const opp = home ? r.away_team : r.home_team;
+            const mine = home ? r.score?.home : r.score?.away;
+            const theirs = home ? r.score?.away : r.score?.home;
+            const res = r.score?.winner_team_id === team.id ? 'V' : r.score?.winner_team_id === 0 ? 'N' : 'D';
+            const tone = { V: colors.success, N: '#9e9e9e', D: colors.danger }[res];
+            return (
+              <Card key={r.id} onPress={() => router.push(`/match/${r.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 }}>
+                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: tone, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ ...font.bold, fontSize: 12, color: '#fff' }}>{res}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ ...font.bold, color: colors.ink }}>contre {opp?.name ?? '?'}</Text>
+                  <Text style={s.sub}>{dayLabel(new Date(r.starts_at))} · {r.venue.name}</Text>
+                </View>
+                <Text style={{ ...font.black, fontSize: 18, color: colors.ink }}>
+                  {mine} - {theirs}
+                </Text>
+              </Card>
+            );
+          })}
+        </View>
       ) : null}
 
       {team.invite_code ? (

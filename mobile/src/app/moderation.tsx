@@ -1,9 +1,10 @@
-// Modération : publications signalées (garder, supprimer, suspendre l'auteur) et gestion des joueurs.
+// Modération : publications signalées (garder, supprimer, suspendre l'auteur), gestion des joueurs, événements bonus et scores contestés.
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GradeBadge, RoleBadge } from '../components/Grade';
+import { ModDisputes, ModEvents } from '../components/ModSeries';
 import { Avatar, Button, Card, Chips, colors, Empty, ErrorText, font, Kicker, Loading, s, Screen, Success } from '../components/ui';
 import { ApiError, del, get, ModReport, ModUser, post, Role } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -27,7 +28,7 @@ function confirm(title: string, message: string): Promise<boolean> {
 
 export default function Moderation() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<'reports' | 'users'>('reports');
+  const [tab, setTab] = useState<'reports' | 'users' | 'events' | 'disputes'>('reports');
   const [reports, setReports] = useState<ModReport[] | null>(null);
   const [q, setQ] = useState('');
   const [found, setFound] = useState<ModUser[]>([]);
@@ -89,6 +90,8 @@ export default function Moderation() {
         options={[
           { value: 'reports', label: `Signalements${reports?.length ? ` (${reports.length})` : ''}` },
           { value: 'users', label: 'Joueurs' },
+          { value: 'events', label: 'Événements bonus' },
+          { value: 'disputes', label: 'Scores contestés' },
         ]}
         value={tab}
         onChange={(v) => v && setTab(v as typeof tab)}
@@ -96,7 +99,10 @@ export default function Moderation() {
       <ErrorText>{error}</ErrorText>
       <Success>{msg}</Success>
 
-      {tab === 'reports' ? (
+      {tab === 'events' ? <ModEvents act={act} /> : null}
+      {tab === 'disputes' ? <ModDisputes /> : null}
+
+      {tab === 'events' || tab === 'disputes' ? null : tab === 'reports' ? (
         reports === null ? (
           <Loading />
         ) : reports.length === 0 ? (
@@ -186,8 +192,12 @@ export default function Moderation() {
         </>
       )}
 
-      <Kicker>Durée des suspensions</Kicker>
-      <Chips options={DURATIONS} value={days} onChange={(v) => v && setDays(v)} />
+      {tab === 'reports' || tab === 'users' ? (
+        <>
+          <Kicker>Durée des suspensions</Kicker>
+          <Chips options={DURATIONS} value={days} onChange={(v) => v && setDays(v)} />
+        </>
+      ) : null}
     </Screen>
   );
 }
