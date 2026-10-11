@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Clé de compte de service Firebase (notifications Android) : à téléverser dans EAS, jamais dans le dépôt.
+*service-account*.json

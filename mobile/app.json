@@ -41,7 +41,15 @@
           "cameraPermission": false
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#ff5223",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "scheme": "supercity",
     "splash": {

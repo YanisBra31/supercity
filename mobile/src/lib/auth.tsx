@@ -1,6 +1,7 @@
 // Session du joueur : chargée au démarrage, partagée par toute l'appli.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { get, Me, patch, post, setToken, setUnauthorizedHandler } from './api';
+import { unregisterPush } from './push';
 import { loadToken, saveToken } from './storage';
 
 type AuthResponse = { user: Me; token: string };
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resetPassword: async (data) => start(await post<AuthResponse>('/auth/password/reset', data)),
       setUser,
       logout: async () => {
+        await unregisterPush();
         await post('/auth/logout').catch(() => undefined);
         await clear();
       },

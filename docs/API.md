@@ -186,3 +186,21 @@ Sur un match entre deux équipes (`home_team` et `away_team`), une fois terminé
 Un score annoncé sans réponse de l'autre capitaine est validé au bout de 48 h. Une équipe porte `streak` : `current` (victoires d'affilée), `best`, `on_fire` (3 d'affilée ou plus) et `form` (5 derniers résultats, `W`, `D`, `L`). Dans un match, `home_team.streak` et `away_team.streak` donnent la série en cours, `bonus` l'événement qui couvre le match, et le détail ajoute `venue.king` : l'équipe qui a la plus longue série en cours sur ce terrain (2 victoires au moins).
 
 Points de grade : 1 par match joué, 2 de plus par victoire de son équipe, 2 par match organisé. Pendant un événement, les points d'un match joué sont multipliés par `multiplier`, puis `bonus_points` s'ajoutent.
+
+## Notifications
+
+L'appli inscrit le téléphone après l'autorisation du joueur. Les alertes passent par le service push d'Expo (`config.push.url` pour le changer, `config.push.access_token` facultatif).
+
+| Méthode | Adresse | Rôle |
+| --- | --- | --- |
+| POST | `/me/push-token` | `token` (jeton Expo), `platform` (`ios`, `android`), `lat` et `lng` facultatifs (gardés à 1 km près). |
+| DELETE | `/me/push-token` | `token` : ce téléphone ne reçoit plus rien (déconnexion). |
+| GET, PATCH | `/me/notifications` | `events` et `streaks` (booléens). Aussi dans `GET /me` sous `notifications`. |
+| GET | `/cron/notifications?key=` | Envoie les alertes en attente (clé `cron_key` de la config). Facultatif. |
+
+Alertes envoyées :
+- un événement bonus qui commence, à ceux qui acceptent `events` (près de son terrain, à 25 km, s'il en vise un) ;
+- une série qui passe 3, 5, 10, 15... victoires d'affilée sur un terrain, à ceux qui acceptent `streaks` et habitent à 25 km, et aux joueurs de l'équipe ;
+- un score annoncé ou contesté, au capitaine adverse (toujours).
+
+Les alertes en attente partent quand un joueur ouvre l'accueil (`GET /bonus-events`), quand un score est validé ou un événement créé, ou par la tâche planifiée. Chacune ne part qu'une fois. Un téléphone désinstallé est oublié.

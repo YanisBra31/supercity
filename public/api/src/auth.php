@@ -132,6 +132,7 @@ function private_user(array $u): array
     return public_user($u) + [
         'email' => $u['email'],
         'email_verified' => $u['email_verified_at'] !== null,
+        'notifications' => notification_prefs($u),
         'suspended_until' => suspension_of($u),
         'suspended_reason' => suspension_of($u) ? ($u['suspended_reason'] ?? null) : null,
         'birth_date' => $u['birth_date'],

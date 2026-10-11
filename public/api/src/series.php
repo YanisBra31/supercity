@@ -227,7 +227,13 @@ function register_series_routes(Router $r): void
             $team = (int)load_team((int)$m['home_team_id'])['captain_id'] === (int)$user['id'] ? (int)$m['home_team_id'] : (int)$m['away_team_id'];
             report_score($m, $team, $in['home_score'], $in['away_score']);
         });
-        respond(200, match_view(load_match((int)$id), (int)$user['id'], true));
+        $m = load_match((int)$id);
+        if ($m['score_status'] === 'confirmed') {
+            run_notifications();
+        } else {
+            notify_score_reported($m, (int)$m['score_team_id']);
+        }
+        respond(200, match_view($m, (int)$user['id'], true));
     });
 
     $r->post('/matches/(\d+)/score/confirm', function (string $id) {
@@ -240,6 +246,7 @@ function register_series_routes(Router $r): void
             }
             query('UPDATE matches SET score_status = "confirmed", score_at = UTC_TIMESTAMP() WHERE id = ?', [$m['id']]);
         });
+        run_notifications();
         respond(200, match_view(load_match((int)$id), (int)$user['id'], true));
     });
 
@@ -255,6 +262,7 @@ function register_series_routes(Router $r): void
             'UPDATE matches SET home_score = ?, away_score = ?, score_status = "confirmed", score_team_id = NULL, score_at = UTC_TIMESTAMP() WHERE id = ?',
             [$in['home_score'], $in['away_score'], $m['id']]
         );
+        run_notifications();
         respond(200, match_view(load_match((int)$id), (int)$mod['id'], true));
     });
 
@@ -282,6 +290,8 @@ function register_series_routes(Router $r): void
     // Événements bonus en cours et à venir, pour tout le monde.
     $r->get('/bonus-events', function () {
         require_user();
+        // L'accueil de l'appli passe ici : on en profite pour envoyer les alertes en attente.
+        run_notifications();
         $rows = query('SELECT * FROM bonus_events WHERE ends_at > UTC_TIMESTAMP() ORDER BY starts_at LIMIT 50')->fetchAll();
         respond(200, ['items' => array_map('bonus_event_view', $rows)]);
     });
@@ -316,7 +326,9 @@ function register_series_routes(Router $r): void
             'INSERT INTO bonus_events (title, description, venue_id, multiplier, bonus_points, starts_at, ends_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [$in['title'], $in['description'] ?? null, $in['venue_id'] ?? null, $in['multiplier'], $bonus, $in['starts_at'], $in['ends_at'], $mod['id']]
         );
-        respond(201, bonus_event_view(one('SELECT * FROM bonus_events WHERE id = ?', [(int)db()->lastInsertId()])));
+        $id = (int)db()->lastInsertId();
+        run_notifications();
+        respond(201, bonus_event_view(one('SELECT * FROM bonus_events WHERE id = ?', [$id])));
     });
 
     $r->delete('/mod/bonus-events/(\d+)', function (string $id) {

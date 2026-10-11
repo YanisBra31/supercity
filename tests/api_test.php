@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -701,6 +701,65 @@ check('événement supprimé : les points reviennent', $s === 204 && $r['grade']
 [$s, $r] = api('DELETE', "/mod/matches/$m4/score", null, $yassin);
 [$s2, $t] = api('GET', "/teams/$teamId", null, $lea);
 check('la modération efface un score : la série redescend', $s === 200 && $r['score']['status'] === null && $t['streak']['current'] === 3, $t['streak'] ?? $t);
+
+echo "Notifications\n";
+$pushes = fn() => mock('GET', '/test/state')['pushes'] ?? [];
+$since = fn(int $from) => array_slice($pushes(), $from);
+[$s, $r] = api('POST', '/me/push-token', ['token' => 'pas-un-jeton-expo', 'platform' => 'ios'], $lea);
+check('jeton de notification invalide refusé', $s === 422, $r);
+// Léa et Karim habitent près du terrain, Sam à Paris.
+[$s] = api('POST', '/me/push-token', ['token' => 'ExponentPushToken[lea]', 'platform' => 'ios', 'lat' => 43.59, 'lng' => 1.43], $lea);
+api('POST', '/me/push-token', ['token' => 'ExponentPushToken[karimGone]', 'platform' => 'android', 'lat' => 43.6, 'lng' => 1.44], $karim);
+api('POST', '/me/push-token', ['token' => 'ExponentPushToken[sam]', 'platform' => 'android', 'lat' => 48.85, 'lng' => 2.35], $sam);
+[$s2, $r] = api('GET', '/me', null, $lea);
+check('téléphone enregistré, alertes activées par défaut', $s === 204 && $r['notifications'] === ['events' => true, 'streaks' => true], $r['notifications'] ?? $r);
+$n0 = count($pushes());
+$more = [];
+foreach ([3, 2] as $d) {
+    $pdo->exec("INSERT INTO matches (organizer_id, venue_id, format, starts_at, duration_min, max_players, home_team_id, away_team_id, visibility)
+        VALUES ($samId, {$v1['id']}, 'city5', UTC_TIMESTAMP() - INTERVAL $d DAY, 60, 10, $teamId, $lionsId, 'public')");
+    $more[] = (int)$pdo->lastInsertId();
+}
+api('POST', "/matches/{$more[0]}/score", ['home_score' => 2, 'away_score' => 0], $yassin);
+$sent = $since($n0);
+check('score annoncé : le capitaine adverse est prévenu', count($sent) === 1 && $sent[0]['to'] === 'ExponentPushToken[sam]' && $sent[0]['title'] === 'Score à confirmer'
+    && $sent[0]['data']['url'] === "/match/{$more[0]}", $sent);
+$n1 = count($pushes());
+api('POST', "/matches/{$more[0]}/score/confirm", null, $sam);
+check('4 victoires d\'affilée : pas encore de palier', count($since($n1)) === 0, $since($n1));
+api('POST', "/mod/matches/{$more[1]}/score", ['home_score' => 3, 'away_score' => 1], $yassin);
+$sent = $since($n1);
+$to = array_column($sent, 'to');
+sort($to);
+check('5 victoires d\'affilée : alerte aux joueurs du coin et à l\'équipe', $to === ['ExponentPushToken[karimGone]', 'ExponentPushToken[lea]']
+    && str_contains($sent[0]['title'], 'Cartel Narvalo est en feu') && str_contains($sent[0]['body'], '5 victoires'), $sent);
+$n2 = count($pushes());
+[$s] = api('GET', '/cron/notifications?key=mauvaise', null, null);
+[$s2] = api('GET', '/cron/notifications?key=cron-test', null, null);
+check('tâche planifiée : clé requise, et pas de doublon', $s === 403 && $s2 === 200 && count($since($n2)) === 0, $since($n2));
+$gone = $pdo->query("SELECT COUNT(*) FROM push_tokens WHERE token = 'ExponentPushToken[karimGone]'")->fetchColumn();
+check('un téléphone désinstallé est oublié', (int)$gone === 0, $gone);
+
+[$s, $r] = api('PATCH', '/me/notifications', ['events' => false], $lea);
+check('Léa coupe les alertes d\'événements', $s === 200 && $r === ['events' => false, 'streaks' => true], $r);
+$n3 = count($pushes());
+[$s, $ev] = api('POST', '/mod/bonus-events', ['title' => 'Nuit du five', 'multiplier' => 3, 'starts_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('-1 minute')), 'ends_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 day'))], $yassin);
+$sent = $since($n3);
+check('événement en cours : alerte à tous ceux qui l\'acceptent', $s === 201 && array_column($sent, 'to') === ['ExponentPushToken[sam]'] && $sent[0]['title'] === '⚡ Nuit du five'
+    && str_starts_with($sent[0]['body'], 'Points x3 jusqu'), $sent);
+$n4 = count($pushes());
+[$s, $ev2] = api('POST', '/mod/bonus-events', ['title' => 'Dimanche bonus', 'multiplier' => 1, 'bonus_points' => 2, 'venue_id' => $v1['id'], 'starts_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('+2 days')), 'ends_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('+3 days'))], $yassin);
+check('événement à venir : pas encore d\'alerte', $s === 201 && count($since($n4)) === 0, $since($n4));
+api('PATCH', '/me/notifications', ['events' => true], $lea);
+$pdo->exec("UPDATE bonus_events SET starts_at = UTC_TIMESTAMP() - INTERVAL 1 MINUTE WHERE id = {$ev2['id']}");
+api('GET', '/bonus-events', null, $karim);
+$sent = $since($n4);
+check('il commence : alerte aux joueurs proches de son terrain seulement', array_column($sent, 'to') === ['ExponentPushToken[lea]'] && str_contains($sent[0]['body'], '+2 pts par match à City stade Bagatelle'), $sent);
+[$s] = api('DELETE', '/me/push-token', ['token' => 'ExponentPushToken[lea]'], $lea);
+$left = $pdo->query("SELECT COUNT(*) FROM push_tokens WHERE user_id = $leaId")->fetchColumn();
+check('déconnexion : le téléphone ne reçoit plus rien', $s === 204 && (int)$left === 0, $left);
+api('DELETE', "/mod/bonus-events/{$ev['id']}", null, $yassin);
+api('DELETE', "/mod/bonus-events/{$ev2['id']}", null, $yassin);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

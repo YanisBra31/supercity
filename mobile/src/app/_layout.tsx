@@ -7,18 +7,39 @@ import {
   Poppins_900Black,
   useFonts,
 } from '@expo-google-fonts/poppins';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Splash } from '../components/brand';
 import { header } from '../components/header';
 import { colors } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { registerPush } from '../lib/push';
+
+/** Joueur connecté : inscrit le téléphone aux alertes, et ouvre l'écran visé quand on touche une notification. */
+function usePush(userId: number | null) {
+  useEffect(() => {
+    if (!userId) return;
+    registerPush();
+    if (Platform.OS === 'web') return;
+    const open = (response: Notifications.NotificationResponse | null) => {
+      const url = response?.notification.request.content.data?.url;
+      if (typeof url === 'string' && url.startsWith('/')) router.push(url as never);
+    };
+    // Appli lancée en touchant une notification, puis notifications touchées pendant qu'elle tourne.
+    open(Notifications.getLastNotificationResponse());
+    Notifications.clearLastNotificationResponse();
+    const sub = Notifications.addNotificationResponseReceivedListener(open);
+    return () => sub.remove();
+  }, [userId]);
+}
 
 function RootStack() {
   const { user } = useAuth();
+  usePush(user?.id ?? null);
   return (
     <Stack screenOptions={{ ...header, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Protected guard={!user}>

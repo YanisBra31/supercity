@@ -29,4 +29,8 @@ return [
         'fee_cents' => 50,             // frais de service Supercity par place, en centimes, payés par le joueur
         'commission_percent' => 10,    // commission Supercity sur le prix des places des espaces pro
     ],
+    // Facultatif : clé de la tâche planifiée qui envoie les notifications en attente
+    // (hPanel > Avancé > Tâches Cron, toutes les 15 min : https://supercity.fr/api/v1/cron/notifications?key=CETTE_CLE).
+    // Sans tâche planifiée, les notifications partent quand un joueur ouvre l'appli.
+    'cron_key' => '',
 ];

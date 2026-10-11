@@ -1,5 +1,6 @@
 <?php
 // Faux Stripe pour les tests (serveur PHP intégré) : comptes, sessions de paiement, remboursements, retours de virement.
+// Sert aussi de faux service push d'Expo (POST /--/api/v2/push/send ; un jeton qui contient « Gone » n'existe plus).
 // Usage : STRIPE_MOCK_STATE=/tmp/stripe.json php -S 127.0.0.1:8097 tests/stripe_mock.php
 // Routes de test : POST /test/accounts/{id}/ready, POST /test/sessions/{id}/pay, GET /test/state.
 declare(strict_types=1);
@@ -102,6 +103,15 @@ switch (true) {
         $state['sessions'][$m[1]]['payment_status'] = 'paid';
         $state['sessions'][$m[1]]['payment_intent'] = $id('pi');
         out(200, $state['sessions'][$m[1]]);
+    case $method === 'POST' && $path === '/--/api/v2/push/send':
+        $tickets = [];
+        foreach (json_decode($raw, true) ?? [] as $msg) {
+            $state['pushes'][] = $msg;
+            $tickets[] = str_contains($msg['to'], 'Gone')
+                ? ['status' => 'error', 'message' => 'not registered', 'details' => ['error' => 'DeviceNotRegistered']]
+                : ['status' => 'ok', 'id' => $id('push')];
+        }
+        out(200, ['data' => $tickets]);
     case $method === 'GET' && $path === '/test/state':
         out(200, $state);
 }

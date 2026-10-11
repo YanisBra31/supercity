@@ -48,7 +48,11 @@ export type Me = PublicUser & {
   created_at: string;
   suspended_until?: string | null;
   suspended_reason?: string | null;
+  notifications?: NotificationPrefs;
 };
+
+/** Alertes que le joueur accepte de recevoir sur son téléphone. */
+export type NotificationPrefs = { events: boolean; streaks: boolean };
 
 export type Team = {
   id: number;
