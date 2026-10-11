@@ -33,8 +33,21 @@ function commission_cents(int $price, ?array $org): int
 /** Version de l'API Stripe v2 (comptes organisateurs), fixée pour que les réponses ne changent pas. */
 const STRIPE_V2_VERSION = '2026-09-30.endive';
 
+/** Clé publiable (pk_…) : obligatoire en production pour créer les jetons de compte. En test, la clé secrète suffit. */
+function publishable_key(): string
+{
+    $s = stripe_config() ?? throw new HttpError(503, 'payments_disabled', "Le paiement en ligne n'est pas encore activé.");
+    if (!empty($s['publishable_key'])) {
+        return $s['publishable_key'];
+    }
+    if (str_starts_with($s['secret_key'], 'sk_live_') || str_starts_with($s['secret_key'], 'rk_live_')) {
+        throw new HttpError(503, 'publishable_key_missing', 'Ajoute publishable_key (pk_live_…) dans le bloc stripe de supercity-config.php.');
+    }
+    return $s['secret_key'];
+}
+
 /** Appel à l'API Stripe, sans bibliothèque : v1 en formulaire encodé, v2 (chemins « /v2/… ») en JSON. */
-function stripe(string $method, string $path, array $params = [], ?string $idempotencyKey = null): array
+function stripe(string $method, string $path, array $params = [], ?string $idempotencyKey = null, ?string $key = null): array
 {
     $s = stripe_config() ?? throw new HttpError(503, 'payments_disabled', "Le paiement en ligne n'est pas encore activé.");
     $flat = function (array $a) use (&$flat): array {
@@ -46,7 +59,7 @@ function stripe(string $method, string $path, array $params = [], ?string $idemp
     $v2 = str_starts_with($path, '/v2/');
     $url = rtrim($s['api_base'] ?? 'https://api.stripe.com', '/') . ($v2 ? '' : '/v1') . $path;
     $query = $v2 ? '' : http_build_query($flat($params));
-    $headers = ['Authorization: Bearer ' . $s['secret_key'], 'Stripe-Version: ' . ($v2 ? ($s['api_version_v2'] ?? STRIPE_V2_VERSION) : '2024-06-20')];
+    $headers = ['Authorization: Bearer ' . ($key ?? $s['secret_key']), 'Stripe-Version: ' . ($v2 ? ($s['api_version_v2'] ?? STRIPE_V2_VERSION) : '2024-06-20')];
     if ($v2) {
         $headers[] = 'Content-Type: application/json';
     }

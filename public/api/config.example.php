@@ -24,6 +24,7 @@ return [
     // les matchs restent alors gratuits. Clés dans dashboard.stripe.com > Développeurs > Clés API.
     'stripe' => [
         'secret_key' => '',            // sk_live_... (ou sk_test_... pour essayer sans vrai argent)
+        'publishable_key' => '',       // pk_live_... (Clé publiable), obligatoire en production pour créer les comptes des pros
         'webhook_secret' => '',        // whsec_... affiché à la création du webhook
         'fee_cents' => 50,             // frais de service Supercity par place, en centimes, payés par le joueur
         'commission_percent' => 10,    // commission Supercity sur le prix des places des espaces pro
