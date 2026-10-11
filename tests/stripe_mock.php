@@ -57,6 +57,8 @@ switch (true) {
         $a = ['id' => $id('acct'), 'object' => 'account', 'charges_enabled' => false, 'payouts_enabled' => false, 'capabilities' => ['transfers' => 'inactive'], 'email' => $state['tokens'][$in['account_token']]['contact_email'] ?? null];
         $state['accounts'][$a['id']] = $a;
         out(200, ['id' => $a['id'], 'object' => 'v2.core.account', 'dashboard' => $in['dashboard'] ?? null]);
+    case $method === 'POST' && $path === '/v2/core/account_links' && isset($in['use_case']['account_onboarding']['configurations']):
+        out(400, ['error' => ['type' => 'invalid_request_error', 'message' => 'Some fields in the request were invalid: use_case.account_onboarding.configurations: unknown field']]);
     case $method === 'POST' && $path === '/v2/core/account_links':
         out(200, ['object' => 'v2.core.account_link', 'account' => $in['account'], 'url' => "https://connect.stripe.test/onboard/{$in['account']}", 'use_case' => $in['use_case']]);
     case $method === 'GET' && preg_match('#^/v1/accounts/([\w]+)$#', $path, $m) === 1:
