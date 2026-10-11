@@ -117,14 +117,18 @@ function register_pro_routes(Router $r): void
         $in = validate(body())->string('return_url', 1, 500, false)->check();
         $back = app_return($in['return_url'] ?? null);
         if (!$o['stripe_account_id']) {
-            // Compte Accounts v2 « destinataire » : il reçoit le prix des places (paiements à destination),
-            // avec le tableau de bord Express. Supercity porte les frais Stripe et les litiges.
+            // Compte Accounts v2 : il reçoit le prix des places (paiements à destination), avec le tableau de bord
+            // Express. Pour un compte français, Stripe exige la capacité carte (merchant) en plus des virements
+            // (recipient). Supercity porte les frais Stripe et les litiges.
             $acct = stripe('POST', '/v2/core/accounts', [
                 'contact_email' => $user['email'],
                 'display_name' => $o['name'],
                 'dashboard' => 'express',
                 'identity' => ['country' => 'fr', 'entity_type' => $o['legal_form']],
-                'configuration' => ['recipient' => ['capabilities' => ['stripe_balance' => ['stripe_transfers' => ['requested' => true]]]]],
+                'configuration' => [
+                    'merchant' => ['capabilities' => ['card_payments' => ['requested' => true]]],
+                    'recipient' => ['capabilities' => ['stripe_balance' => ['stripe_transfers' => ['requested' => true]]]],
+                ],
                 'defaults' => [
                     'currency' => 'eur',
                     'locales' => ['fr-FR'],
@@ -140,7 +144,7 @@ function register_pro_routes(Router $r): void
             'use_case' => [
                 'type' => 'account_onboarding',
                 'account_onboarding' => [
-                    'configurations' => ['recipient'],
+                    'configurations' => ['merchant', 'recipient'],
                     'refresh_url' => bounce_url($back, ['onboard' => 'retry']),
                     'return_url' => bounce_url($back, ['onboard' => 'done']),
                 ],
