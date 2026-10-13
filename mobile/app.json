@@ -59,10 +59,14 @@
       "backgroundColor": "#ff5223"
     },
     "extra": {
-      "apiUrl": "https://supercity.fr/api/v1"
+      "apiUrl": "https://supercity.fr/api/v1",
+      "eas": {
+        "projectId": "26481ff0-86cd-4140-ae32-e999fa9784eb"
+      }
     },
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "owner": "supercity"
   }
 }
