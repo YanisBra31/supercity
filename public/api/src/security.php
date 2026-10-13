@@ -274,7 +274,7 @@ function mail_html(string $title, string $hello, string $intro, string $code, st
     </td></tr>
     <tr><td align="center" style="padding:20px 16px 0;font-family:$font;font-size:12px;line-height:18px;color:#8d8079;">
       Tu reçois cet e-mail car il a été demandé depuis l'appli Supercity.<br>
-      <a href="$site" style="color:#ff5223;text-decoration:none;font-weight:600;">supercity.fr</a>
+      <a href="$site" style="color:#ff5223;text-decoration:none;font-weight:600;">supercity.fr</a> &middot; <a href="$site/mentions-legales/" style="color:#8d8079;">Mentions légales</a>
     </td></tr>
   </table>
 </td></tr>
