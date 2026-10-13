@@ -178,6 +178,10 @@ check('les anciennes sessions sont coupées', $s === 401);
 [$s] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
 [$s, $r] = api('POST', '/auth/password/forgot', ['email' => 'nina@example.fr']);
 check('limite les e-mails envoyés sans le révéler', $s === 204 && substr_count(file_get_contents($config['mail_log']), 'nina@example.fr') === 3);
+$mails = array_map(fn($l) => json_decode($l, true), file($config['mail_log']));
+$last = end($mails);
+check('e-mail mis en page : code en grand, version texte gardée', str_contains($last['html'] ?? '', '<!doctype html>') && str_contains($last['html'], implode('&#8202;', str_split(last_code($last['to']))))
+    && str_contains($last['text'], last_code($last['to'])) && !str_contains($last['html'], '<script'), $last['subject'] ?? $last);
 
 [$s, $r] = api('POST', '/me/password', ['current_password' => 'faux', 'new_password' => 'Petit-pont-22'], $nina2);
 check('changer de mot de passe exige l\'actuel', $s === 422 && isset($r['fields']['current_password']), $r);
