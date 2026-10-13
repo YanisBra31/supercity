@@ -100,12 +100,13 @@ function age_from(string $date): int
     return (new DateTimeImmutable($date))->diff(new DateTimeImmutable('today'))->y;
 }
 
-function send_mail(string $to, string $subject, string $text): void
+/** Envoie un e-mail : version texte, et version mise en page (HTML) si fournie, pour les messageries qui l'affichent. */
+function send_mail(string $to, string $subject, string $text, ?string $html = null): void
 {
     $c = config();
     if (!empty($c['mail_log'])) {
         // Environnement de test : on écrit l'e-mail dans un fichier au lieu de l'envoyer.
-        file_put_contents($c['mail_log'], json_encode(['to' => $to, 'subject' => $subject, 'text' => $text]) . "\n", FILE_APPEND);
+        file_put_contents($c['mail_log'], json_encode(['to' => $to, 'subject' => $subject, 'text' => $text, 'html' => $html]) . "\n", FILE_APPEND);
         return;
     }
     $from = $c['mail_from'] ?? 'Supercity <contact@supercity.fr>';
@@ -117,10 +118,17 @@ function send_mail(string $to, string $subject, string $text): void
         'Date: ' . date(DATE_RFC2822),
         'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . substr(strrchr($address, '@'), 1) . '>',
         'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: base64',
     ];
-    $body = chunk_split(base64_encode($text));
+    if ($html === null) {
+        $headers[] = 'Content-Type: text/plain; charset=UTF-8';
+        $headers[] = 'Content-Transfer-Encoding: base64';
+        $body = chunk_split(base64_encode($text));
+    } else {
+        $boundary = 'sc-' . bin2hex(random_bytes(12));
+        $headers[] = "Content-Type: multipart/alternative; boundary=\"$boundary\"";
+        $part = fn(string $type, string $content) => "--$boundary\r\nContent-Type: $type; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($content));
+        $body = $part('text/plain', $text) . $part('text/html', $html) . "--$boundary--\r\n";
+    }
     if (!empty($c['smtp']['host'])) {
         try {
             smtp_send($c['smtp'], $address, $to, array_merge(["To: $to", "Subject: $encoded"], $headers), $body);
@@ -201,11 +209,79 @@ function send_code(array $user, string $purpose): void
         [$user['id'], $purpose, hash('sha256', $code)]
     );
     $name = $user['display_name'];
+    $valid = 'Il est valable ' . CODE_MINUTES . ' minutes.';
     if ($purpose === 'verify') {
-        send_mail($user['email'], "Ton code Supercity : $code", "Salut $name,\n\nBienvenue sur Supercity ! Pour confirmer ton adresse e-mail, entre ce code dans l'appli :\n\n    $code\n\nIl est valable " . CODE_MINUTES . " minutes. Si tu n'as pas créé de compte, ignore ce message.\n\nÀ bientôt sur le terrain,\nSupercity");
+        $intro = 'Bienvenue sur Supercity ! Pour confirmer ton adresse e-mail, entre ce code dans l\'appli :';
+        $note = "Si tu n'as pas créé de compte, ignore ce message.";
+        send_mail(
+            $user['email'],
+            "Ton code Supercity : $code",
+            "Salut $name,\n\n$intro\n\n    $code\n\n$valid $note\n\nÀ bientôt sur le terrain,\nSupercity",
+            mail_html('Confirme ton adresse', "Salut $name,", $intro, $code, "$valid $note", 'À bientôt sur le terrain,')
+        );
     } else {
-        send_mail($user['email'], "Réinitialisation de ton mot de passe : $code", "Salut $name,\n\nTu as demandé à changer ton mot de passe Supercity. Entre ce code dans l'appli :\n\n    $code\n\nIl est valable " . CODE_MINUTES . " minutes. Si ce n'est pas toi, ignore ce message : ton mot de passe reste le même.\n\nSupercity");
+        $intro = 'Tu as demandé à changer ton mot de passe Supercity. Entre ce code dans l\'appli :';
+        $note = 'Si ce n\'est pas toi, ignore ce message : ton mot de passe reste le même.';
+        send_mail(
+            $user['email'],
+            "Réinitialisation de ton mot de passe : $code",
+            "Salut $name,\n\n$intro\n\n    $code\n\n$valid $note\n\nSupercity",
+            mail_html('Nouveau mot de passe', "Salut $name,", $intro, $code, "$valid $note", 'À bientôt sur le terrain,')
+        );
     }
+}
+
+/**
+ * Mise en page des e-mails aux couleurs de Supercity : bandeau orange avec le logo, code en grand, pied de page.
+ * Tableaux et styles en ligne, la seule écriture que toutes les messageries (Gmail, Outlook, Apple Mail) affichent pareil.
+ */
+function mail_html(string $title, string $hello, string $intro, string $code, string $note, string $signoff): string
+{
+    $e = fn(string $s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $site = 'https://supercity.fr';
+    $font = "'Poppins', 'Segoe UI', Helvetica, Arial, sans-serif";
+    $digits = implode('&#8202;', str_split($e($code)));
+    return <<<HTML
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{$e($title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body style="margin:0;padding:0;background-color:#fff1e4;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Ton code : {$e($code)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff1e4;">
+<tr><td align="center" style="padding:32px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+    <tr><td style="background-color:#ff5223;background-image:linear-gradient(135deg,#ff9417 0%,#ff7a1e 50%,#ff5223 100%);border-radius:24px 24px 0 0;padding:28px 32px;" align="left">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="vertical-align:middle;padding-right:14px;"><img src="$site/logo-blanc.png" width="42" height="52" alt="" style="display:block;border:0;"></td>
+        <td style="vertical-align:middle;font-family:$font;font-size:24px;font-weight:800;color:#fff8f1;letter-spacing:-0.5px;">Supercity</td>
+      </tr></table>
+      <div style="font-family:$font;font-size:11px;font-weight:600;letter-spacing:2.4px;text-transform:uppercase;color:#1f1a17;padding-top:22px;">{$e($title)}</div>
+    </td></tr>
+    <tr><td style="background-color:#ffffff;border-radius:0 0 24px 24px;padding:32px;border:1px solid #f0dccb;border-top:0;">
+      <p style="margin:0 0 12px;font-family:$font;font-size:18px;font-weight:800;color:#1f1a17;">{$e($hello)}</p>
+      <p style="margin:0 0 24px;font-family:$font;font-size:15px;line-height:24px;color:#5c524c;">{$e($intro)}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" style="background-color:#1f1a17;border-radius:18px;padding:22px 12px;font-family:'Courier New',Courier,monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#fff8f1;">$digits</td>
+      </tr></table>
+      <p style="margin:24px 0 0;font-family:$font;font-size:13px;line-height:20px;color:#5c524c;">{$e($note)}</p>
+      <p style="margin:24px 0 0;font-family:$font;font-size:15px;line-height:22px;color:#1f1a17;">{$e($signoff)}<br><strong style="color:#ff5223;">L'équipe Supercity</strong></p>
+    </td></tr>
+    <tr><td align="center" style="padding:20px 16px 0;font-family:$font;font-size:12px;line-height:18px;color:#8d8079;">
+      Tu reçois cet e-mail car il a été demandé depuis l'appli Supercity.<br>
+      <a href="$site" style="color:#ff5223;text-decoration:none;font-weight:600;">supercity.fr</a>
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>
+HTML;
 }
 
 /** Vérifie un code ; le consomme s'il est bon, compte l'essai sinon. */
