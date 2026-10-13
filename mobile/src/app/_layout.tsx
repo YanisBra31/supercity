@@ -64,6 +64,7 @@ function RootStack() {
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
       </Stack.Protected>
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
+      <Stack.Screen name="mentions" options={{ title: 'Mentions légales', presentation: 'modal' }} />
     </Stack>
   );
 }
