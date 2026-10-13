@@ -124,6 +124,7 @@ function public_user(array $u): array
         'accent' => $u['accent'] ?? 'orange',
         'grade' => grade_for(user_stats((int)$u['id'])),
         'site_role' => role_of($u),
+        'cosmetics' => equipped_cosmetics($u),
     ];
 }
 
@@ -133,6 +134,7 @@ function private_user(array $u): array
         'email' => $u['email'],
         'email_verified' => $u['email_verified_at'] !== null,
         'notifications' => notification_prefs($u),
+        'coins' => coin_balance((int)$u['id']),
         'suspended_until' => suspension_of($u),
         'suspended_reason' => suspension_of($u) ? ($u['suspended_reason'] ?? null) : null,
         'birth_date' => $u['birth_date'],

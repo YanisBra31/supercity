@@ -17,6 +17,7 @@ require __DIR__ . '/src/payments.php';
 require __DIR__ . '/src/pros.php';
 require __DIR__ . '/src/series.php';
 require __DIR__ . '/src/notifications.php';
+require __DIR__ . '/src/shop.php';
 
 date_default_timezone_set('UTC');
 
@@ -51,6 +52,7 @@ try {
     register_pro_routes($router);
     register_series_routes($router);
     register_notification_routes($router);
+    register_shop_routes($router);
     $router->dispatch($method, $path);
 } catch (HttpError $e) {
     $payload = ['error' => $e->errorCode, 'message' => $e->getMessage()];

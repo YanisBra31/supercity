@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GradeBadge, RoleBadge } from '../components/Grade';
 import { ModDisputes, ModEvents } from '../components/ModSeries';
+import { ModShop } from '../components/ModShop';
 import { Avatar, Button, Card, Chips, colors, Empty, ErrorText, font, Kicker, Loading, s, Screen, Success } from '../components/ui';
 import { ApiError, del, get, ModReport, ModUser, post, Role } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -28,7 +29,7 @@ function confirm(title: string, message: string): Promise<boolean> {
 
 export default function Moderation() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<'reports' | 'users' | 'events' | 'disputes'>('reports');
+  const [tab, setTab] = useState<'reports' | 'users' | 'events' | 'disputes' | 'shop'>('reports');
   const [reports, setReports] = useState<ModReport[] | null>(null);
   const [q, setQ] = useState('');
   const [found, setFound] = useState<ModUser[]>([]);
@@ -92,6 +93,7 @@ export default function Moderation() {
           { value: 'users', label: 'Joueurs' },
           { value: 'events', label: 'Événements bonus' },
           { value: 'disputes', label: 'Scores contestés' },
+          { value: 'shop', label: 'Boutique' },
         ]}
         value={tab}
         onChange={(v) => v && setTab(v as typeof tab)}
@@ -101,8 +103,9 @@ export default function Moderation() {
 
       {tab === 'events' ? <ModEvents act={act} /> : null}
       {tab === 'disputes' ? <ModDisputes /> : null}
+      {tab === 'shop' ? <ModShop act={act} /> : null}
 
-      {tab === 'events' || tab === 'disputes' ? null : tab === 'reports' ? (
+      {tab === 'events' || tab === 'disputes' || tab === 'shop' ? null : tab === 'reports' ? (
         reports === null ? (
           <Loading />
         ) : reports.length === 0 ? (

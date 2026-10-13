@@ -24,6 +24,7 @@ export type PublicUser = {
   // Absent si l'API en ligne est plus ancienne que l'appli.
   grade?: Grade;
   site_role?: Role;
+  cosmetics?: Equipped;
 };
 export type Role = 'user' | 'moderator' | 'admin';
 export type Grade = {
@@ -49,7 +50,28 @@ export type Me = PublicUser & {
   suspended_until?: string | null;
   suspended_reason?: string | null;
   notifications?: NotificationPrefs;
+  coins?: number;
 };
+
+/** Cosmétiques de profil : cadre de photo, bannière, titre. */
+export type CosmeticType = 'frame' | 'banner' | 'title';
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type CosmeticLook = { colors: string[]; effect?: 'none' | 'glow' | 'spin'; pattern?: 'none' | 'stripes' | 'dots' | 'flames' };
+export type CosmeticBrief = { id: number; type: CosmeticType; name: string; rarity: Rarity; look: CosmeticLook };
+export type Equipped = { frame: CosmeticBrief | null; banner: CosmeticBrief | null; title: CosmeticBrief | null };
+export type Cosmetic = CosmeticBrief & {
+  price: number;
+  min_level: number | null;
+  collection: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  state: 'on_sale' | 'upcoming' | 'ended' | 'retired';
+  owned: boolean;
+  equipped: boolean;
+  locked: boolean;
+  owners?: number;
+};
+export type Shop = { coins: number; coins_per_point: number; equipped: Equipped; items: Cosmetic[] };
 
 /** Alertes que le joueur accepte de recevoir sur son téléphone. */
 export type NotificationPrefs = { events: boolean; streaks: boolean };
