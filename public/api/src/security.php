@@ -122,12 +122,13 @@ function send_mail(string $to, string $subject, string $text, ?string $html = nu
     if ($html === null) {
         $headers[] = 'Content-Type: text/plain; charset=UTF-8';
         $headers[] = 'Content-Transfer-Encoding: base64';
-        $body = chunk_split(base64_encode($text));
+        $body = chunk_split(base64_encode($text), 76, "\n");
     } else {
         $boundary = 'sc-' . bin2hex(random_bytes(12));
         $headers[] = "Content-Type: multipart/alternative; boundary=\"$boundary\"";
-        $part = fn(string $type, string $content) => "--$boundary\r\nContent-Type: $type; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . chunk_split(base64_encode($content));
-        $body = $part('text/plain', $text) . $part('text/html', $html) . "--$boundary--\r\n";
+        // Fins de ligne en \n : smtp_send() les passe en \r\n, et mail() les adapte lui-même.
+        $part = fn(string $type, string $content) => "--$boundary\nContent-Type: $type; charset=UTF-8\nContent-Transfer-Encoding: base64\n\n" . chunk_split(base64_encode($content), 76, "\n");
+        $body = $part('text/plain', $text) . $part('text/html', $html) . "--$boundary--\n";
     }
     if (!empty($c['smtp']['host'])) {
         try {
@@ -189,7 +190,7 @@ function smtp_send(array $s, string $from, string $to, array $headers, string $b
     $cmd("RCPT TO:<$to>", 250);
     $cmd('DATA', 354);
     // Une ligne qui commence par un point est doublée (règle SMTP).
-    $data = implode("\r\n", $headers) . "\r\n\r\n" . preg_replace('/^\./m', '..', str_replace("\n", "\r\n", rtrim($body)));
+    $data = implode("\r\n", $headers) . "\r\n\r\n" . preg_replace('/^\./m', '..', preg_replace('/\r?\n/', "\r\n", rtrim($body)));
     $cmd($data . "\r\n.", 250);
     fwrite($sock, "QUIT\r\n");
     fclose($sock);
