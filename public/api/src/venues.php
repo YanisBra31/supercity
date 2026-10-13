@@ -100,6 +100,6 @@ function register_venue_routes(Router $r): void
     $r->get('/venues/(\d+)', function (string $id) {
         require_user();
         $v = one('SELECT * FROM venues WHERE id = ?', [(int)$id]) ?? not_found('Terrain');
-        respond(200, venue_view($v));
+        respond(200, venue_view($v) + ['king' => venue_king((int)$v['id'])]);
     });
 }

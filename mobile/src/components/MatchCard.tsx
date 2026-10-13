@@ -6,6 +6,7 @@ import { euros } from '../lib/pay';
 import { distanceLabel, formatLabel, formatShort, levelLabel, timeLabel } from '../lib/format';
 import { Gradient } from './brand';
 import { Card, colors, font, Meta, Pill } from './ui';
+import { ON_FIRE } from './Streak';
 
 const DAYS = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -55,7 +56,11 @@ export function MatchCard({ match: m, index }: { match: Match; index?: number })
         <Meta icon="location-outline">{[m.title ? m.venue.name : null, m.venue.city, dist].filter(Boolean).join(' · ') || m.venue.address}</Meta>
         {m.organization ? <Meta icon="briefcase-outline">{m.organization.name}</Meta> : null}
         {m.home_team ? (
-          <Meta icon="shield-outline">{`${m.home_team.name} vs ${m.away_team?.name ?? 'adversaire à trouver'}`}</Meta>
+          <Meta icon="shield-outline">
+            {m.score?.status === 'confirmed' && m.away_team
+              ? `${m.home_team.name} ${m.score.home} - ${m.score.away} ${m.away_team.name}`
+              : `${m.home_team.name}${(m.home_team.streak ?? 0) >= ON_FIRE ? ' 🔥' : ''} vs ${m.away_team ? `${m.away_team.name}${(m.away_team.streak ?? 0) >= ON_FIRE ? ' 🔥' : ''}` : 'adversaire à trouver'}`}
+          </Meta>
         ) : (
           <Meta icon="stats-chart-outline">{levelLabel(m.level)}</Meta>
         )}

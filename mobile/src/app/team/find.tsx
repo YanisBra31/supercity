@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Card, colors, Empty, Field, font, Pill, s, Screen, TeamCrest } from '../../components/ui';
+import { StreakBadge } from '../../components/Streak';
 import { get, Team } from '../../lib/api';
 
 export default function FindTeam() {
@@ -26,7 +27,10 @@ export default function FindTeam() {
         <Card key={t.id} index={i} onPress={() => router.push(`/team/${t.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TeamCrest name={t.name} logo={t.logo_url} primary={t.color_primary} secondary={t.color_secondary} size={48} />
           <View style={{ flex: 1, gap: 2 }}>
-            <Text style={{ ...font.extrabold, fontSize: 16, color: colors.ink }}>{t.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ ...font.extrabold, fontSize: 16, color: colors.ink, flexShrink: 1 }}>{t.name}</Text>
+              <StreakBadge count={t.streak?.current} />
+            </View>
             <Text style={s.sub}>
               {t.members_count} joueur{t.members_count > 1 ? 's' : ''}
               {t.city ? ` · ${t.city}` : ''}

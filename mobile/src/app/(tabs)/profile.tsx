@@ -12,6 +12,7 @@ import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
 import { GradeBadge, GradeCard, RoleBadge } from '../../components/Grade';
+import { NotificationSettings } from '../../components/NotificationSettings';
 
 export default function Profile() {
   const { user, updateProfile, logout, setUser } = useAuth();
@@ -231,6 +232,9 @@ export default function Profile() {
       <Kicker>Espace pro</Kicker>
       <Text style={s.sub}>Tu gères un five, un club, une association ? Publie des créneaux et des tournois payants.</Text>
       <Button title="Ouvrir mon espace pro" icon="briefcase-outline" variant="dark" onPress={() => router.push('/pro')} />
+
+      <Kicker>Notifications</Kicker>
+      <NotificationSettings user={user} onChange={setUser} />
 
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />

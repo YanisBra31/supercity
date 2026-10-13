@@ -78,8 +78,10 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
     }
     $price = (int)$m['price_cents'];
     $team = fn($tid) => $tid ? (($t = one('SELECT id, name, logo_url, color_primary, color_secondary FROM teams WHERE id = ?', [$tid]))
-        ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'], 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary']]
+        ? ['id' => (int)$t['id'], 'name' => $t['name'], 'logo_url' => $t['logo_url'], 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary'],
+            'streak' => team_streak((int)$t['id'])['current']]
         : null) : null;
+    $bonus = match_bonus($m);
     $organizer = one('SELECT * FROM users WHERE id = ?', [$m['organizer_id']]);
     $org = $m['organization_id'] ? one('SELECT * FROM organizations WHERE id = ?', [$m['organization_id']]) : null;
     $isOrganizer = $viewerId !== null && (int)$m['organizer_id'] === $viewerId;
@@ -112,8 +114,11 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'is_organizer' => $isOrganizer,
         // Ce que l'organisation touche par place, commission Supercity déduite (vu par l'organisateur seulement).
         'payout_cents' => $isOrganizer && $price > 0 ? $price - commission_cents($price, $org) : null,
+        'score' => score_view($m, $viewerId),
+        'bonus' => $bonus ? bonus_event_view($bonus) : null,
     ];
     if ($withPlayers) {
+        $out['venue']['king'] = venue_king((int)$m['venue_id']);
         $rows = query(
             'SELECT u.*, p.status AS p_status, p.team_id AS p_team FROM match_participants p JOIN users u ON u.id = p.user_id
              WHERE p.match_id = ? AND p.status IN ("registered", "waitlist") ORDER BY p.status = "waitlist", p.updated_at, p.created_at',

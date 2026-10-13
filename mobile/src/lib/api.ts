@@ -37,7 +37,7 @@ export type Grade = {
 };
 export type Accent = 'orange' | 'nuit' | 'rouge' | 'bleu' | 'vert' | 'violet';
 export type PublicProfile = PublicUser & {
-  stats: { played: number; organized: number };
+  stats: { played: number; organized: number; wins?: number };
   teams: { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; role: 'captain' | 'player' }[];
   member_since: string;
 };
@@ -48,7 +48,11 @@ export type Me = PublicUser & {
   created_at: string;
   suspended_until?: string | null;
   suspended_reason?: string | null;
+  notifications?: NotificationPrefs;
 };
+
+/** Alertes que le joueur accepte de recevoir sur son téléphone. */
+export type NotificationPrefs = { events: boolean; streaks: boolean };
 
 export type Team = {
   id: number;
@@ -66,6 +70,39 @@ export type Team = {
   my_role: 'captain' | 'player' | null;
   invite_code?: string;
   members?: (PublicUser & { role: 'captain' | 'player'; joined_at: string })[];
+  // Absent si l'API en ligne est plus ancienne que l'appli.
+  streak?: Streak;
+};
+
+/** Série de victoires d'une équipe : en cours, meilleure, et forme sur les 5 derniers matchs (V, N, D). */
+export type Streak = { current: number; best: number; on_fire: boolean; form: ('W' | 'D' | 'L')[] };
+
+/** Roi du terrain : l'équipe avec la plus longue série de victoires en cours sur ce terrain. */
+export type VenueKing = { team: TeamBrief; streak: number; on_fire: boolean };
+
+/** Score d'un match entre deux équipes, donné par les capitaines. */
+export type MatchScore = {
+  home: number | null;
+  away: number | null;
+  status: 'reported' | 'confirmed' | 'disputed' | null;
+  reported_by_team_id: number | null;
+  /** Équipe gagnante, 0 pour un nul, null tant que le score n'est pas validé. */
+  winner_team_id: number | null;
+  can_report: boolean;
+  can_confirm: boolean;
+};
+
+/** Événement bonus créé par la modération : points multipliés et/ou points en plus par match joué. */
+export type BonusEvent = {
+  id: number;
+  title: string;
+  description: string | null;
+  multiplier: number;
+  bonus_points: number;
+  venue: Venue | null;
+  starts_at: string;
+  ends_at: string;
+  active: boolean;
 };
 
 export type Venue = {
@@ -78,6 +115,7 @@ export type Venue = {
   surface: Surface;
   covered: boolean;
   distance_km: number | null;
+  king?: VenueKing | null;
 };
 
 export type Match = {
@@ -113,6 +151,8 @@ export type Match = {
   /** Ce que l'organisation touche par place, commission Supercity déduite (organisateur seulement). */
   payout_cents: number | null;
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
+  score?: MatchScore | null;
+  bonus?: BonusEvent | null;
 };
 
 /** Réponse d'inscription ou de désistement d'un match. */
@@ -132,7 +172,7 @@ export type MyOrganization = OrgSummary & {
   stats: { upcoming: number; places_sold: number; gross_cents: number; commission_cents: number; net_cents: number };
 };
 
-export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string };
+export type MatchTeam = { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; streak?: number };
 
 export class ApiError extends Error {
   constructor(

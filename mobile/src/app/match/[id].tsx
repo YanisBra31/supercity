@@ -16,6 +16,9 @@ function durationLabel(min: number): string {
   return `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60}` : ''}`;
 }
 import { GradeBadge, RoleBadge } from '../../components/Grade';
+import { ScoreCard } from '../../components/ScoreCard';
+import { BonusBanner, KingCard, StreakBadge } from '../../components/Streak';
+import { useAuth } from '../../lib/auth';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -35,6 +38,8 @@ export default function MatchDetail() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const { user } = useAuth();
+  const moderator = user?.site_role === 'moderator' || user?.site_role === 'admin';
 
   const load = useCallback(async () => {
     try {
@@ -118,18 +123,47 @@ export default function MatchDetail() {
       </Hero>
 
       {m.home_team || m.away_team ? (
-        <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
             {m.home_team ? <TeamCrest name={m.home_team.name} logo={m.home_team.logo_url} primary={m.home_team.color_primary} secondary={m.home_team.color_secondary} size={52} /> : <Avatar name="?" size={52} />}
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.home_team?.name ?? 'Joueurs libres'}</Text>
+            <View style={{ alignSelf: 'center' }}>
+              <StreakBadge count={m.home_team?.streak} onDark />
+            </View>
           </View>
-          <Text style={{ ...font.black, fontSize: 22, color: colors.orange1 }}>VS</Text>
+          {m.score?.home != null && m.score.away != null ? (
+            <View style={{ alignItems: 'center', alignSelf: 'center' }}>
+              <Text style={{ ...font.black, fontSize: 30, color: colors.chalk }}>
+                {m.score.home} - {m.score.away}
+              </Text>
+              {m.score.status !== 'confirmed' ? (
+                <Text style={{ ...font.semibold, fontSize: 10, color: colors.orange1 }}>{m.score.status === 'disputed' ? 'CONTESTÉ' : 'À CONFIRMER'}</Text>
+              ) : null}
+            </View>
+          ) : (
+            <Text style={{ ...font.black, fontSize: 22, color: colors.orange1, alignSelf: 'center' }}>VS</Text>
+          )}
           <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
             {m.away_team ? <TeamCrest name={m.away_team.name} logo={m.away_team.logo_url} primary={m.away_team.color_primary} secondary={m.away_team.color_secondary} size={52} /> : <Avatar name="?" size={52} tone="night" />}
             <Text style={{ ...font.extrabold, fontSize: 14, color: colors.chalk, textAlign: 'center' }}>{m.away_team?.name ?? 'Adversaire à trouver'}</Text>
+            <View style={{ alignSelf: 'center' }}>
+              <StreakBadge count={m.away_team?.streak} onDark />
+            </View>
           </View>
         </Gradient>
       ) : null}
+
+      <ScoreCard
+        key={`${m.score?.status}-${m.score?.home}-${m.score?.away}`}
+        m={m}
+        busy={busy}
+        moderator={moderator}
+        onReport={(home, away) => act(() => post<Match>(`/matches/${m.id}/score`, { home_score: home, away_score: away }))}
+        onConfirm={() => act(() => post<Match>(`/matches/${m.id}/score/confirm`))}
+        onModerate={(home, away) => act(() => post<Match>(`/mod/matches/${m.id}/score`, { home_score: home, away_score: away }))}
+      />
+
+      {m.bonus && !closed ? <BonusBanner event={m.bonus} compact /> : null}
 
       {seekOpponent ? (
         <Card style={{ gap: 10, borderColor: colors.orange1, borderWidth: 2 }}>
@@ -167,6 +201,8 @@ export default function MatchDetail() {
           {m.venue.distance_km !== null ? ` · ${distanceLabel(m.venue.distance_km)}` : ''}
         </Text>
       </Card>
+
+      <KingCard king={m.venue.king} />
 
       {m.organization ? (
         <Card onPress={() => router.push(`/org/${m.organization!.id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>

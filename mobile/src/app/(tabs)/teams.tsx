@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
 import { Hero } from '../../components/brand';
 import { Button, Card, Chips, Empty, ErrorText, Field, Kicker, Label, Pill, Screen, TeamCrest, colors, font, s } from '../../components/ui';
+import { StreakBadge } from '../../components/Streak';
 import { ApiError, Challenge, Format, get, post, Team } from '../../lib/api';
 import { ChallengeCard } from '../../components/ChallengeCard';
 import { FORMATS, formatLabel } from '../../lib/format';
@@ -123,6 +124,7 @@ export default function Teams() {
           <View style={{ flex: 1, gap: 2 }}>
           <View style={[s.row, { justifyContent: 'space-between' }]}>
             <Text style={{ fontSize: 17, ...font.extrabold, color: colors.ink, flex: 1 }}>{t.name}</Text>
+            <StreakBadge count={t.streak?.current} />
             {t.my_role === 'captain' ? <Pill text="Capitaine" /> : null}
           </View>
           <Text style={s.sub}>
