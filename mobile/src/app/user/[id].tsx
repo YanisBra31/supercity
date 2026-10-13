@@ -4,11 +4,12 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FadeIn, Hero } from '../../components/brand';
-import { Avatar, Card, colors, ErrorText, font, Kicker, Loading, Pill, s, Screen, TeamCrest } from '../../components/ui';
+import { Card, colors, ErrorText, font, Kicker, Loading, Pill, s, Screen, TeamCrest } from '../../components/ui';
 import { ApiError, get, Post, PublicProfile } from '../../lib/api';
 import { PostCard } from '../../components/PostCard';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { GradeBadge, GradeCard, RoleBadge } from '../../components/Grade';
+import { BannerPattern, bannerColors, FramedAvatar, TitleTag } from '../../components/Cosmetics';
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 
@@ -41,11 +42,19 @@ export default function UserProfile() {
   return (
     <Screen>
       <Stack.Screen options={{ title: p.display_name }} />
-      <Hero tone={p.accent} title="" kicker={`Sur Supercity depuis ${MONTHS[since.getMonth()]} ${since.getFullYear()}`} kickerColor={p.accent === 'nuit' ? colors.orange1 : colors.night}>
+      <Hero
+        tone={p.accent}
+        colors={bannerColors(p.cosmetics?.banner)}
+        title=""
+        kicker={`Sur Supercity depuis ${MONTHS[since.getMonth()]} ${since.getFullYear()}`}
+        kickerColor={p.cosmetics?.banner ? colors.chalk : p.accent === 'nuit' ? colors.orange1 : colors.night}
+      >
+        <BannerPattern banner={p.cosmetics?.banner} />
         <View style={st.head}>
-          <Avatar name={p.display_name} uri={p.avatar_url} size={88} tone="night" ring />
+          <FramedAvatar frame={p.cosmetics?.frame} name={p.display_name} uri={p.avatar_url} size={88} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={st.name}>{p.display_name}</Text>
+            <TitleTag title={p.cosmetics?.title} />
             <View style={[s.row, { gap: 6 }]}>
               <GradeBadge grade={p.grade} size="md" />
               <RoleBadge role={p.site_role} />

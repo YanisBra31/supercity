@@ -6,13 +6,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swatches } from '../../components/AccentPicker';
 import { ACCENTS, AccentName, FadeIn, Hero } from '../../components/brand';
 import { MatchCard } from '../../components/MatchCard';
-import { Avatar, Banner, Button, Chips, colors, ErrorText, Field, font, Kicker, Label, Pill, s, Screen, Success, TeamCrest } from '../../components/ui';
+import { Banner, Button, Chips, colors, ErrorText, Field, font, Kicker, Label, Pill, s, Screen, Success, TeamCrest } from '../../components/ui';
 import { ApiError, del, Foot, get, Match, Me, Position, PublicProfile, uploadImage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
 import { GradeBadge, GradeCard, RoleBadge } from '../../components/Grade';
 import { NotificationSettings } from '../../components/NotificationSettings';
+import { BannerPattern, bannerColors, FramedAvatar, TitleTag } from '../../components/Cosmetics';
 
 export default function Profile() {
   const { user, updateProfile, logout, setUser } = useAuth();
@@ -104,10 +105,17 @@ export default function Profile() {
 
   return (
     <Screen top>
-      <Hero tone={accent} kicker="Ton profil de joueur" kickerColor={accent === 'nuit' ? colors.orange1 : colors.night} title="">
+      <Hero
+        tone={accent}
+        colors={bannerColors(user.cosmetics?.banner)}
+        kicker="Ton profil de joueur"
+        kickerColor={user.cosmetics?.banner ? colors.chalk : accent === 'nuit' ? colors.orange1 : colors.night}
+        title=""
+      >
+        <BannerPattern banner={user.cosmetics?.banner} />
         <View style={st.head}>
           <Pressable onPress={changePhoto} accessibilityRole="button" accessibilityLabel="Changer ma photo">
-            <Avatar name={user.display_name} uri={user.avatar_url} size={92} tone="night" ring />
+            <FramedAvatar frame={user.cosmetics?.frame} name={user.display_name} uri={user.avatar_url} size={92} />
             <View style={st.camera}>
               <Ionicons name={uploading ? 'hourglass-outline' : 'camera'} size={16} color={colors.chalk} />
             </View>
@@ -116,6 +124,7 @@ export default function Profile() {
             <Text style={st.name} numberOfLines={2}>
               {user.display_name}
             </Text>
+            <TitleTag title={user.cosmetics?.title} />
             <View style={[s.row, { gap: 6 }]}>
               <GradeBadge grade={user.grade ?? pub?.grade} size="md" />
               <RoleBadge role={user.site_role} />
@@ -176,6 +185,12 @@ export default function Profile() {
         <ErrorText>{`Ton compte est suspendu jusqu'au ${new Date(user.suspended_until).toLocaleDateString('fr-FR')}${user.suspended_reason ? ` (${user.suspended_reason})` : ''}. Tu peux consulter l'appli, mais pas publier ni organiser.`}</ErrorText>
       ) : null}
       <GradeCard grade={user.grade ?? pub?.grade} />
+      <Banner
+        icon="bag-handle"
+        title={user.coins != null ? `Boutique · ${user.coins.toLocaleString('fr-FR')} pièces` : 'Boutique'}
+        text="Cadres, bannières et titres pour ton profil. Nouveautés chaque saison."
+        onPress={() => router.push('/shop')}
+      />
 
       <Kicker>Mes prochains matchs</Kicker>
       {matches.length ? matches.map((m, i) => <MatchCard key={m.id} match={m} index={i} />) : <Text style={s.sub}>Aucun match prévu. Va voir l'onglet Matchs !</Text>}

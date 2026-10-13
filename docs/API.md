@@ -204,3 +204,17 @@ Alertes envoyées :
 - un score annoncé ou contesté, au capitaine adverse (toujours).
 
 Les alertes en attente partent quand un joueur ouvre l'accueil (`GET /bonus-events`), quand un score est validé ou un événement créé, ou par la tâche planifiée. Chacune ne part qu'une fois. Un téléphone désinstallé est oublié.
+
+## Boutique et pièces
+
+Les pièces se gagnent en jouant : 10 par point de grade (`COINS_PER_POINT`). Les points de grade ne s'achètent pas. Les pièces servent seulement aux cosmétiques de profil : cadre de photo (`frame`), bannière (`banner`) et titre (`title`). `GET /me` donne le solde (`coins`), et chaque profil public donne ce qu'il porte (`cosmetics.frame`, `.banner`, `.title`, chacun `{id, type, name, rarity, look}` ou `null`).
+
+| Méthode | Adresse | Rôle |
+| --- | --- | --- |
+| GET | `/shop` | `coins`, `coins_per_point`, `equipped`, et `items` : ce qui est en vente et tout ce que le joueur possède (`price`, `rarity`, `look`, `collection`, `ends_at`, `state`, `owned`, `equipped`, `locked`). |
+| POST | `/shop/{id}/buy` | Achète (ou débloque si gratuit). Refus : `already_owned` (409), `not_on_sale` (409), `not_enough_coins` (402), `grade_required` (403). Renvoie la boutique. |
+| PATCH | `/me/cosmetics` | `frame`, `banner`, `title` : un id possédé du bon type, ou `null` pour retirer. Renvoie la boutique. |
+| GET | `/mod/cosmetics` | Modération : tout le catalogue, avec `owners`. |
+| POST | `/mod/cosmetics` | Modération : `type`, `name`, `rarity` (`common`, `rare`, `epic`, `legendary`), `price`, `look` (`colors` : 2 ou 3 couleurs, `effect` pour un cadre : `none`, `glow`, `spin`, `pattern` pour une bannière : `none`, `stripes`, `dots`, `flames`), `min_level` (grade 1 à 6), `collection`, `starts_at` et `ends_at` (120 jours au plus) pour une saison. |
+| DELETE | `/mod/cosmetics/{id}` | Modération : retire de la vente. Ceux qui l'ont le gardent. |
+| POST | `/admin/users/{id}/coins` | Admin : `amount` (positif ou négatif), par exemple pour récompenser un tournoi. |

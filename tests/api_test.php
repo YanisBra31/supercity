@@ -7,9 +7,11 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
+$pdo->exec('DELETE FROM cosmetics WHERE created_by IS NOT NULL');
+$pdo->exec('UPDATE cosmetics SET retired = 0');
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
 const PASS = 'Crampons-2026';
@@ -760,6 +762,62 @@ $left = $pdo->query("SELECT COUNT(*) FROM push_tokens WHERE user_id = $leaId")->
 check('déconnexion : le téléphone ne reçoit plus rien', $s === 204 && (int)$left === 0, $left);
 api('DELETE', "/mod/bonus-events/{$ev['id']}", null, $yassin);
 api('DELETE', "/mod/bonus-events/{$ev2['id']}", null, $yassin);
+
+echo "Boutique et pièces\n";
+$cat = fn(array $shop, string $name) => array_values(array_filter($shop['items'], fn($i) => $i['name'] === $name))[0] ?? null;
+[$s, $shop] = api('GET', '/shop', null, $karim);
+$karimPoints = api('GET', "/users/$karimId", null, $karim)[1]['grade']['points'];
+check('boutique : pièces = 10 par point de grade', $s === 200 && $shop['coins'] === $karimPoints * 10 && $shop['coins_per_point'] === 10, [$shop['coins'] ?? $shop, $karimPoints]);
+check('catalogue en vente, saison comprise, rien d\'équipé', count($shop['items']) >= 19 && $cat($shop, 'Feuille d\'automne')['collection'] === 'Saison d\'automne'
+    && $shop['equipped'] === ['frame' => null, 'banner' => null, 'title' => null], $shop['equipped']);
+$pdo->exec("INSERT INTO coin_ledger (user_id, amount, reason) VALUES ($karimId, " . (1000 - $shop['coins']) . ", 'grant')");
+$neon = $cat($shop, 'Néon');
+[$s, $shop] = api('POST', "/shop/{$neon['id']}/buy", null, $karim);
+check('achat : pièces débitées, cosmétique possédé', $s === 200 && $shop['coins'] === 700 && $cat($shop, 'Néon')['owned'] === true, $shop['coins'] ?? $shop);
+[$s, $r] = api('POST', "/shop/{$neon['id']}/buy", null, $karim);
+check('pas deux fois le même', $s === 409 && $r['error'] === 'already_owned', $r);
+[$s, $r] = api('POST', '/shop/' . $cat($shop, 'Brasier')['id'] . '/buy', null, $karim);
+[$s2, $shop] = api('POST', '/shop/' . $cat($shop, 'Pelouse')['id'] . '/buy', null, $karim);
+check('pas assez de pièces : refusé, rien de débité', $s === 402 && $r['error'] === 'not_enough_coins' && $s2 === 200 && $shop['coins'] === 400, [$r, $shop['coins']]);
+$crown = $cat($shop, 'Couronne');
+[$s, $r] = api('POST', "/shop/{$crown['id']}/buy", null, $karim);
+check('cadre Couronne réservé au grade Légende', $crown['locked'] === true && $crown['price'] === 0 && $s === 403 && $r['error'] === 'grade_required', $r);
+[$s, $r] = api('PATCH', '/me/cosmetics', ['frame' => $cat($shop, 'Braise')['id']], $karim);
+check('impossible d\'équiper ce qu\'on n\'a pas', $s === 422, $r);
+[$s, $r] = api('PATCH', '/me/cosmetics', ['frame' => $cat($shop, 'Pelouse')['id']], $karim);
+check('un cadre va dans la case cadre', $s === 422, $r);
+[$s, $shop] = api('PATCH', '/me/cosmetics', ['frame' => $neon['id'], 'banner' => $cat($shop, 'Pelouse')['id']], $karim);
+[$s2, $pub] = api('GET', "/users/$karimId", null, $lea);
+check('équipé : visible sur le profil public', $s === 200 && $pub['cosmetics']['frame']['name'] === 'Néon' && $pub['cosmetics']['frame']['look']['effect'] === 'glow'
+    && $pub['cosmetics']['banner']['look']['pattern'] === 'stripes' && $pub['cosmetics']['title'] === null, $pub['cosmetics'] ?? $pub);
+[$s, $shop] = api('PATCH', '/me/cosmetics', ['banner' => null], $karim);
+[$s2, $me] = api('GET', '/me', null, $karim);
+check('retirer la bannière, garder le cadre ; solde sur /me', $shop['equipped']['banner'] === null && $shop['equipped']['frame']['id'] === $neon['id'] && $me['coins'] === 400, [$shop['equipped'], $me['coins'] ?? null]);
+
+[$s, $r] = api('POST', '/mod/cosmetics', ['type' => 'frame', 'name' => 'Givre', 'rarity' => 'epic', 'price' => 300, 'look' => ['colors' => ['#e3f2fd', '#42a5f5'], 'effect' => 'spin']], $karim);
+check('créer un cosmétique : réservé à la modération', $s === 403, $r);
+[$s, $r] = api('POST', '/mod/cosmetics', ['type' => 'frame', 'name' => 'Givre', 'rarity' => 'epic', 'price' => 300, 'look' => ['colors' => ['bleu']]], $lea);
+check('couleurs invalides refusées', $s === 422, $r);
+$t = fn(string $rel) => gmdate('Y-m-d\TH:i:s\Z', strtotime($rel));
+[$s, $givre] = api('POST', '/mod/cosmetics', ['type' => 'frame', 'name' => 'Givre', 'rarity' => 'epic', 'price' => 300, 'collection' => 'Saison d\'hiver',
+    'look' => ['colors' => ['#E3F2FD', '#42a5f5'], 'effect' => 'spin', 'script' => 'x'], 'starts_at' => $t('-1 minute'), 'ends_at' => $t('+30 days')], $lea);
+check('collection d\'hiver créée, apparence nettoyée', $s === 201 && $givre['state'] === 'on_sale' && $givre['look'] === ['colors' => ['#e3f2fd', '#42a5f5'], 'effect' => 'spin'], $givre);
+[$s, $soon] = api('POST', '/mod/cosmetics', ['type' => 'title', 'name' => 'Bientôt', 'rarity' => 'rare', 'price' => 100, 'look' => ['colors' => ['#1e88e5', '#0d2c6b']], 'starts_at' => $t('+2 days'), 'ends_at' => $t('+9 days')], $lea);
+[$s2, $r] = api('POST', '/mod/cosmetics', ['type' => 'title', 'name' => 'Trop long', 'rarity' => 'rare', 'price' => 100, 'look' => ['colors' => ['#1e88e5', '#0d2c6b']], 'ends_at' => $t('+200 days')], $lea);
+[$s3, $shop] = api('GET', '/shop', null, $karim);
+check('à venir : pas encore en boutique ; saison de 200 jours refusée', $s === 201 && $soon['state'] === 'upcoming' && $cat($shop, 'Bientôt') === null && $cat($shop, 'Givre') !== null && $s2 === 422, [$soon, $r]);
+[$s, $shop] = api('POST', "/shop/{$givre['id']}/buy", null, $karim);
+api('PATCH', '/me/cosmetics', ['frame' => $givre['id']], $karim);
+[$s2] = api('DELETE', "/mod/cosmetics/{$givre['id']}", null, $lea);
+[$s3, $r] = api('POST', "/shop/{$givre['id']}/buy", null, $lea);
+[$s4, $shop] = api('GET', '/shop', null, $karim);
+[$s5, $mods] = api('GET', '/mod/cosmetics', null, $lea);
+$g = array_values(array_filter($mods['items'], fn($i) => $i['id'] === $givre['id']))[0];
+check('retiré de la vente : ceux qui l\'ont le gardent', $s2 === 204 && $s3 === 409 && $cat($shop, 'Givre')['owned'] === true && $shop['equipped']['frame']['name'] === 'Givre'
+    && $g['state'] === 'retired' && $g['owners'] === 1, [$s3, $g]);
+[$s, $r] = api('POST', "/admin/users/$leaId/coins", ['amount' => 500], $lea);
+[$s2, $r2] = api('POST', "/admin/users/$leaId/coins", ['amount' => 500], $yassin);
+check('offrir des pièces : réservé à l\'admin', $s === 403 && $s2 === 200 && $r2['coins'] >= 500, [$r, $r2]);
 
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);

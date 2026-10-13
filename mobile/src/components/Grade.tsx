@@ -60,7 +60,7 @@ export function GradeCard({ grade }: { grade?: Grade }) {
           <Gradient colors={g.colors} style={{ flex: 1 }} />
         </Animated.View>
       </View>
-      <Text style={st.hint}>1 point par match joué, 2 par match organisé.</Text>
+      <Text style={st.hint}>1 point par match joué, 2 de plus par victoire, 2 par match organisé. Chaque point rapporte 10 pièces pour la boutique.</Text>
     </View>
   );
 }
