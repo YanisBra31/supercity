@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "946410943751",
+    "project_id": "supercity-f615a",
+    "storage_bucket": "supercity-f615a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:946410943751:android:e79f51e34ce746e22cc1a2",
+        "android_client_info": {
+          "package_name": "fr.supercity.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8uDHYjNj8tqmI6nJMCbPzhlQrFyrHF3M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
