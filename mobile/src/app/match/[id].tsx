@@ -2,10 +2,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
-import { Avatar, Button, Card, colors, ErrorText, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
+import { Avatar, Button, Card, colors, ErrorText, IconButton, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../../lib/api';
 import { euros, openStripe, returnUrl } from '../../lib/pay';
 import { distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
@@ -84,7 +84,8 @@ export default function MatchDetail() {
 
   if (!m) return error ? <Screen><ErrorText>{error}</ErrorText></Screen> : <Loading />;
 
-  const closed = m.status === 'cancelled' || m.status === 'played';
+  const cancelled = m.status === 'cancelled';
+  const closed = cancelled || m.status === 'played';
   const inMatch = m.my_status === 'registered' || m.my_status === 'waitlist' || m.my_status === 'pending';
   const paid = m.price_cents > 0 && !m.is_organizer;
   const total = m.price_cents + m.fee_cents;
@@ -103,15 +104,72 @@ export default function MatchDetail() {
   const registered = m.players?.filter((p) => p.status === 'registered') ?? [];
   const waiting = m.players?.filter((p) => p.status === 'waitlist') ?? [];
 
+  const share = () =>
+    Share.share({
+      message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
+    });
+  // Action principale, fixée en bas : s'inscrire, payer sa place, ou l'état du match.
+  const primary = closed ? (
+    <View style={[st.state, { flex: 1 }]}>
+      <Text style={st.stateText}>{cancelled ? 'Ce match a été annulé.' : 'Match terminé.'}</Text>
+    </View>
+  ) : m.my_status === 'pending' ? (
+    <Button
+      title={`Payer ma place · ${euros(total)}`}
+      icon="card-outline"
+      loading={busy}
+      style={{ flex: 1 }}
+      onPress={() => act(async () => pay((await post<{ checkout_url: string }>(`/matches/${m.id}/pay`, { return_url: returnUrl(`match/${m.id}`) })).checkout_url, m))}
+    />
+  ) : inMatch ? (
+    <View style={[st.state, { flex: 1 }]}>
+      <Ionicons name={m.my_status === 'waitlist' ? 'time' : 'checkmark-circle'} size={20} color={colors.success} />
+      <Text style={st.stateText}>{m.my_status === 'waitlist' ? "Tu es en liste d'attente" : 'Tu es inscrit, à toi de jouer !'}</Text>
+    </View>
+  ) : (
+    <Button
+      title={m.spots_left > 0 ? (paid && !m.my_paid ? `Je joue · ${euros(total)}` : 'Je joue') : "Liste d'attente"}
+      icon="football"
+      loading={busy}
+      style={{ flex: 1 }}
+      onPress={() =>
+        act(async () => {
+          const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
+          return pay(r.checkout_url, r);
+        })
+      }
+    />
+  );
+  const footer = (
+    <>
+      <ErrorText>{error}</ErrorText>
+      <Success>{msg}</Success>
+      {!closed && !inMatch && paid && m.spots_left === 0 ? <Text style={s.sub}>Si une place se libère, tu auras quelques heures pour la payer.</Text> : null}
+      <View style={[s.row, { gap: 10 }]}>
+        {primary}
+        <IconButton icon="share-outline" label="Partager le match" onPress={share} />
+      </View>
+    </>
+  );
+
   return (
-    <Screen>
+    <Screen footer={footer}>
       <Stack.Screen options={{ title: m.title ?? m.venue.name }} />
       <Hero
+        colors={cancelled ? ['#a59a93', '#5c524c'] : undefined}
         kicker={`${m.kind === 'tournament' ? 'Tournoi' : formatLabel(m.format)} · ${formatShort(m.format)}`}
         title={m.title ?? whenLabel(m.starts_at)}
         sub={[m.title ? whenLabel(m.starts_at) : null, durationLabel(m.duration_min), levelLabel(m.level), `organisé par ${m.organization?.name ?? m.organizer.display_name}`].filter(Boolean).join(' · ')}
       >
-        <View style={{ marginTop: 8 }}>{statusPill(m)}</View>
+        {cancelled ? (
+          <View style={st.cancelled}>
+            <Ionicons name="close-circle" size={18} color={colors.chalk} />
+            <Text style={st.cancelledText}>Match annulé</Text>
+          </View>
+        ) : (
+          <View style={{ marginTop: 8 }}>{statusPill(m)}</View>
+        )}
+        {cancelled ? null : (
         <View style={{ marginTop: 12, gap: 6 }}>
           <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(31,26,23,.25)', overflow: 'hidden' }}>
             <View style={{ width: `${Math.min(1, m.players_count / m.max_players) * 100}%`, height: 8, backgroundColor: colors.night }} />
@@ -120,6 +178,7 @@ export default function MatchDetail() {
             {m.players_count}/{m.max_players} joueurs{m.spots_left > 0 ? ` · ${m.spots_left} place${m.spots_left > 1 ? 's' : ''} libre${m.spots_left > 1 ? 's' : ''}` : ''}
           </Text>
         </View>
+        )}
       </Hero>
 
       {m.home_team || m.away_team ? (
@@ -234,34 +293,12 @@ export default function MatchDetail() {
         <Card style={{ gap: 10, borderColor: colors.orange2, borderWidth: 2 }}>
           <Text style={{ ...font.bold, fontSize: 15, color: colors.ink }}>Ta place est réservée jusqu'à {m.my_hold_until ? timeLabel(new Date(m.my_hold_until)) : 'bientôt'}</Text>
           <Text style={s.sub}>Paie-la pour confirmer ton inscription, sinon elle passera au joueur suivant.</Text>
-          <Button
-            title={`Payer ma place · ${euros(total)}`}
-            icon="card-outline"
-            loading={busy}
-            onPress={() => act(async () => pay((await post<{ checkout_url: string }>(`/matches/${m.id}/pay`, { return_url: returnUrl(`match/${m.id}`) })).checkout_url, m))}
-          />
         </Card>
       ) : null}
 
       {m.description ? <Text style={[s.sub, { color: colors.ink }]}>{m.description}</Text> : null}
 
-      <ErrorText>{error}</ErrorText>
-      <Success>{msg}</Success>
-      {!closed && !inMatch ? (
-        <Button
-          title={m.spots_left > 0 ? (paid && !m.my_paid ? `Je joue · ${euros(total)}` : 'Je joue') : "Rejoindre la liste d'attente"}
-          icon="football"
-          loading={busy}
-          onPress={() =>
-            act(async () => {
-              const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
-              return pay(r.checkout_url, r);
-            })
-          }
-        />
-      ) : null}
-      {!closed && !inMatch && paid && m.spots_left === 0 ? <Text style={s.sub}>Si une place se libère, tu auras quelques heures pour la payer.</Text> : null}
-      {!closed && inMatch ? (
+      {!closed && inMatch && m.my_status !== 'pending' ? (
         <Button
           title="Me désister"
           variant="ghost"
@@ -276,16 +313,6 @@ export default function MatchDetail() {
           }}
         />
       ) : null}
-      <Button
-        title="Partager le match"
-        variant="ghost"
-        icon="share-outline"
-        onPress={() =>
-          Share.share({
-            message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
-          })
-        }
-      />
 
       <View style={{ gap: 8 }}>
         <Label>
@@ -324,3 +351,10 @@ export default function MatchDetail() {
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  cancelled: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, backgroundColor: colors.night, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+  cancelledText: { ...font.bold, fontSize: 13, color: colors.chalk },
+  state: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52 },
+  stateText: { ...font.semibold, fontSize: 14, color: colors.ink, flexShrink: 1 },
+});

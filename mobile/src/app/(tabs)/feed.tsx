@@ -4,9 +4,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BouncingBall, Hero } from '../../components/brand';
+import { BouncingBall } from '../../components/brand';
 import { PostCard } from '../../components/PostCard';
-import { Avatar, Chips, colors, Empty, ErrorText, font, s } from '../../components/ui';
+import { Avatar, Chips, colors, Empty, ErrorText, font, PageHeader, s } from '../../components/ui';
 import { ApiError, get, Post } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 
@@ -64,7 +64,7 @@ export default function Feed() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.orange2} />}
       ListHeaderComponent={
         <View style={{ gap: 12, marginBottom: 4 }}>
-          <Hero kicker="Dans les vestiaires" title="Le fil" sub="Résultats, photos, annonces : ce qui se passe sur les terrains." />
+          <PageHeader kicker="Dans les vestiaires" title="Le fil" sub="Résultats, photos, annonces des terrains." />
           <Pressable onPress={() => router.push('/post/new')} accessibilityRole="button" style={({ pressed }) => [s.row, { backgroundColor: colors.white, borderRadius: 20, padding: 12, gap: 12, borderWidth: 1, borderColor: colors.line }, pressed && { borderColor: colors.orange1 }]}>
             <Avatar name={user?.display_name ?? ''} uri={user?.avatar_url} tone={user?.accent} size={40} />
             <Text style={{ ...font.regular, flex: 1, color: colors.dim, fontSize: 15 }}>Quoi de neuf sur le terrain ?</Text>

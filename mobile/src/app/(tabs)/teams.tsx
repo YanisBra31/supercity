@@ -2,8 +2,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Platform, Text, View } from 'react-native';
-import { Hero } from '../../components/brand';
-import { Button, Card, Chips, Empty, ErrorText, Field, Kicker, Label, Pill, Screen, TeamCrest, colors, font, s } from '../../components/ui';
+import { Button, Card, Chips, Empty, ErrorText, Field, IconButton, Kicker, Label, PageHeader, Pill, Screen, TeamCrest, colors, font, s } from '../../components/ui';
 import { StreakBadge } from '../../components/Streak';
 import { ApiError, Challenge, Format, get, post, Team } from '../../lib/api';
 import { ChallengeCard } from '../../components/ChallengeCard';
@@ -75,11 +74,18 @@ export default function Teams() {
 
   return (
     <Screen top>
-      <Hero kicker="Ton vestiaire" title="Mes équipes" sub="Monte ton équipe, invite tes potes avec un code." />
+      <PageHeader
+        kicker="Ton vestiaire"
+        title="Équipes"
+        sub="Monte ton équipe, invite tes potes avec un code."
+        right={mode === 'none' ? <IconButton icon="add" label="Créer une équipe" onPress={() => setMode('create')} dark /> : undefined}
+      />
       {mode === 'none' ? (
-        <View style={[s.row]}>
-          <Button title="Créer" icon="add" onPress={() => setMode('create')} style={{ flex: 1 }} />
-          <Button title="Rejoindre" icon="key-outline" variant="dark" onPress={() => setMode('join')} style={{ flex: 1 }} />
+        <View style={s.row}>
+          <Button title="Rejoindre" icon="key-outline" variant="ghost" onPress={() => setMode('join')} style={{ flex: 1 }} />
+          {teams?.some((t) => t.my_role === 'captain') ? (
+            <Button title="Défier" icon="flash" variant="dark" onPress={() => router.push('/team/find')} style={{ flex: 1 }} />
+          ) : null}
         </View>
       ) : null}
 
@@ -106,9 +112,6 @@ export default function Teams() {
 
       {mode === 'none' ? <ErrorText>{error}</ErrorText> : null}
 
-      {teams?.some((t) => t.my_role === 'captain') ? (
-        <Button title="Défier une équipe" icon="flash" variant="dark" onPress={() => router.push('/team/find')} />
-      ) : null}
       {live.length ? <Kicker>{`Défis en cours (${live.length})`}</Kicker> : null}
       {live.map((c, i) => (
         <ChallengeCard key={c.id} c={c} index={i} busy={busy === c.id} onAccept={() => respond(c, 'accept')} onDecline={() => respond(c, 'decline')} onCancel={() => respond(c, 'cancel')} />

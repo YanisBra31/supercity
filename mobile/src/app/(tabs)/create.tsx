@@ -1,10 +1,9 @@
 // Organiser un match : format, date, terrain, puis options. Un espace pro publie aussi des tournois et fixe un prix.
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
-import { Hero } from '../../components/brand';
-import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
+import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
@@ -128,9 +127,30 @@ export default function CreateMatch() {
     }
   };
 
+  // Récap toujours visible au-dessus du bouton Publier : ce qui est choisi, ce qui manque.
+  const when = minutes === null ? null : new Date(days[day].getTime() + minutes * 60000);
+  const recap = [
+    FORMATS.find((f) => f.value === format)!.label,
+    when ? `${dayLabel(when).toLowerCase()} ${timeLabel(when)}` : null,
+    venue?.name ?? null,
+  ].filter(Boolean).join(' · ');
+  const missing = minutes === null ? "Choisis l'heure" : !venue ? 'Choisis le terrain' : null;
+
   return (
-    <Screen top>
-      <Hero kicker="Coup d'envoi" title={isTournament ? 'Organise ton tournoi' : 'Organise ton match'} sub="Publie-le, les joueurs du coin s'inscrivent." />
+    <Screen
+      top
+      footer={
+        <>
+          <Text style={st.recap} numberOfLines={1}>
+            {recap}
+            {missing ? <Text style={{ color: colors.orange2 }}>{` · ${missing}`}</Text> : null}
+          </Text>
+          <ErrorText>{error}</ErrorText>
+          <Button title={isTournament ? 'Publier le tournoi' : 'Publier le match'} icon="megaphone-outline" onPress={submit} loading={loading} />
+        </>
+      }
+    >
+      <PageHeader kicker="Coup d'envoi" title={isTournament ? 'Organise ton tournoi' : 'Organise ton match'} sub="Publie-le, les joueurs du coin s'inscrivent." />
 
       {org ? (
         <>
@@ -272,11 +292,13 @@ export default function CreateMatch() {
 
       <Field label="Infos pour les joueurs" value={description} onChangeText={setDescription} placeholder="Chasubles fournies, rendez-vous 10 min avant…" multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
 
-      <ErrorText>{error}</ErrorText>
-      <Button title={isTournament ? 'Publier le tournoi' : 'Publier le match'} icon="megaphone-outline" onPress={submit} loading={loading} />
       {!org ? (
         <Button title="Tu gères un five ou une asso ? Espace pro" variant="ghost" icon="briefcase-outline" onPress={() => router.push('/pro')} />
       ) : null}
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  recap: { ...font.semibold, fontSize: 13, color: colors.ink },
+});
