@@ -349,7 +349,7 @@ function register_auth_routes(Router $r): void
 
     // Profil public : infos, statistiques et équipes.
     $r->get('/users/(\d+)', function (string $id) {
-        require_user();
+        $viewer = require_user();
         $u = one('SELECT * FROM users WHERE id = ?', [(int)$id]) ?? not_found('Joueur');
         $stats = user_stats((int)$u['id']);
         $teams = query(
@@ -364,6 +364,7 @@ function register_auth_routes(Router $r): void
                 'color_primary' => $t['color_primary'], 'color_secondary' => $t['color_secondary'], 'role' => $t['role'],
             ], $teams),
             'member_since' => iso($u['created_at']),
+            'card' => player_card($u, (int)$viewer['id'] === (int)$u['id']),
         ]);
     });
 }
