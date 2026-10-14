@@ -37,7 +37,24 @@ export type Grade = {
   next_at: number | null;
 };
 export type Accent = 'orange' | 'nuit' | 'rouge' | 'bleu' | 'vert' | 'violet';
+export type CardStat = 'pac' | 'sho' | 'pas' | 'dri' | 'def' | 'phy';
+/** Carte joueur façon FUT : notes de 40 à 99, étoiles de 1 à 5. */
+export type PlayerCard = {
+  overall: number;
+  stats: Record<CardStat, number>;
+  weak_foot: number;
+  skill_moves: number;
+  votes: number;
+  /** Moins de 3 votes : surtout l'estimation du joueur. */
+  estimated: boolean;
+  /** Sa propre estimation, en étoiles (sur son profil seulement). */
+  self?: { stats: Record<CardStat, number>; weak_foot: number; skill_moves: number; set: boolean };
+};
+/** Joueur à noter après un match, avec la note déjà donnée. */
+export type RatingPlayer = PublicUser & { stars: number | null; best: CardStat | null };
+
 export type PublicProfile = PublicUser & {
+  card?: PlayerCard;
   stats: { played: number; organized: number; wins?: number };
   teams: { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; role: 'captain' | 'player' }[];
   member_since: string;
@@ -175,6 +192,8 @@ export type Match = {
   players?: (PublicUser & { status: 'registered' | 'waitlist'; team_id: number | null })[];
   score?: MatchScore | null;
   bonus?: BonusEvent | null;
+  /** Match fini depuis moins de 7 jours et j'y ai joué : joueurs qu'il me reste à noter. */
+  ratings_left?: number | null;
 };
 
 /** Réponse d'inscription ou de désistement d'un match. */

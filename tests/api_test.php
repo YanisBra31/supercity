@@ -823,6 +823,33 @@ check('retiré de la vente : ceux qui l\'ont le gardent', $s2 === 204 && $s3 ===
 [$s2, $r2] = api('POST', "/admin/users/$leaId/coins", ['amount' => 500], $yassin);
 check('offrir des pièces : réservé à l\'admin', $s === 403 && $s2 === 200 && $r2['coins'] >= 500, [$r, $r2]);
 
+echo "Cartes joueurs\n";
+[$s, $r] = api('GET', "/users/$samId", null, $sam);
+[$s2, $r2] = api('GET', "/users/$samId", null, $lea);
+check('carte : estimation par défaut, réglages visibles par soi seul', $s === 200 && $r['card']['estimated'] === true && $r['card']['votes'] === 0
+    && isset($r['card']['self']['stats']['pac']) && !isset($r2['card']['self']) && $r2['card']['overall'] >= 40, $r['card'] ?? $r);
+[$s, $r] = api('PATCH', '/me/card', ['stats' => ['pac' => 6, 'sho' => 5, 'pas' => 5, 'dri' => 5, 'def' => 5, 'phy' => 5]], $sam);
+check('estimation : 1 à 5 étoiles par stat', $s === 422 && isset($r['fields']['stats']), $r);
+[$s, $card] = api('PATCH', '/me/card', ['stats' => ['pac' => 5, 'sho' => 5, 'pas' => 5, 'dri' => 5, 'def' => 5, 'phy' => 5], 'weak_foot' => 4, 'skill_moves' => 3], $sam);
+check('estimation enregistrée : 5 étoiles = 99', $s === 200 && $card['overall'] === 99 && $card['stats']['pac'] === 99 && $card['weak_foot'] === 4 && $card['self']['set'] === true, $card);
+[$s] = api('GET', "/matches/$m1/ratings", null, $yassin);
+[$s2] = api('GET', "/matches/$m4/ratings", null, $lea);
+[$s3, $r] = api('GET', "/matches/$m4/ratings", null, $yassin);
+check('notes : 7 jours après la fin, joueurs du match seulement', $s === 403 && $s2 === 403 && $s3 === 200 && array_column($r['players'], 'id') === [$samId] && $r['players'][0]['stars'] === null, [$s, $s2, $r]);
+[$s, $m] = api('GET', "/matches/$m4", null, $yassin);
+[$s2, $mFut] = api('GET', "/matches/{$mCartel['id']}", null, $yassin);
+check('match fini : il reste un joueur à noter', $m['ratings_left'] === 1 && $mFut['ratings_left'] === null, [$m['ratings_left'] ?? null, $mFut['ratings_left'] ?? null]);
+[$s, $r] = api('POST', "/matches/$m4/ratings", ['ratings' => [['user_id' => $yassinId, 'stars' => 5]]], $yassin);
+check('on ne se note pas soi-même', $s === 422, $r);
+[$s, $r] = api('POST', "/matches/$m4/ratings", ['ratings' => [['user_id' => $samId, 'stars' => 1, 'best' => 'sho']]], $yassin);
+[$s2, $m] = api('GET', "/matches/$m4", null, $yassin);
+[$s3, $pub] = api('GET', "/users/$samId", null, $lea);
+check('vote : pèse comme un tiers de l\'estimation, le point fort compte une étoile de plus', $s === 200 && $r['players'][0]['stars'] === 1 && $m['ratings_left'] === 0
+    && $pub['card']['votes'] === 1 && $pub['card']['stats']['pac'] === 84 && $pub['card']['stats']['sho'] === 88 && $pub['card']['estimated'] === true, $pub['card'] ?? $r);
+api('POST', "/matches/$m4/ratings", ['ratings' => [['user_id' => $samId, 'stars' => 5]]], $yassin);
+[$s, $pub] = api('GET', "/users/$samId", null, $lea);
+check('on peut changer sa note : un seul vote compté', $pub['card']['votes'] === 1 && $pub['card']['stats']['sho'] === 99, $pub['card']);
+
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);
 check('match introuvable : 404', $s === 404, $r);
