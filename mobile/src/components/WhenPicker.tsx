@@ -1,9 +1,10 @@
-// Choix du jour et de l'heure d'un match : calendrier du mois intégré, puis créneaux par moment de la journée.
+// Choix du jour et de l'heure d'un match : deux lignes de choix rapides déjà remplies, le calendrier complet en option dans un volet.
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gradient } from './brand';
-import { Chip, colors, font } from './ui';
+import { Button, Chip, colors, font } from './ui';
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const WEEK = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -29,6 +30,25 @@ export function freeTimes(day: Date): number[] {
   const out: number[] = [];
   for (let m = 8 * 60; m < 24 * 60; m += 30) if (at(day, m).getTime() >= Date.now() + LEAD_MS) out.push(m);
   return out;
+}
+
+const SHORT_DAYS = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
+// Les heures où l'on joue le plus : proposées en premier, 19h par défaut.
+const USUAL = [18 * 60, 19 * 60, 20 * 60, 21 * 60];
+
+const plusDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const same = (a: Date, b: Date) => a.getTime() === b.getTime();
+const shortDay = (d: Date) => {
+  const today = startOfDay(new Date());
+  if (same(d, today)) return "Aujourd'hui";
+  if (same(d, plusDays(today, 1))) return 'Demain';
+  return `${SHORT_DAYS[d.getDay()]} ${d.getDate()}`;
+};
+
+/** Heure proposée d'office ce jour-là : 19h si possible, sinon la plus proche des heures habituelles. */
+export function defaultTime(day: Date): number | null {
+  const free = freeTimes(day);
+  return [19 * 60, 20 * 60, 21 * 60, 18 * 60].find((m) => free.includes(m)) ?? free[0] ?? null;
 }
 
 /** Premier jour où il reste un créneau (aujourd'hui, ou demain s'il est tard). */
@@ -142,6 +162,56 @@ export function TimePicker({ day, value, onChange }: { day: Date; value: number 
   );
 }
 
+/** Deux lignes : jours proches et heures habituelles, déjà choisis. L'icône calendrier ouvre tout le reste. */
+export function WhenField({ day, minutes, onChange }: { day: Date; minutes: number | null; onChange: (day: Date, minutes: number | null) => void }) {
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+  const today = startOfDay(new Date());
+  // Aujourd'hui (s'il reste un créneau), demain, puis le prochain week-end.
+  const sat = plusDays(today, ((6 - today.getDay() + 7) % 7) || 7);
+  const quickDays = [...(freeTimes(today).length ? [today] : []), plusDays(today, 1), sat, plusDays(sat, 1)]
+    .filter((d, i, a) => a.findIndex((x) => same(x, d)) === i)
+    .slice(0, 3);
+  // Un jour choisi dans le calendrier prend la place du dernier, pour rester sur une ligne.
+  if (!quickDays.some((d) => same(d, day))) quickDays[quickDays.length - 1] = day;
+  const free = freeTimes(day);
+  const quickTimes = USUAL.filter((m) => free.includes(m));
+  if (minutes !== null && !quickTimes.includes(minutes)) quickTimes.push(minutes);
+  // Changer de jour garde l'heure si elle est encore libre, sinon en propose une.
+  const pickDay = (d: Date) => onChange(d, minutes !== null && freeTimes(d).includes(minutes) ? minutes : defaultTime(d));
+
+  return (
+    <View style={{ gap: 8 }}>
+      <View style={st.row}>
+        {quickDays.map((d) => (
+          <Chip key={d.getTime()} label={shortDay(d)} on={same(d, day)} onPress={() => pickDay(d)} />
+        ))}
+      </View>
+      <View style={st.row}>
+        {quickTimes.map((m) => (
+          <Chip key={m} label={hhmm(m)} on={m === minutes} onPress={() => onChange(day, m)} />
+        ))}
+        <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel="Autre jour ou autre heure" style={st.more}>
+          <Ionicons name="calendar-outline" size={16} color={colors.orange2} />
+          <Text style={st.moreText}>Autre</Text>
+        </Pressable>
+      </View>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+        <Pressable style={st.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Fermer" />
+        <View style={[st.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={st.grabber} />
+          <Text style={st.title}>Quand ?</Text>
+          <ScrollView contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
+            <CalendarPicker value={day} onChange={pickDay} />
+            <TimePicker day={day} value={minutes} onChange={(m) => onChange(day, m)} />
+          </ScrollView>
+          <Button title="C'est bon" icon="checkmark" onPress={() => setOpen(false)} />
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   cal: { backgroundColor: colors.white, borderRadius: 18, borderWidth: 1.5, borderColor: colors.line, padding: 10 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
@@ -155,4 +225,11 @@ const st = StyleSheet.create({
   num: { ...font.semibold, fontSize: 14, color: colors.ink },
   slot: { ...font.semibold, fontSize: 12, color: colors.dim, textTransform: 'uppercase', letterSpacing: 0.6 },
   times: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  more: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999, borderWidth: 1.5, borderColor: colors.orange2, borderStyle: 'dashed' },
+  moreText: { ...font.semibold, fontSize: 13, color: colors.orange2 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(31,26,23,.45)' },
+  sheet: { backgroundColor: colors.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 10, gap: 14, maxHeight: '90%' },
+  grabber: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: colors.line },
+  title: { ...font.extrabold, fontSize: 22, color: colors.ink },
 });

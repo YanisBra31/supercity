@@ -3,7 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
-import { CalendarPicker, firstOpenDay, freeTimes, TimePicker } from '../../components/WhenPicker';
+import { defaultTime, firstOpenDay, WhenField } from '../../components/WhenPicker';
 import { Button, Card, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
@@ -17,7 +17,7 @@ const TOURNAMENT_HOURS = [2, 3, 4, 6, 8, 10];
 export default function CreateMatch() {
   const [format, setFormat] = useState<Format>('city5');
   const [day, setDay] = useState(firstOpenDay);
-  const [minutes, setMinutes] = useState<number | null>(null);
+  const [minutes, setMinutes] = useState<number | null>(() => defaultTime(firstOpenDay()));
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [q, setQ] = useState('');
@@ -96,7 +96,7 @@ export default function CreateMatch() {
         ...(pro ? { organization_id: org!.id, kind: isTournament ? 'tournament' : 'match', title: title.trim() || null } : {}),
         ...(isTournament ? { duration_min: hours * 60 } : {}),
       });
-      setMinutes(null);
+      setMinutes(defaultTime(day));
       setDescription('');
       setTitle('');
       router.push(`/match/${m.id}`);
@@ -162,18 +162,15 @@ export default function CreateMatch() {
       <Label>Format</Label>
       <Chips options={FORMATS.map((f) => ({ value: f.value, label: `${f.label} · ${f.short}` }))} value={format} onChange={(v) => { if (v) { setFormat(v); setMaxPlayers(null); } }} />
 
-      <Label>Jour</Label>
-      <CalendarPicker
-        value={day}
-        onChange={(d) => {
+      <Label>Quand</Label>
+      <WhenField
+        day={day}
+        minutes={minutes}
+        onChange={(d, m) => {
           setDay(d);
-          // L'heure choisie reste si elle est encore possible ce jour-là.
-          if (minutes !== null && !freeTimes(d).includes(minutes)) setMinutes(null);
+          setMinutes(m);
         }}
       />
-
-      <Label>{`Heure · ${dayLabel(day).toLowerCase()}`}</Label>
-      <TimePicker day={day} value={minutes} onChange={setMinutes} />
 
       <Label>Terrain</Label>
       {venue ? (
