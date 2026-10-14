@@ -1,9 +1,10 @@
 // Organiser un match : format, date, terrain, puis options. Un espace pro publie aussi des tournois et fixe un prix.
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
-import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
+import { CalendarPicker, firstOpenDay, freeTimes, TimePicker } from '../../components/WhenPicker';
+import { Button, Card, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
@@ -11,26 +12,11 @@ import { Place } from '../../lib/address';
 import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 import { takeLastVenue } from '../../lib/venueStore';
 
-const TIMES = Array.from({ length: 32 }, (_, i) => 8 * 60 + i * 30); // 8h00 → 23h30
 const TOURNAMENT_HOURS = [2, 3, 4, 6, 8, 10];
 
-function HScroll({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
-      {children}
-    </ScrollView>
-  );
-}
-
 export default function CreateMatch() {
-  const days = useMemo(() => Array.from({ length: 21 }, (_, i) => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + i);
-    return d;
-  }), []);
   const [format, setFormat] = useState<Format>('city5');
-  const [day, setDay] = useState(0);
+  const [day, setDay] = useState(firstOpenDay);
   const [minutes, setMinutes] = useState<number | null>(null);
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -87,19 +73,13 @@ export default function CreateMatch() {
     }, [loadVenues])
   );
 
-  const isPast = (d: number, m: number) => {
-    const t = new Date(days[d]);
-    t.setMinutes(m);
-    return t.getTime() < Date.now() + 15 * 60 * 1000;
-  };
-
   const submit = async () => {
     setError('');
     if (minutes === null) return setError("Choisis l'heure du match.");
     if (!venue) return setError('Choisis un terrain.');
     if (isTournament && title.trim().length < 3) return setError('Donne un nom au tournoi.');
     if (price > 0 && !payouts?.ready) return setError('Active les paiements dans ton espace pro pour fixer un prix.');
-    const start = new Date(days[day]);
+    const start = new Date(day);
     start.setMinutes(minutes);
     setLoading(true);
     try {
@@ -128,7 +108,7 @@ export default function CreateMatch() {
   };
 
   // Récap toujours visible au-dessus du bouton Publier : ce qui est choisi, ce qui manque.
-  const when = minutes === null ? null : new Date(days[day].getTime() + minutes * 60000);
+  const when = minutes === null ? null : new Date(day.getTime() + minutes * 60000);
   const recap = [
     FORMATS.find((f) => f.value === format)!.label,
     when ? `${dayLabel(when).toLowerCase()} ${timeLabel(when)}` : null,
@@ -183,20 +163,17 @@ export default function CreateMatch() {
       <Chips options={FORMATS.map((f) => ({ value: f.value, label: `${f.label} · ${f.short}` }))} value={format} onChange={(v) => { if (v) { setFormat(v); setMaxPlayers(null); } }} />
 
       <Label>Jour</Label>
-      <HScroll>
-        {days.map((d, i) => (
-          <Chip key={i} label={dayLabel(d)} on={i === day} onPress={() => setDay(i)} />
-        ))}
-      </HScroll>
+      <CalendarPicker
+        value={day}
+        onChange={(d) => {
+          setDay(d);
+          // L'heure choisie reste si elle est encore possible ce jour-là.
+          if (minutes !== null && !freeTimes(d).includes(minutes)) setMinutes(null);
+        }}
+      />
 
-      <Label>Heure</Label>
-      <HScroll>
-        {TIMES.filter((m) => !isPast(day, m)).map((m) => {
-          const d = new Date(days[day]);
-          d.setMinutes(m);
-          return <Chip key={m} label={timeLabel(d)} on={m === minutes} onPress={() => setMinutes(m)} />;
-        })}
-      </HScroll>
+      <Label>{`Heure · ${dayLabel(day).toLowerCase()}`}</Label>
+      <TimePicker day={day} value={minutes} onChange={setMinutes} />
 
       <Label>Terrain</Label>
       {venue ? (
