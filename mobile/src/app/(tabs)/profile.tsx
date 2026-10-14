@@ -254,6 +254,14 @@ export default function Profile() {
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />
+      <View style={[s.row, { justifyContent: 'center', gap: 18 }]}>
+        <Text style={st.legal} onPress={() => router.push('/cgu')}>
+          Conditions d'utilisation
+        </Text>
+        <Text style={st.legal} onPress={() => router.push('/mentions')}>
+          Mentions légales
+        </Text>
+      </View>
     </Screen>
   );
 }
@@ -268,5 +276,6 @@ const st = StyleSheet.create({
   stats: { flexDirection: 'row', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,248,241,.3)' },
   statNum: { ...font.black, fontSize: 22, color: colors.chalk },
   statLabel: { ...font.medium, fontSize: 11, color: colors.chalk, opacity: 0.85 },
+  legal: { ...font.medium, fontSize: 12.5, color: colors.dim, textDecorationLine: 'underline' },
   teamName: { ...font.semibold, fontSize: 12, color: colors.ink, textAlign: 'center' },
 });

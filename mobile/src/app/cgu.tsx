@@ -1,4 +1,5 @@
 // Conditions d'utilisation et confidentialité (version provisoire, à faire relire avant la sortie publique).
+import { Link } from 'expo-router';
 import { Text, View } from 'react-native';
 import { colors, font, Kicker, Screen, Title } from '../components/ui';
 
@@ -21,11 +22,15 @@ const SECTIONS: [string, string][] = [
   ],
   [
     'Tes données',
-    "On conserve ton e-mail, ton pseudo, ta date de naissance (jamais affichée) et les infos de profil que tu choisis de remplir. Ta position sert uniquement à chercher les matchs proches, elle n'est pas enregistrée. Tes données ne sont ni vendues ni partagées avec des annonceurs.",
+    "On conserve ton e-mail, ton pseudo, ta date de naissance (jamais affichée) et les infos de profil que tu choisis de remplir. Ta position sert à chercher les matchs proches. Si tu actives les notifications, une position approchée (à 1 km près) est gardée pour t'alerter de ce qui se passe près de chez toi. Tes données ne sont ni vendues ni partagées avec des annonceurs.",
   ],
   [
     'Tes droits',
     "Conformément au RGPD, tu peux consulter, corriger ou supprimer tes données à tout moment depuis ton profil ou en écrivant à l'équipe Supercity. Les mots de passe sont chiffrés et nous ne les connaissons pas.",
+  ],
+  [
+    'Paiements et boutique',
+    "Les places payantes sont réglées par Stripe ; Supercity ne voit pas tes coordonnées bancaires. Les pièces de la boutique se gagnent en jouant, n'ont aucune valeur en argent et ne sont ni remboursables ni échangeables.",
   ],
   ['Évolutions', "Ces conditions peuvent évoluer ; tu seras prévenu dans l'appli en cas de changement important."],
 ];
@@ -33,7 +38,7 @@ const SECTIONS: [string, string][] = [
 export default function Cgu() {
   return (
     <Screen>
-      <Title kicker="Version du 10 octobre 2026" sub="Le résumé de nos règles du jeu, en clair.">
+      <Title kicker="Version du 13 octobre 2026" sub="Le résumé de nos règles du jeu, en clair.">
         Conditions d'utilisation
       </Title>
       {SECTIONS.map(([title, text], i) => (
@@ -42,6 +47,9 @@ export default function Cgu() {
           <Text style={{ ...font.regular, fontSize: 14, lineHeight: 22, color: colors.ink }}>{text}</Text>
         </View>
       ))}
+      <Link href="/mentions" style={{ ...font.bold, color: colors.orange2, fontSize: 14 }}>
+        Voir les mentions légales
+      </Link>
     </Screen>
   );
 }
