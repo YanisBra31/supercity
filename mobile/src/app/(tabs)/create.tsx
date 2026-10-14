@@ -1,10 +1,10 @@
 // Organiser un match : format, date, terrain, puis options. Un espace pro publie aussi des tournois et fixe un prix.
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
-import { Hero } from '../../components/brand';
-import { Button, Card, Chip, Chips, colors, ErrorText, Field, Label, s, Screen, font } from '../../components/ui';
+import { defaultTime, firstOpenDay, WhenField } from '../../components/WhenPicker';
+import { Button, Card, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
 import { dayLabel, distanceLabel, FORMATS, LEVELS, surfaceLabel, timeLabel } from '../../lib/format';
@@ -12,27 +12,12 @@ import { Place } from '../../lib/address';
 import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 import { takeLastVenue } from '../../lib/venueStore';
 
-const TIMES = Array.from({ length: 32 }, (_, i) => 8 * 60 + i * 30); // 8h00 → 23h30
 const TOURNAMENT_HOURS = [2, 3, 4, 6, 8, 10];
 
-function HScroll({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
-      {children}
-    </ScrollView>
-  );
-}
-
 export default function CreateMatch() {
-  const days = useMemo(() => Array.from({ length: 21 }, (_, i) => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + i);
-    return d;
-  }), []);
   const [format, setFormat] = useState<Format>('city5');
-  const [day, setDay] = useState(0);
-  const [minutes, setMinutes] = useState<number | null>(null);
+  const [day, setDay] = useState(firstOpenDay);
+  const [minutes, setMinutes] = useState<number | null>(() => defaultTime(firstOpenDay()));
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [q, setQ] = useState('');
@@ -88,19 +73,13 @@ export default function CreateMatch() {
     }, [loadVenues])
   );
 
-  const isPast = (d: number, m: number) => {
-    const t = new Date(days[d]);
-    t.setMinutes(m);
-    return t.getTime() < Date.now() + 15 * 60 * 1000;
-  };
-
   const submit = async () => {
     setError('');
     if (minutes === null) return setError("Choisis l'heure du match.");
     if (!venue) return setError('Choisis un terrain.');
     if (isTournament && title.trim().length < 3) return setError('Donne un nom au tournoi.');
     if (price > 0 && !payouts?.ready) return setError('Active les paiements dans ton espace pro pour fixer un prix.');
-    const start = new Date(days[day]);
+    const start = new Date(day);
     start.setMinutes(minutes);
     setLoading(true);
     try {
@@ -117,7 +96,7 @@ export default function CreateMatch() {
         ...(pro ? { organization_id: org!.id, kind: isTournament ? 'tournament' : 'match', title: title.trim() || null } : {}),
         ...(isTournament ? { duration_min: hours * 60 } : {}),
       });
-      setMinutes(null);
+      setMinutes(defaultTime(day));
       setDescription('');
       setTitle('');
       router.push(`/match/${m.id}`);
@@ -128,9 +107,30 @@ export default function CreateMatch() {
     }
   };
 
+  // Récap toujours visible au-dessus du bouton Publier : ce qui est choisi, ce qui manque.
+  const when = minutes === null ? null : new Date(day.getTime() + minutes * 60000);
+  const recap = [
+    FORMATS.find((f) => f.value === format)!.label,
+    when ? `${dayLabel(when).toLowerCase()} ${timeLabel(when)}` : null,
+    venue?.name ?? null,
+  ].filter(Boolean).join(' · ');
+  const missing = minutes === null ? "Choisis l'heure" : !venue ? 'Choisis le terrain' : null;
+
   return (
-    <Screen top>
-      <Hero kicker="Coup d'envoi" title={isTournament ? 'Organise ton tournoi' : 'Organise ton match'} sub="Publie-le, les joueurs du coin s'inscrivent." />
+    <Screen
+      top
+      footer={
+        <>
+          <Text style={st.recap} numberOfLines={1}>
+            {recap}
+            {missing ? <Text style={{ color: colors.orange2 }}>{` · ${missing}`}</Text> : null}
+          </Text>
+          <ErrorText>{error}</ErrorText>
+          <Button title={isTournament ? 'Publier le tournoi' : 'Publier le match'} icon="megaphone-outline" onPress={submit} loading={loading} />
+        </>
+      }
+    >
+      <PageHeader kicker="Coup d'envoi" title={isTournament ? 'Organise ton tournoi' : 'Organise ton match'} sub="Publie-le, les joueurs du coin s'inscrivent." />
 
       {org ? (
         <>
@@ -162,21 +162,15 @@ export default function CreateMatch() {
       <Label>Format</Label>
       <Chips options={FORMATS.map((f) => ({ value: f.value, label: `${f.label} · ${f.short}` }))} value={format} onChange={(v) => { if (v) { setFormat(v); setMaxPlayers(null); } }} />
 
-      <Label>Jour</Label>
-      <HScroll>
-        {days.map((d, i) => (
-          <Chip key={i} label={dayLabel(d)} on={i === day} onPress={() => setDay(i)} />
-        ))}
-      </HScroll>
-
-      <Label>Heure</Label>
-      <HScroll>
-        {TIMES.filter((m) => !isPast(day, m)).map((m) => {
-          const d = new Date(days[day]);
-          d.setMinutes(m);
-          return <Chip key={m} label={timeLabel(d)} on={m === minutes} onPress={() => setMinutes(m)} />;
-        })}
-      </HScroll>
+      <Label>Quand</Label>
+      <WhenField
+        day={day}
+        minutes={minutes}
+        onChange={(d, m) => {
+          setDay(d);
+          setMinutes(m);
+        }}
+      />
 
       <Label>Terrain</Label>
       {venue ? (
@@ -272,11 +266,13 @@ export default function CreateMatch() {
 
       <Field label="Infos pour les joueurs" value={description} onChangeText={setDescription} placeholder="Chasubles fournies, rendez-vous 10 min avant…" multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
 
-      <ErrorText>{error}</ErrorText>
-      <Button title={isTournament ? 'Publier le tournoi' : 'Publier le match'} icon="megaphone-outline" onPress={submit} loading={loading} />
       {!org ? (
         <Button title="Tu gères un five ou une asso ? Espace pro" variant="ghost" icon="briefcase-outline" onPress={() => router.push('/pro')} />
       ) : null}
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  recap: { ...font.semibold, fontSize: 13, color: colors.ink },
+});

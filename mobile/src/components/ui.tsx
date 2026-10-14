@@ -48,14 +48,56 @@ const tap = () => {
 };
 
 // `top` : écran sans en-tête, on décale sous la barre d'état.
-export function Screen({ children, scroll = true, top = false }: { children: ReactNode; scroll?: boolean; top?: boolean }) {
+export function Screen({ children, scroll = true, top = false, footer }: { children: ReactNode; scroll?: boolean; top?: boolean; footer?: ReactNode }) {
   const insets = useSafeAreaInsets();
   const pad = top ? { paddingTop: insets.top + 12 } : null;
   if (!scroll) return <View style={[s.screen, pad]}>{children}</View>;
-  return (
+  const body = (
     <ScrollView style={s.screenBg} contentContainerStyle={[s.screen, pad]} keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
+  );
+  if (!footer) return body;
+  // Action principale fixée en bas de l'écran, toujours visible.
+  return (
+    <View style={s.screenBg}>
+      {body}
+      {/* Dans un onglet (top), la barre d'onglets protège déjà le bas de l'écran. */}
+      <View style={[s.dock, { paddingBottom: top ? 12 : Math.max(insets.bottom, 12) }]}>{footer}</View>
+    </View>
+  );
+}
+
+/** En-tête d'onglet compact : sur-titre, titre, sous-titre, et une action à droite. */
+export function PageHeader({ kicker, title, sub, right }: { kicker?: string; title: string; sub?: string; right?: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+      <View style={{ flex: 1, gap: 2 }}>
+        {kicker ? <Text style={[s.kicker, { color: colors.orange2 }]}>{kicker}</Text> : null}
+        <Text style={s.pageTitle} numberOfLines={2}>
+          {title}
+        </Text>
+        {sub ? <Text style={s.sub}>{sub}</Text> : null}
+      </View>
+      {right}
+    </View>
+  );
+}
+
+/** Bouton rond à icône (bascule carte, réglages...). */
+export function IconButton({ icon, label, onPress, dark }: { icon: IconName; label: string; onPress: () => void; dark?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => {
+        tap();
+        onPress();
+      }}
+      style={({ pressed }) => [s.iconBtn, dark && { backgroundColor: colors.night, borderColor: colors.night }, pressed && { transform: [{ scale: 0.94 }] }]}
+    >
+      <Ionicons name={icon} size={20} color={dark ? colors.chalk : colors.ink} />
+    </Pressable>
   );
 }
 
@@ -385,6 +427,9 @@ export const s = StyleSheet.create({
   screen: { flexGrow: 1, backgroundColor: colors.bg, padding: 20, gap: 16 },
   kicker: { ...font.semibold, fontSize: 11, letterSpacing: 2.4, textTransform: 'uppercase' },
   title: { ...font.extrabold, fontSize: 30, lineHeight: 38, color: colors.ink, letterSpacing: -0.6 },
+  pageTitle: { ...font.extrabold, fontSize: 28, lineHeight: 34, color: colors.ink, letterSpacing: -0.6 },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
+  dock: { paddingHorizontal: 20, paddingTop: 12, gap: 8, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
   sub: { ...font.regular, fontSize: 14, color: colors.dim, lineHeight: 21 },
   label: { ...font.semibold, fontSize: 11, color: colors.ink, textTransform: 'uppercase', letterSpacing: 1.6 },
   buttonWrap: { borderRadius: 999 },
