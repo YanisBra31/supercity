@@ -116,6 +116,14 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'payout_cents' => $isOrganizer && $price > 0 ? $price - commission_cents($price, $org) : null,
         'score' => score_view($m, $viewerId),
         'bonus' => $bonus ? bonus_event_view($bonus) : null,
+        // Match fini : le joueur peut noter les autres pendant 7 jours ; combien il lui en reste.
+        'ratings_left' => rating_open($m, $viewerId)
+            ? (int)one(
+                'SELECT COUNT(*) AS n FROM match_participants p LEFT JOIN player_ratings r ON r.match_id = p.match_id AND r.rater_id = ? AND r.rated_id = p.user_id
+                 WHERE p.match_id = ? AND p.status = "registered" AND p.user_id <> ? AND r.rated_id IS NULL',
+                [$viewerId, $id, $viewerId]
+            )['n']
+            : null,
     ];
     if ($withPlayers) {
         $out['venue']['king'] = venue_king((int)$m['venue_id']);

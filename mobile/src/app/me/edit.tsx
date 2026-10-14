@@ -1,11 +1,12 @@
-// Modifier son profil : photo, couleur de carte, pseudo, bio, infos de jeu. Enregistrer reste en bas de l'écran.
+// Modifier son profil : photo, couleur de carte, pseudo, bio, infos de jeu et estimation de sa carte FUT. Enregistrer reste en bas de l'écran.
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import { Swatches } from '../../components/AccentPicker';
 import { ACCENTS, AccentName } from '../../components/brand';
-import { Button, Chips, ErrorText, Field, Label, s, Screen, Success } from '../../components/ui';
-import { ApiError, del, Foot, Me, Position, uploadImage } from '../../lib/api';
+import { CARD_STATS, Stars } from '../../components/PlayerCard';
+import { Button, Card, Chips, colors, ErrorText, Field, font, Kicker, Label, s, Screen, Success } from '../../components/ui';
+import { ApiError, CardStat, del, Foot, get, Me, patch, PlayerCard, Position, PublicProfile, uploadImage } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
@@ -26,6 +27,16 @@ export default function EditProfile() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  // Estimation de la carte : chargée depuis le profil public, envoyée seulement si on y touche.
+  const [card, setCard] = useState<NonNullable<PlayerCard['self']> | null>(null);
+  const [cardTouched, setCardTouched] = useState(false);
+  useEffect(() => {
+    if (user) get<PublicProfile>(`/users/${user.id}`).then((p) => p.card?.self && setCard(p.card.self)).catch(() => undefined);
+  }, [user?.id]);
+  const touchCard = (next: NonNullable<PlayerCard['self']>) => {
+    setCard(next);
+    setCardTouched(true);
+  };
 
   const save = async () => {
     setMsg('');
@@ -43,6 +54,10 @@ export default function EditProfile() {
         level,
         strong_foot: foot,
       });
+      if (card && cardTouched) {
+        await patch('/me/card', { stats: card.stats, weak_foot: card.weak_foot, skill_moves: card.skill_moves });
+        setCardTouched(false);
+      }
       setMsg('Profil enregistré.');
     } catch (e) {
       setError(e instanceof ApiError ? Object.values(e.fields)[0] ?? e.message : 'Enregistrement impossible.');
@@ -127,6 +142,28 @@ export default function EditProfile() {
       <Chips options={LEVELS.map((l, i) => ({ value: i + 1, label: l }))} value={level} onChange={setLevel} allowEmpty />
       <Label>Pied fort</Label>
       <Chips options={FEET} value={foot} onChange={setFoot} allowEmpty />
+      {card ? (
+        <>
+          <Kicker>Ma carte joueur</Kicker>
+          <Card style={{ gap: 10 }}>
+            <Text style={s.sub}>Estime-toi honnêtement : les joueurs qui jouent avec toi te noteront ensuite, et leurs votes prendront le relais.</Text>
+            {CARD_STATS.map((st) => (
+              <View key={st.key} style={[s.row, { justifyContent: 'space-between' }]}>
+                <Text style={{ ...font.semibold, fontSize: 14, color: colors.ink }}>{st.label}</Text>
+                <Stars n={card.stats[st.key]} size={24} color={colors.orange2} onPick={(n) => touchCard({ ...card, stats: { ...card.stats, [st.key as CardStat]: n } })} />
+              </View>
+            ))}
+            <View style={[s.row, { justifyContent: 'space-between' }]}>
+              <Text style={{ ...font.semibold, fontSize: 14, color: colors.ink }}>Pied faible</Text>
+              <Stars n={card.weak_foot} size={24} color={colors.orange2} onPick={(n) => touchCard({ ...card, weak_foot: n })} />
+            </View>
+            <View style={[s.row, { justifyContent: 'space-between' }]}>
+              <Text style={{ ...font.semibold, fontSize: 14, color: colors.ink }}>Gestes techniques</Text>
+              <Stars n={card.skill_moves} size={24} color={colors.orange2} onPick={(n) => touchCard({ ...card, skill_moves: n })} />
+            </View>
+          </Card>
+        </>
+      ) : null}
       <Button title="Voir mon profil public" variant="ghost" icon="eye-outline" onPress={() => router.push(`/user/${user.id}`)} />
 
     </Screen>
