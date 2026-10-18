@@ -526,6 +526,20 @@ check('activer les paiements : compte Accounts v2 (carte + virements, Express), 
     && $create['params']['defaults']['responsibilities'] === ['fees_collector' => 'application', 'losses_collector' => 'application']
     && str_ends_with((string)$create['version'], '.endive'), [$r, $link, $create]);
 $acct = array_key_last($st['accounts']);
+
+/** Où renvoie la page de retour de Stripe. */
+function pay_back_location(string $to): string
+{
+    global $base;
+    $ch = curl_init($base . '/pay/back?' . http_build_query(['to' => $to, 'paid' => 1]));
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true]);
+    $raw = (string)curl_exec($ch);
+    return preg_match('/^Location: (.+)$/mi', $raw, $m) ? trim($m[1]) : '';
+}
+$site = preg_replace('#^(https?://[^/]+).*$#', '$1', $base);
+check('retour de Stripe vers l\'appli web du même site', pay_back_location("$site/app/match/12") === "$site/app/match/12?paid=1", pay_back_location("$site/app/match/12"));
+check('retour de Stripe vers un autre site : refusé', pay_back_location('https://ailleurs.example/app/match/12') === 'supercity://?paid=1'
+    && pay_back_location("$site.ailleurs.example/app") === 'supercity://?paid=1', pay_back_location('https://ailleurs.example/app/match/12'));
 [$s, $r] = api('PATCH', '/me/organization', ['legal_form' => 'non_profit'], $karim);
 check('forme juridique bloquée une fois le compte Stripe créé', $s === 409 && $r['error'] === 'legal_form_locked', $r);
 [$sc] = user('Sans Connect', 'sansconnect@example.fr');

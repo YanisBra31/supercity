@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Place, searchAddress, searchPlaces } from '../lib/address';
 import { Coords } from '../lib/location';
 import { colors, font, Label, s } from './ui';
+import { sheetWidth } from './WebFrame';
 
 const ICONS: Record<Place['kind'], keyof typeof Ionicons.glyphMap> = {
   housenumber: 'home-outline',
@@ -150,7 +151,7 @@ export function PlaceSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
-      <View style={[st.sheet, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[st.sheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
         <View style={st.grabber} />
         <Text style={st.title}>Chercher autour de…</Text>
         <Pressable

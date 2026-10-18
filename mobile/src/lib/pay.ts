@@ -2,18 +2,20 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
+import { webUrl } from './links';
 
-/** Adresse de retour vers l'appli (schéma supercity://, ou exp:// dans Expo Go). */
+/** Adresse de retour vers l'appli (schéma supercity://, exp:// dans Expo Go, ou page de l'appli web). */
 export function returnUrl(path: string): string {
-  if (Platform.OS === 'web') return `${globalThis.location?.origin ?? ''}/${path}`;
+  if (Platform.OS === 'web') return webUrl(path);
   return Linking.createURL(path);
 }
 
 /** Ouvre la page Stripe ; renvoie true si le joueur est revenu par le lien de retour. */
 export async function openStripe(url: string, back: string): Promise<boolean> {
   if (Platform.OS === 'web') {
+    // Sur le web, on quitte la page : l'écran se recharge au retour de Stripe et vérifie le paiement.
     globalThis.location?.assign(url);
-    return false;
+    return new Promise(() => undefined);
   }
   const res = await WebBrowser.openAuthSessionAsync(url, back);
   return res.type === 'success';

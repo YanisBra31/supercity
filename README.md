@@ -25,6 +25,7 @@ En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'h
 2. Copier `public/api/config.example.php` en `supercity-config.php` dans le dossier qui contient `public_html` (pas dedans), et le remplir avec les identifiants MySQL.
 3. Vérifier `app/legal.ts` (éditeur, adresse, contact) : il alimente les mentions légales et la politique de confidentialité.
 4. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).
+5. Appli web : `cd mobile && npm run build:web`, puis déposer le dossier `mobile/dist/app` dans `public_html` (elle s'ouvre sur `supercity.fr/app`, et appelle l'API du même site). Le dossier `app` n'est pas dans `out/` : ne pas l'effacer en redéposant le site.
 
 ## Tester l'API
 

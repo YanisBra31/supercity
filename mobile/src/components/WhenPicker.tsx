@@ -5,6 +5,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gradient } from './brand';
 import { Button, Chip, colors, font } from './ui';
+import { sheetWidth } from './WebFrame';
 
 const MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const WEEK = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -198,7 +199,7 @@ export function WhenField({ day, minutes, onChange }: { day: Date; minutes: numb
       </View>
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <Pressable style={st.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Fermer" />
-        <View style={[st.sheet, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[st.sheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
           <View style={st.grabber} />
           <Text style={st.title}>Quand ?</Text>
           <ScrollView contentContainerStyle={{ gap: 14 }} showsVerticalScrollIndicator={false}>
