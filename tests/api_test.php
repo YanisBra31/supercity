@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('DELETE FROM cosmetics WHERE created_by IS NOT NULL');
@@ -822,6 +822,12 @@ check('retiré de la vente : ceux qui l\'ont le gardent', $s2 === 204 && $s3 ===
 [$s, $r] = api('POST', "/admin/users/$leaId/coins", ['amount' => 500], $lea);
 [$s2, $r2] = api('POST', "/admin/users/$leaId/coins", ['amount' => 500], $yassin);
 check('offrir des pièces : réservé à l\'admin', $s === 403 && $s2 === 200 && $r2['coins'] >= 500, [$r, $r2]);
+[$s, $r] = api('POST', "/admin/users/$leaId/points", ['amount' => 120], $lea);
+[$s2, $r2] = api('POST', "/admin/users/$leaId/points", ['amount' => 120], $yassin);
+[$s3, $shop2] = api('GET', '/shop', null, $lea);
+check('points de grade : réservés à l\'admin, le grade et les pièces suivent', $s === 403 && $s2 === 200 && $r2['grade']['key'] === 'legende' && $shop2['coins'] >= 1200 + 500, [$r, $r2['grade'] ?? $r2, $shop2['coins'] ?? $shop2]);
+[$s, $r] = api('POST', "/admin/users/$leaId/points", ['amount' => -1000], $yassin);
+check('reprendre des points : jamais sous zéro', $s === 200 && $r['grade']['key'] === 'rookie' && $r['grade']['points'] === 0, $r['grade'] ?? $r);
 
 echo "Cartes joueurs\n";
 [$s, $r] = api('GET', "/users/$samId", null, $sam);

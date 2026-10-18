@@ -94,6 +94,11 @@ export const HELP: HelpTopic[] = [
         a: "En jouant : chaque point de grade te rapporte 10 pièces. Joue, gagne et organise des matchs pour en avoir plus.",
       },
       {
+        id: 'inventaire',
+        q: 'Où retrouver les objets que j\'ai achetés ?',
+        a: "Dans la boutique, touche « Mon inventaire ». Tous tes cadres, bannières et titres y sont rangés : touche un objet pour le porter, touche-le encore pour le retirer.",
+      },
+      {
         id: 'cosmetiques',
         q: 'Que puis-je acheter avec mes pièces ?',
         a: "Des cadres, bannières et titres pour personnaliser ton profil. Ils ne changent ni ton grade ni tes points. Les pièces n'ont aucune valeur en argent : un objet acheté reste à toi, il n'est ni remboursable ni échangeable.",

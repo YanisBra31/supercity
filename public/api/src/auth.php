@@ -52,7 +52,8 @@ function issue_token(int $userId): array
 }
 
 /** Profil public d'un joueur (sans e-mail). */
-// Grades de joueur : seuil de points (1 par match joué, 2 de plus s'il est gagné, 2 par match organisé ; voir series.php pour les bonus).
+// Grades de joueur : seuil de points (1 par match joué, 2 de plus s'il est gagné, 2 par match organisé ; voir series.php pour les bonus,
+// et grade_bonus pour les points donnés par un admin).
 const GRADES = [
     ['key' => 'rookie', 'label' => 'Rookie', 'min' => 0],
     ['key' => 'espoir', 'label' => 'Espoir', 'min' => 5],
@@ -81,6 +82,8 @@ function user_stats(int $id): array
             $points += $p;
             $wins += (int)$won;
         }
+        // Points donnés ou repris par un admin (jamais en dessous de zéro au total).
+        $points = max(0, $points + (int)one('SELECT COALESCE(SUM(amount), 0) AS n FROM grade_bonus WHERE user_id = ?', [$id])['n']);
         $cache[$id] = ['played' => count($played), 'wins' => $wins, 'organized' => $organized, 'points' => $points];
     }
     return $cache[$id];
