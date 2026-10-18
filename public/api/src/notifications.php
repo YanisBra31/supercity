@@ -1,6 +1,6 @@
 <?php
 // Notifications sur les téléphones, envoyées par le service push d'Expo : événements bonus, séries sur les terrains proches,
-// score à confirmer. Les alertes en attente partent dès qu'un joueur ouvre l'appli (ou via /cron/notifications).
+// score à confirmer. Celles qui concernent un joueur passent par notify() (social.php) et restent dans sa boîte de réception. Les alertes en attente partent dès qu'un joueur ouvre l'appli (ou via /cron/notifications).
 declare(strict_types=1);
 
 const PUSH_RADIUS_KM = 25;
@@ -150,6 +150,7 @@ function run_notifications(): void
                 "$n victoires d'affilée à {$venue['name']}. Qui va les arrêter ?",
                 ['url' => "/team/$winner"]
             );
+            notify($members, 'streak', "🔥 {$team['name']} est en feu", "$n victoires d'affilée à {$venue['name']}.", "/team/$winner", null, false);
         }
     } catch (Throwable $e) {
         // Une alerte ratée ne doit jamais faire échouer la requête du joueur.
@@ -165,11 +166,12 @@ function notify_score_reported(array $m, int $byTeam): void
         $by = load_team($byTeam);
         $m = load_match((int)$m['id']);
         $verb = $m['score_status'] === 'disputed' ? 'contestent le score et annoncent' : 'annoncent';
-        push_send(
-            push_tokens_of([(int)load_team($other)['captain_id']]),
+        notify(
+            [(int)load_team($other)['captain_id']],
+            'score',
             'Score à confirmer',
             "{$by['name']} $verb {$m['home_score']} - {$m['away_score']}. Confirme-le ou annonce le bon.",
-            ['url' => "/match/{$m['id']}"]
+            "/match/{$m['id']}"
         );
     } catch (Throwable $e) {
         error_log('supercity push: ' . $e->getMessage());
