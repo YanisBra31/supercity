@@ -1,23 +1,24 @@
 // Écran d'accueil avant connexion : dégradé, terrain qui se trace, blason, ballon.
+// En mode sombre : fond nuit et blason noir, le bouton principal passe en orange.
 import { router } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BouncingBall, FadeIn, Gradient, PitchLines } from '../../components/brand';
-import { Button, colors, font, Kicker } from '../../components/ui';
+import { Button, colors, font, isDark, Kicker } from '../../components/ui';
 
 export default function Welcome() {
   return (
-    <Gradient style={{ flex: 1 }}>
+    <Gradient tone={isDark ? 'night' : 'orange'} style={{ flex: 1 }}>
       <View style={st.pitch} pointerEvents="none">
         <PitchLines width={520} height={320} opacity={0.28} />
       </View>
       <SafeAreaView style={st.safe}>
         <View style={st.top}>
           <FadeIn index={0}>
-            <Image source={require('../../../assets/splash-icon.png')} style={st.crest} resizeMode="contain" />
+            <Image source={isDark ? require('../../../assets/logo-noir.png') : require('../../../assets/splash-icon.png')} style={st.crest} resizeMode="contain" />
           </FadeIn>
           <FadeIn index={2} style={{ alignItems: 'center', gap: 6 }}>
-            <Kicker color={colors.chalk}>Le foot amateur, réinventé</Kicker>
+            <Kicker color={isDark ? colors.orange1 : colors.chalk}>Le foot amateur, réinventé</Kicker>
             <Text style={st.brand}>Supercity</Text>
           </FadeIn>
           <FadeIn index={4}>
@@ -30,7 +31,7 @@ export default function Welcome() {
           <View style={{ alignItems: 'center', marginBottom: 6 }}>
             <BouncingBall size={22} />
           </View>
-          <Button title="Créer mon compte" variant="dark" onPress={() => router.push('/register')} />
+          <Button title="Créer mon compte" variant={isDark ? 'primary' : 'dark'} onPress={() => router.push('/register')} />
           <Button title="J'ai déjà un compte" variant="light" onPress={() => router.push('/login')} />
         </FadeIn>
       </SafeAreaView>

@@ -8,7 +8,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "fr.supercity.app"
+      "bundleIdentifier": "fr.supercity.app",
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,14 +54,22 @@
           "color": "#ff5223",
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ff5223",
+          "dark": {
+            "image": "./assets/logo-noir.png",
+            "backgroundColor": "#000000"
+          }
+        }
       ]
     ],
     "scheme": "supercity",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ff5223"
-    },
     "extra": {
       "apiUrl": "https://supercity.fr/api/v1",
       "eas": {
