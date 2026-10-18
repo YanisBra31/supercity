@@ -110,15 +110,16 @@ function api_url(string $path): string
     return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'supercity.fr') . $prefix . $path;
 }
 
-/** Adresse de retour vers l'appli : schéma de l'appli (ou Expo Go), ou site web autorisé. */
+/** Adresse de retour vers l'appli : schéma de l'appli (ou Expo Go), appli web du même site, ou site web autorisé. */
 function app_return(?string $url): string
 {
     $url = (string)$url;
     if (preg_match('#^(supercity|exp|exps)://#', $url)) {
         return $url;
     }
-    $origin = preg_match('#^(https?://[^/]+)#', $url, $m) ? $m[1] : '';
-    if ($origin !== '' && in_array($origin, config()['cors_origins'] ?? [], true)) {
+    $origin = preg_match('#^(https?://[^/]+)(/|$)#', $url, $m) ? $m[1] : '';
+    $self = preg_match('#^(https?://[^/]+)#', api_url(''), $s) ? $s[1] : '';
+    if ($origin !== '' && ($origin === $self || in_array($origin, config()['cors_origins'] ?? [], true))) {
         return $url;
     }
     return 'supercity://';

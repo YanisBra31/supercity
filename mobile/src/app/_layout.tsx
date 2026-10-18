@@ -8,12 +8,13 @@ import {
   useFonts,
 } from '@expo-google-fonts/poppins';
 import * as Notifications from 'expo-notifications';
-import { router, Stack } from 'expo-router';
+import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Splash } from '../components/brand';
+import { WebFrame } from '../components/WebFrame';
 import { header } from '../components/header';
 import { colors } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -44,9 +45,30 @@ function usePush(userId: number | null) {
   }, [userId]);
 }
 
+// Lien partagé ouvert sans être connecté (supercity.fr/app/match/12) : on y va juste après la connexion.
+let sharedPath: string | null =
+  Platform.OS === 'web' && /^\/app\/(match|user|team|teams)(\/|$)/.test(globalThis.location?.pathname ?? '') ? globalThis.location.pathname.replace(/^\/app/, '') : null;
+
+function useSharedLink(loggedIn: boolean) {
+  const path = usePathname();
+  const wasOut = useRef(!loggedIn);
+  useEffect(() => {
+    if (!loggedIn) {
+      wasOut.current = true;
+      return;
+    }
+    if (sharedPath && wasOut.current && path === '/') {
+      wasOut.current = false;
+      router.push(sharedPath as never);
+      sharedPath = null;
+    }
+  }, [loggedIn, path]);
+}
+
 function RootStack() {
   const { user } = useAuth();
   usePush(user?.id ?? null);
+  useSharedLink(!!user);
   useBadgePolling(user?.id ?? null);
   return (
     <Stack screenOptions={{ ...header, contentStyle: { backgroundColor: colors.bg } }}>
@@ -116,7 +138,11 @@ function Gate() {
 
   return (
     <View style={{ flex: 1 }}>
-      {loaded ? <RootStack /> : null}
+      {loaded ? (
+        <WebFrame>
+          <RootStack />
+        </WebFrame>
+      ) : null}
       <CelebrationHost />
       {gone ? null : (
         <Animated.View

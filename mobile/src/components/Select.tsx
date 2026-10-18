@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, font, Label, s } from './ui';
+import { sheetWidth } from './WebFrame';
 
 export type SelectOption<T> = { value: T; label: string; hint?: string };
 
@@ -52,7 +53,7 @@ export function Select<T extends string | number>({
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <Pressable style={st.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Fermer" />
-        <View style={[st.sheet, { paddingBottom: insets.bottom + 12 }]}>
+        <View style={[st.sheet, sheetWidth, { paddingBottom: insets.bottom + 12 }]}>
           <View style={st.grabber} />
           <Text style={st.title}>{title ?? label}</Text>
           <ScrollView ref={scroll} style={{ maxHeight: ROW * 7 }}>

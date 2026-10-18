@@ -9,6 +9,7 @@ import { PresenceDot } from './Friends';
 import { Button, colors, ErrorText, font, s } from './ui';
 import { ApiError, get, Invitable, post } from '../lib/api';
 import { presenceLabel } from '../lib/presence';
+import { sheetWidth } from './WebFrame';
 
 const STATE_LABEL = { in: 'Déjà dans le match', invited: 'Déjà invité' } as const;
 
@@ -57,7 +58,7 @@ export function InviteSheet({ matchId, visible, onClose, onSent }: { matchId: nu
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
-      <View style={[st.sheet, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[st.sheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
         <View style={st.grabber} />
         <View style={[s.row, { justifyContent: 'space-between' }]}>
           <Text style={st.title}>Inviter des amis</Text>

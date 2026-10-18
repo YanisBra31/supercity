@@ -132,6 +132,14 @@ export default function ChatScreen() {
           accessibilityLabel="Message"
           onSubmitEditing={send}
           blurOnSubmit={false}
+          onKeyPress={(e) => {
+            // Sur ordinateur : Entrée envoie, Maj + Entrée passe à la ligne.
+            const k = e.nativeEvent as { key: string; shiftKey?: boolean };
+            if (Platform.OS === 'web' && k.key === 'Enter' && !k.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
         />
         <Pressable
           onPress={send}

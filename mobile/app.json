@@ -23,7 +23,13 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "output": "single"
+      "output": "single",
+      "name": "Supercity",
+      "shortName": "Supercity",
+      "description": "Trouve un match de foot près de chez toi, rejoins-le en deux secondes.",
+      "lang": "fr",
+      "themeColor": "#1f1a17",
+      "backgroundColor": "#ff5223"
     },
     "plugins": [
       "expo-router",
@@ -73,7 +79,8 @@
       }
     },
     "experiments": {
-      "typedRoutes": false
+      "typedRoutes": false,
+      "baseUrl": "/app"
     },
     "owner": "supercity"
   }

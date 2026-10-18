@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Format } from '../lib/api';
 import { FORMATS, LEVELS } from '../lib/format';
 import { Button, Chip, Chips, colors, font, Label } from './ui';
+import { sheetWidth } from './WebFrame';
 
 export type When = 'all' | 'today' | 'tomorrow' | 'weekend' | 'week';
 export type Filters = {
@@ -136,7 +137,7 @@ export function FilterSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Fermer les filtres" />
-      <View style={[st.sheet, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[st.sheet, sheetWidth, { paddingBottom: insets.bottom + 16 }]}>
         <View style={st.grabber} />
         <View style={[st.sheetHead]}>
           <Text style={st.sheetTitle}>Filtres</Text>

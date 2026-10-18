@@ -2,11 +2,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, IconButton, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../../lib/api';
+import { shareMessage, webUrl } from '../../lib/links';
 import { euros, openStripe, returnUrl } from '../../lib/pay';
 import { dayLabel, distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
 
@@ -114,10 +115,10 @@ export default function MatchDetail() {
   const registered = m.players?.filter((p) => p.status === 'registered') ?? [];
   const waiting = m.players?.filter((p) => p.status === 'waitlist') ?? [];
 
-  const share = () =>
-    Share.share({
-      message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
-    });
+  const share = async () => {
+    const r = await shareMessage(`${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : ${webUrl(`match/${m.id}`)}`);
+    if (r === 'copied') setMsg('Lien du match copié, colle-le à tes potes.');
+  };
   const join = () =>
     act(async () => {
       const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });

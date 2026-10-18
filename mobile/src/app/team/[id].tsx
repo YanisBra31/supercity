@@ -2,10 +2,11 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Platform, Pressable, Share, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, ErrorText, Kicker, Loading, Pill, readableOn, Screen, TeamCrest, colors, font, s } from '../../components/ui';
 import { ApiError, del, get, Match, post, Team } from '../../lib/api';
+import { shareMessage, webUrl } from '../../lib/links';
 import { useAuth } from '../../lib/auth';
 import { dayLabel, formatLabel, levelLabel, POSITIONS } from '../../lib/format';
 import { GradeBadge, RoleBadge } from '../../components/Grade';
@@ -145,9 +146,10 @@ export default function TeamDetail() {
           <Button
             title="Inviter des joueurs"
             icon="share-social-outline"
-            onPress={() =>
-              Share.share({ message: `Rejoins ${team.name} sur Supercity avec le code ${team.invite_code}` })
-            }
+            onPress={async () => {
+              const r = await shareMessage(`Rejoins ${team.name} sur Supercity avec le code ${team.invite_code} : ${webUrl('teams')}`);
+              if (r === 'copied') setCopied(true);
+            }}
           />
           {captain ? (
             <Text style={{ ...font.semibold, color: colors.chalk, opacity: 0.7, textAlign: 'center' }} onPress={() => act(() => post(`/teams/${team.id}/invite-code`))}>

@@ -147,7 +147,8 @@ export default function Confidentialite() {
       <h2>Sécurité</h2>
       <p>
         Les échanges avec l&apos;appli sont chiffrés (HTTPS), les mots de passe sont chiffrés de façon irréversible, les
-        tentatives de connexion sont limitées et ta session est gardée dans l&apos;espace sécurisé de ton téléphone. En
+        tentatives de connexion sont limitées et ta session est gardée dans l&apos;espace sécurisé de ton téléphone (sur
+        l&apos;appli web, dans ton navigateur, et effacée quand tu te déconnectes). En
         cas de fuite de données présentant un risque pour toi, on te prévient, ainsi que la CNIL.
       </p>
 
@@ -161,7 +162,8 @@ export default function Confidentialite() {
       <p>
         Le site ne dépose aucun cookie, ni de mesure d&apos;audience, ni de publicité, et ne charge aucun service tiers
         (les polices sont servies par le site lui-même). Si cela change, cette page sera mise à jour et ton accord
-        sera demandé avant tout dépôt de cookie non essentiel.
+        sera demandé avant tout dépôt de cookie non essentiel. L&apos;appli web (supercity.fr/app) garde seulement ta
+        session dans ton navigateur, ce qui est nécessaire pour rester connecté.
       </p>
 
       <h2>Changements</h2>

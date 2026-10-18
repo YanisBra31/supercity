@@ -2,10 +2,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { FriendRow, sendFriend } from '../components/Friends';
 import { Button, colors, Empty, ErrorText, font, IconButton, Kicker, Loading, Pill, s } from '../components/ui';
 import { ApiError, Friendship, Friends as FriendsData, get, PublicUser } from '../lib/api';
+import { shareMessage, webUrl } from '../lib/links';
 import { useAuth } from '../lib/auth';
 import { timeAgo } from '../lib/format';
 
@@ -73,7 +74,11 @@ export default function Friends() {
     }
   };
 
-  const share = () => user && Share.share({ message: `Ajoute-moi sur Supercity, je suis ${user.display_name} : supercity://user/${user.id}` });
+  const [copied, setCopied] = useState(false);
+  const share = async () => {
+    if (!user) return;
+    if ((await shareMessage(`Ajoute-moi sur Supercity, je suis ${user.display_name} : ${webUrl(`user/${user.id}`)}`)) === 'copied') setCopied(true);
+  };
 
   if (!data) return error ? <View style={s.screen}><ErrorText>{error}</ErrorText></View> : <Loading />;
 
@@ -186,7 +191,7 @@ export default function Friends() {
           {data.outgoing.map((u) => (
             <FriendRow key={u.id} u={u} sub={`En attente · ${timeAgo(u.requested_at)}`} right={<SmallButton title="Annuler" ghost onPress={() => act(u.id, false)} />} />
           ))}
-          <Button title="Inviter un pote" icon="share-outline" variant="ghost" onPress={share} />
+          <Button title={copied ? 'Lien copié, colle-le à ton pote' : 'Inviter un pote'} icon={copied ? 'checkmark' : 'share-outline'} variant="ghost" onPress={share} />
           {data.friends.length ? (
             <Text style={[s.sub, { textAlign: 'center', fontSize: 12.5 }]}>
               Tes amis voient aussi ton statut. Tu peux le cacher dans les Réglages.
