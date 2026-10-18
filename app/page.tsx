@@ -34,8 +34,8 @@ const formats = [
 const features = [
   ["Matchs autour de toi", "Filtre par distance, date, format et niveau."],
   ["Inscriptions en un geste", "Les places se remplissent en direct, avec liste d'attente."],
-  ["Profil et stats", "Trophées, buts, titres d'homme du match."],
-  ["Fil d'actualité", "Les résultats et les exploits de ton équipe."],
+  ["Amis et discussions", "Vois qui est en ligne, invite tes potes, discute avant le match."],
+  ["Profil et stats", "Grade, carte joueur, trophées et défis entre équipes."],
 ];
 
 const marquee = ["City", "Futsal", "8 vs 8", "11 vs 11", "Partout", "Sur tous les terrains"];
@@ -98,9 +98,14 @@ export default function Home() {
           <a href="#formats">Formats</a>
           <a href="#appli">L&apos;appli</a>
         </nav>
-        <a className="nav__cta" href="#rejoindre">
-          Rejoindre
-        </a>
+        <div className="nav__actions">
+          <a className="nav__login" href="/app/">
+            Se connecter
+          </a>
+          <a className="nav__cta" href="/app/">
+            Ouvrir l&apos;appli
+          </a>
+        </div>
       </header>
 
       <main>
@@ -111,7 +116,7 @@ export default function Home() {
             <div className="hero__text">
               <p className="eyebrow">
                 <span className="live-dot" aria-hidden="true" />
-                Bientôt sur iOS et Android
+                Disponible sur le web · iOS et Android bientôt
               </p>
               <h1>
                 <Words text="Le foot amateur," />
@@ -125,9 +130,15 @@ export default function Home() {
                 joueurs près de chez toi. City, futsal, 8 vs 8 ou 11 vs 11 : tu choisis le terrain, on
                 s&apos;occupe du reste.
               </p>
-              <div className="hero__form">
-                <Waitlist />
+              <div className="hero__form hero__actions">
+                <a className="btn btn--dark" href="/app/register">
+                  Créer mon compte
+                </a>
+                <a className="btn btn--light" href="/app/">
+                  J&apos;ai déjà un compte
+                </a>
               </div>
+              <p className="hero__note">Gratuit, dans ton navigateur, sur ordinateur comme sur téléphone.</p>
             </div>
             <div className="hero__crest" data-parallax>
               <Image src="/logo-blanc.png" alt="Écusson Supercity" width={418} height={520} priority />
@@ -219,7 +230,7 @@ export default function Home() {
             <p className="kicker" data-reveal>
               L&apos;appli
             </p>
-            <h2 data-reveal>Ton équipe dans la poche.</h2>
+            <h2 data-reveal>Ton équipe dans la poche, et sur ton ordi.</h2>
             <ul className="features">
               {features.map(([t, d], i) => (
                 <li key={t} data-reveal style={{ "--i": i } as React.CSSProperties}>
@@ -228,13 +239,19 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+            <a className="btn btn--orange" href="/app/" data-reveal>
+              Ouvrir l&apos;appli
+            </a>
           </div>
         </section>
 
         <section className="join" id="rejoindre">
           <div className="join__text" data-reveal>
             <h2>Rejoins-nous.</h2>
-            <p>Laisse ton e-mail : tu seras parmi les premiers à jouer quand l&apos;appli sortira.</p>
+            <p>
+              Supercity se joue déjà sur <a href="/app/">supercity.fr/app</a>. Laisse ton e-mail pour être prévenu de la
+              sortie sur iOS et Android.
+            </p>
             <Waitlist dark />
           </div>
           <div className="join__poster" data-reveal data-parallax>

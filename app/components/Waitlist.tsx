@@ -52,7 +52,7 @@ export default function Waitlist({ dark = false }: { dark?: boolean }) {
       <input
         id={`email-${id}`}
         type="email"
-        placeholder="Ton e-mail pour le coup d'envoi"
+        placeholder="Ton e-mail pour la sortie mobile"
         autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}

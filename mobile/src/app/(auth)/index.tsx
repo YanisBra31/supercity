@@ -5,8 +5,12 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BouncingBall, FadeIn, Gradient, PitchLines } from '../../components/brand';
 import { Button, colors, font, isDark, Kicker } from '../../components/ui';
+import { DesktopWelcome } from '../../components/DesktopWelcome';
+import { useWebLayout } from '../../components/WebFrame';
 
 export default function Welcome() {
+  const layout = useWebLayout();
+  if (layout !== 'phone') return <DesktopWelcome />;
   return (
     <Gradient tone={isDark ? 'night' : 'orange'} style={{ flex: 1 }}>
       <View style={st.pitch} pointerEvents="none">
