@@ -7,6 +7,7 @@ import { FadeIn, Hero } from './brand';
 import { BannerPattern, bannerColors, FramedAvatar, TitleTag } from './Cosmetics';
 import { GradeBadge, GradeCard, RoleBadge } from './Grade';
 import { PlayerCardView } from './PlayerCard';
+import { ProfileCards } from './ProfileCards';
 import { PostCard } from './PostCard';
 import { Card, colors, font, Kicker, Pill, s, TeamCrest } from './ui';
 import { Post, PublicProfile } from '../lib/api';
@@ -90,8 +91,14 @@ export function ProfileView({
       </Hero>
       {actions}
       {children}
-      {p.card ? <PlayerCardView card={p.card} name={p.display_name} uri={p.avatar_url} position={p.position} /> : null}
-      <GradeCard grade={p.grade} />
+      <ProfileCards
+        pages={[
+          ...(p.grade ? [{ title: 'Grade', render: () => <GradeCard grade={p.grade} /> }] : []),
+          ...(p.card
+            ? [{ title: 'Carte joueur', render: (visit: number) => <PlayerCardView key={visit} card={p.card!} name={p.display_name} uri={p.avatar_url} position={p.position} /> }]
+            : []),
+        ]}
+      />
 
       <Card index={0} style={{ gap: 12 }}>
         {facts.map(([icon, label, value]) => (
