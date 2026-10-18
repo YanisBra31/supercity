@@ -58,6 +58,26 @@ export type PublicProfile = PublicUser & {
   stats: { played: number; organized: number; wins?: number };
   teams: { id: number; name: string; logo_url: string | null; color_primary: string; color_secondary: string; role: 'captain' | 'player' }[];
   member_since: string;
+  friendship?: Friendship;
+  /** Statut du joueur, visible seulement par ses amis (null s'il le cache). */
+  presence?: Presence | null;
+};
+export type Friendship = 'none' | 'outgoing' | 'incoming' | 'friends';
+export type PresenceMatch = { id: number; title: string | null; format: Format; venue: string; starts_at: string; ends_at: string };
+export type Presence = { state: 'match' | 'online' | 'offline'; last_seen_at: string | null; match: PresenceMatch | null; next_match: PresenceMatch | null };
+export type Friend = PublicUser & { presence: Presence | null; since: string };
+export type FriendRequest = PublicUser & { requested_at: string };
+export type Friends = { friends: Friend[]; incoming: FriendRequest[]; outgoing: FriendRequest[] };
+export type Badge = { unread: number; friend_requests: number };
+export type InboxItem = {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  url: string | null;
+  actor: { id: number; display_name: string; avatar_url: string | null } | null;
+  created_at: string;
+  read: boolean;
 };
 export type Me = PublicUser & {
   email: string;
@@ -68,6 +88,7 @@ export type Me = PublicUser & {
   suspended_reason?: string | null;
   notifications?: NotificationPrefs;
   coins?: number;
+  show_presence?: boolean;
 };
 
 /** Cosmétiques de profil : cadre de photo, bannière, titre. */

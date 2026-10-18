@@ -109,11 +109,11 @@ export function PageHeader({ kicker, title, sub, right }: { kicker?: string; tit
 }
 
 /** Bouton rond à icône (bascule carte, réglages...). */
-export function IconButton({ icon, label, onPress, dark }: { icon: IconName; label: string; onPress: () => void; dark?: boolean }) {
+export function IconButton({ icon, label, onPress, dark, badge }: { icon: IconName; label: string; onPress: () => void; dark?: boolean; badge?: number }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={badge ? `${label}, ${badge} nouveau${badge > 1 ? 'x' : ''}` : label}
       onPress={() => {
         tap();
         onPress();
@@ -121,6 +121,11 @@ export function IconButton({ icon, label, onPress, dark }: { icon: IconName; lab
       style={({ pressed }) => [s.iconBtn, dark && { backgroundColor: colors.night, borderColor: colors.night }, pressed && { transform: [{ scale: 0.94 }] }]}
     >
       <Ionicons name={icon} size={20} color={dark ? colors.chalk : colors.ink} />
+      {badge ? (
+        <View style={s.badge}>
+          <Text style={s.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -465,6 +470,8 @@ export const s = StyleSheet.create({
   kicker: { ...font.semibold, fontSize: 11, letterSpacing: 2.4, textTransform: 'uppercase' },
   title: { ...font.extrabold, fontSize: 30, lineHeight: 38, color: colors.ink, letterSpacing: -0.6 },
   pageTitle: { ...font.black, fontSize: 34, lineHeight: 40, color: colors.ink, letterSpacing: -1.2 },
+  badge: { position: 'absolute', top: -4, right: -4, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.orange2, borderWidth: 2, borderColor: colors.bg },
+  badgeText: { ...font.bold, fontSize: 11, lineHeight: 14, color: colors.chalk },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   dock: { paddingHorizontal: 20, paddingTop: 12, gap: 8, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
   sub: { ...font.regular, fontSize: 14, color: colors.dim, lineHeight: 21 },

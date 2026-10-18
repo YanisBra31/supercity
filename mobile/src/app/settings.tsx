@@ -1,7 +1,7 @@
-// Réglages : modération, espace pro, notifications, sécurité, informations légales, déconnexion.
+// Réglages : modération, espace pro, notifications, amis, sécurité, informations légales, déconnexion.
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { NotificationSettings } from '../components/NotificationSettings';
+import { NotificationSettings, PresenceSetting } from '../components/NotificationSettings';
 import { Button, colors, font, Kicker, s, Screen } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { openPrivacy } from '../lib/pay';
@@ -24,6 +24,10 @@ export default function Settings() {
 
       <Kicker>Notifications</Kicker>
       <NotificationSettings user={user} onChange={setUser} />
+
+      <Kicker>Amis</Kicker>
+      <Button title="Mes amis" variant="dark" icon="people-outline" onPress={() => router.push('/friends')} />
+      <PresenceSetting user={user} onChange={setUser} />
 
       <Kicker>Aide</Kicker>
       <Button title="Questions fréquentes" variant="dark" icon="help-circle-outline" onPress={() => router.push('/help')} />

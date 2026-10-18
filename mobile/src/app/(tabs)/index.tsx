@@ -12,6 +12,7 @@ import { Banner, colors, Empty, ErrorText, font, IconButton, PageHeader } from '
 import { ApiError, BonusEvent, get, Match, Venue } from '../../lib/api';
 import { BonusBanner } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
+import { useBadge } from '../../lib/badge';
 import { Place } from '../../lib/address';
 import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 
@@ -22,6 +23,7 @@ export default function Matches() {
   const { user } = useAuth();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [view, setView] = useState<View_>('list');
+  const badge = useBadge();
   const [sheet, setSheet] = useState(false);
   const [placeSheet, setPlaceSheet] = useState(false);
   const [place, setPlace] = useState<Place | null>(null);
@@ -81,12 +83,15 @@ export default function Matches() {
         title="Matchs"
         sub={found}
         right={
-          <IconButton
-            icon={view === 'list' ? 'map-outline' : 'list'}
-            label={view === 'list' ? 'Voir sur la carte' : 'Voir la liste'}
-            onPress={() => setView(view === 'list' ? 'map' : 'list')}
-            dark
-          />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton icon="notifications-outline" label="Notifications" badge={badge.unread} onPress={() => router.push('/notifications')} />
+            <IconButton
+              icon={view === 'list' ? 'map-outline' : 'list'}
+              label={view === 'list' ? 'Voir sur la carte' : 'Voir la liste'}
+              onPress={() => setView(view === 'list' ? 'map' : 'list')}
+              dark
+            />
+          </View>
         }
       />
       <View style={st.toolbar}>

@@ -49,7 +49,12 @@ export default function Confidentialite() {
         <li>
           <strong>Ton activité</strong> : matchs rejoints ou organisés, équipes, défis, scores, publications,
           commentaires, « j&apos;aime », notes données et reçues après les matchs, grade, pièces et objets de la
-          boutique. Base : exécution du service.
+          boutique, amis et demandes d&apos;ami, notifications reçues dans l&apos;appli. Base : exécution du service.
+        </li>
+        <li>
+          <strong>Ton statut</strong> : l&apos;heure de ta dernière activité dans l&apos;appli. Avec tes matchs, elle permet
+          de montrer à tes amis, et à eux seuls, si tu es en ligne ou en match. Tu peux le cacher à tout moment dans les
+          Réglages. Base : exécution du service.
         </li>
         <li>
           <strong>Ta position</strong>, seulement si tu l&apos;autorises : elle sert à chercher les matchs proches et
@@ -84,6 +89,7 @@ export default function Confidentialite() {
           Les paiements : 10 ans, comme l&apos;impose le Code de commerce, sans ton nom ni ton e-mail une fois ton
           compte supprimé.
         </li>
+        <li>Les notifications dans l&apos;appli : 90 jours.</li>
         <li>Les tentatives de connexion : 2 jours. Les codes envoyés par e-mail : 30 minutes.</li>
         <li>Les sessions de connexion : 60 jours au plus, ou jusqu&apos;à ta déconnexion.</li>
         <li>Les journaux techniques de l&apos;hébergeur : 12 mois au plus.</li>

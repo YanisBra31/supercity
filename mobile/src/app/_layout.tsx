@@ -19,6 +19,7 @@ import { colors } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { CelebrationHost } from '../components/Celebration';
 import { registerPush } from '../lib/push';
+import { refreshBadge, useBadgePolling } from '../lib/badge';
 
 /** Joueur connecté : inscrit le téléphone aux alertes, et ouvre l'écran visé quand on touche une notification. */
 function usePush(userId: number | null) {
@@ -34,13 +35,19 @@ function usePush(userId: number | null) {
     open(Notifications.getLastNotificationResponse());
     Notifications.clearLastNotificationResponse();
     const sub = Notifications.addNotificationResponseReceivedListener(open);
-    return () => sub.remove();
+    // Une notification qui arrive pendant que l'appli est ouverte met à jour la cloche.
+    const received = Notifications.addNotificationReceivedListener(() => refreshBadge());
+    return () => {
+      sub.remove();
+      received.remove();
+    };
   }, [userId]);
 }
 
 function RootStack() {
   const { user } = useAuth();
   usePush(user?.id ?? null);
+  useBadgePolling(user?.id ?? null);
   return (
     <Stack screenOptions={{ ...header, contentStyle: { backgroundColor: colors.bg } }}>
       <Stack.Protected guard={!user}>
@@ -68,6 +75,8 @@ function RootStack() {
         <Stack.Screen name="account" options={{ title: 'Mes données' }} />
         <Stack.Screen name="rate/[id]" options={{ title: 'Noter les joueurs' }} />
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="friends" options={{ title: 'Mes amis' }} />
       </Stack.Protected>
       <Stack.Screen name="help" options={{ title: 'Aide' }} />
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
