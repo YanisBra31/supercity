@@ -61,6 +61,8 @@ function RootStack() {
         <Stack.Screen name="moderation" options={{ title: 'Modération' }} />
         <Stack.Screen name="pro" options={{ title: 'Espace pro' }} />
         <Stack.Screen name="shop" options={{ title: 'Boutique' }} />
+        <Stack.Screen name="me/edit" options={{ title: 'Modifier mon profil' }} />
+        <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
       </Stack.Protected>
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />

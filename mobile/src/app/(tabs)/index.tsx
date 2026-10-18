@@ -2,14 +2,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Hero } from '../../components/brand';
 import { MatchCard } from '../../components/MatchCard';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { ActiveFilters, activeCount, DEFAULT_FILTERS, FilterButton, Filters, FilterSheet, whenRange, WhenBar } from '../../components/MatchFilters';
 import { MatchMap } from '../../components/MatchMap';
-import { Banner, colors, Empty, ErrorText, font } from '../../components/ui';
+import { Banner, colors, Empty, ErrorText, font, IconButton, PageHeader } from '../../components/ui';
 import { ApiError, BonusEvent, get, Match, Venue } from '../../lib/api';
 import { BonusBanner } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
@@ -73,16 +72,31 @@ export default function Matches() {
 
   const count = activeCount(filters, !!coords);
 
-  // Barre commune aux deux vues : bascule liste/carte, dates, bouton de filtres, filtres actifs.
+  const found = items ? `${items.length} match${items.length > 1 ? 's' : ''} à rejoindre` : 'Recherche des terrains…';
+  // En-tête commun aux deux vues : titre et bascule liste/carte, lieu et filtres, dates, filtres actifs.
   const controls = (
     <View style={{ gap: 12 }}>
+      <PageHeader
+        kicker="Trouve ton match"
+        title="Matchs"
+        sub={found}
+        right={
+          <IconButton
+            icon={view === 'list' ? 'map-outline' : 'list'}
+            label={view === 'list' ? 'Voir sur la carte' : 'Voir la liste'}
+            onPress={() => setView(view === 'list' ? 'map' : 'list')}
+            dark
+          />
+        }
+      />
       <View style={st.toolbar}>
-        <Segmented value={view} onChange={setView} />
+        <View style={{ flex: 1 }}>
+          <PlaceButton place={place} hasCoords={!!coords} onPress={() => setPlaceSheet(true)} />
+        </View>
         <FilterButton count={count} onPress={() => setSheet(true)} />
       </View>
       <WhenBar value={filters.when} onChange={(when) => setFilters((f) => ({ ...f, when }))} />
       <ActiveFilters f={filters} hasCoords={!!coords} onChange={setFilters} />
-      <PlaceButton place={place} hasCoords={!!coords} onPress={() => setPlaceSheet(true)} />
       {!coords ? (
         <View style={st.notice}>
           <Ionicons name="location-outline" size={16} color={colors.dim} />
@@ -103,14 +117,10 @@ export default function Matches() {
       <PlaceSheet visible={placeSheet} near={coords} onPick={choosePlace} onClose={() => setPlaceSheet(false)} />
     </>
   );
-  const found = items ? `${items.length} match${items.length > 1 ? 's' : ''} à rejoindre` : 'Recherche des terrains…';
-
   if (view === 'map') {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 12, gap: 6 }}>
-          <Text style={st.mapTitle}>Carte des matchs</Text>
-          <Text style={st.mapSub}>{found}</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: insets.top + 12, paddingBottom: 12 }}>
           {controls}
         </View>
         <MatchMap matches={items ?? []} venues={venues} coords={coords} radiusKm={filters.radius} />
@@ -130,14 +140,13 @@ export default function Matches() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.orange2} />}
         ListHeaderComponent={
           <View style={{ gap: 14, marginBottom: 4 }}>
-            <Hero kicker={place ? 'Trouve ton match' : 'Près de chez toi'} title={place ? `Les matchs autour de ${place.city ?? place.name}` : 'Les matchs autour de toi'} sub={found} />
+            {controls}
             {user && !user.email_verified ? (
               <Banner icon="mail-unread-outline" title="Confirme ton e-mail" text="Entre le code reçu pour sécuriser ton compte." onPress={() => router.push('/verify')} />
             ) : null}
             {events.map((e) => (
               <BonusBanner key={e.id} event={e} />
             ))}
-            {controls}
           </View>
         }
         ListEmptyComponent={
@@ -155,34 +164,8 @@ export default function Matches() {
   );
 }
 
-function Segmented({ value, onChange }: { value: View_; onChange: (v: View_) => void }) {
-  const opts: { v: View_; label: string; icon: 'list' | 'map' }[] = [
-    { v: 'list', label: 'Liste', icon: 'list' },
-    { v: 'map', label: 'Carte', icon: 'map' },
-  ];
-  return (
-    <View style={st.segment} accessibilityRole="tablist">
-      {opts.map((o) => {
-        const on = o.v === value;
-        return (
-          <Pressable key={o.v} onPress={() => onChange(o.v)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[st.segBtn, on && st.segOn]}>
-            <Ionicons name={o.icon} size={16} color={on ? colors.chalk : colors.ink} />
-            <Text style={[st.segText, on && { color: colors.chalk }]}>{o.label}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 const st = StyleSheet.create({
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  segment: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: 999, borderWidth: 1, borderColor: colors.line, padding: 3 },
-  segBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: 999 },
-  segOn: { backgroundColor: colors.orange2 },
-  segText: { ...font.semibold, fontSize: 13, color: colors.ink },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   noticeText: { ...font.regular, fontSize: 13, color: colors.dim, flex: 1 },
-  mapTitle: { ...font.extrabold, fontSize: 26, color: colors.ink, letterSpacing: -0.5 },
-  mapSub: { ...font.regular, fontSize: 14, color: colors.dim, marginBottom: 6 },
 });
