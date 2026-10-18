@@ -22,7 +22,7 @@ function Row({ icon, title, text, value, onChange }: { icon: IconName; title: st
 }
 
 export function NotificationSettings({ user, onChange }: { user: Me; onChange: (u: Me) => void }) {
-  const prefs = user.notifications ?? { events: true, streaks: true };
+  const prefs = { friends: true, ...(user.notifications ?? { events: true, streaks: true }) };
   const [phone, setPhone] = useState<'on' | 'denied' | 'unavailable' | null>(null);
   const [error, setError] = useState('');
 
@@ -40,6 +40,7 @@ export function NotificationSettings({ user, onChange }: { user: Me; onChange: (
   return (
     <Card style={{ gap: 14 }}>
       <Row icon="flash-outline" title="Événements bonus" text="Quand un événement fait gagner plus de points." value={prefs.events} onChange={(v) => set('events', v)} />
+      <Row icon="people-outline" title="Matchs de mes amis" text="Quand un ami organise ou rejoint un match où il reste de la place." value={prefs.friends} onChange={(v) => set('friends', v)} />
       <Row icon="flame-outline" title="Séries près de chez moi" text="Quand une équipe enchaîne les victoires sur un terrain du coin." value={prefs.streaks} onChange={(v) => set('streaks', v)} />
       {Platform.OS !== 'web' ? (
         phone === 'denied' ? (

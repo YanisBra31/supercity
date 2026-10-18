@@ -79,6 +79,16 @@ export type InboxItem = {
   created_at: string;
   read: boolean;
 };
+export type Invitable = PublicUser & { invite: 'in' | 'invited' | 'available'; presence: Presence | null };
+export type ChatScope = 'match' | 'team';
+export type ChatMessage = {
+  id: number;
+  body: string;
+  created_at: string;
+  author: { id: number; display_name: string; avatar_url: string | null; accent: Accent };
+  mine: boolean;
+};
+export type Chat = { title: string; members_count: number; items: ChatMessage[] };
 export type Me = PublicUser & {
   email: string;
   email_verified: boolean;
@@ -112,7 +122,7 @@ export type Cosmetic = CosmeticBrief & {
 export type Shop = { coins: number; coins_per_point: number; equipped: Equipped; items: Cosmetic[] };
 
 /** Alertes que le joueur accepte de recevoir sur son téléphone. */
-export type NotificationPrefs = { events: boolean; streaks: boolean };
+export type NotificationPrefs = { events: boolean; streaks: boolean; friends?: boolean };
 
 export type Team = {
   id: number;
@@ -129,6 +139,7 @@ export type Team = {
   members_count: number;
   my_role: 'captain' | 'player' | null;
   invite_code?: string;
+  chat_unread?: number;
   members?: (PublicUser & { role: 'captain' | 'player'; joined_at: string })[];
   // Absent si l'API en ligne est plus ancienne que l'appli.
   streak?: Streak;
@@ -215,6 +226,8 @@ export type Match = {
   bonus?: BonusEvent | null;
   /** Match fini depuis moins de 7 jours et j'y ai joué : joueurs qu'il me reste à noter. */
   ratings_left?: number | null;
+  /** Messages non lus de la discussion du match (null si on n'y a pas accès). */
+  chat_unread?: number | null;
 };
 
 /** Réponse d'inscription ou de désistement d'un match. */

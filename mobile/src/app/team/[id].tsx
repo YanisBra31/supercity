@@ -89,6 +89,14 @@ export default function TeamDetail() {
       {!team.my_role ? (
         <Button title="Défier cette équipe" icon="flash" onPress={() => router.push({ pathname: '/challenge/new', params: { to: String(team.id) } })} />
       ) : null}
+      {team.my_role ? (
+        <Button
+          title={team.chat_unread ? `Discussion d'équipe · ${team.chat_unread}` : "Discussion d'équipe"}
+          icon="chatbubbles-outline"
+          variant={team.chat_unread ? 'primary' : 'dark'}
+          onPress={() => router.push(`/chat/team/${team.id}`)}
+        />
+      ) : null}
       {captain ? (
         <Button title="Personnaliser l'équipe" icon="color-palette-outline" variant="dark" onPress={() => router.push(`/team/edit/${team.id}`)} />
       ) : null}

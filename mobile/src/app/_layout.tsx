@@ -77,6 +77,7 @@ function RootStack() {
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="friends" options={{ title: 'Mes amis' }} />
+        <Stack.Screen name="chat/[scope]/[id]" options={{ title: 'Discussion' }} />
       </Stack.Protected>
       <Stack.Screen name="help" options={{ title: 'Aide' }} />
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
