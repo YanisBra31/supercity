@@ -49,10 +49,22 @@ function refresh_match(int $matchId): void
     if ($free > 0) {
         // Match payant : la place est réservée, le joueur a quelques heures pour la payer.
         $paid = (int)$m['price_cents'] > 0;
+        $promoted = array_column(query(
+            'SELECT user_id FROM match_participants WHERE match_id = ? AND status = "waitlist" ORDER BY updated_at, created_at LIMIT ' . $free,
+            [$matchId]
+        )->fetchAll(), 'user_id');
         query(
             'UPDATE match_participants SET status = ' . ($paid ? '"pending", hold_until = ?' : '"registered"') . '
              WHERE match_id = ? AND status = "waitlist" ORDER BY updated_at, created_at LIMIT ' . $free,
             $paid ? [promoted_hold($m), $matchId] : [$matchId]
+        );
+        $where = 'à ' . (one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']])['name'] ?? 'ton terrain') . ', ' . fr_when($m['starts_at']);
+        notify(
+            $promoted,
+            'waitlist',
+            'Une place s\'est libérée',
+            $paid ? "Tu sors de la liste d'attente $where. Paie ta place vite pour la garder." : "Tu sors de la liste d'attente : tu joues $where.",
+            "/match/$matchId"
         );
     }
     $status = registered_count($matchId) >= (int)$m['max_players'] ? 'full' : 'open';
@@ -421,6 +433,14 @@ function register_match_routes(Router $r): void
         }
         query('UPDATE matches SET status = "cancelled" WHERE id = ?', [$m['id']]);
         refund_all((int)$m['id']);
+        if (strtotime($m['starts_at'] . ' UTC') > time()) {
+            $players = array_column(query(
+                'SELECT user_id FROM match_participants WHERE match_id = ? AND status <> "withdrawn" AND user_id <> ?',
+                [$m['id'], $user['id']]
+            )->fetchAll(), 'user_id');
+            $paid = (int)$m['price_cents'] > 0 ? ' Tu es remboursé en entier.' : '';
+            notify($players, 'cancelled', 'Match annulé', "{$user['display_name']} a annulé le match du " . fr_when($m['starts_at']) . ".$paid", "/match/{$m['id']}", (int)$user['id']);
+        }
         respond(200, match_view(load_match((int)$id), (int)$user['id']));
     });
 

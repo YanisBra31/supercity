@@ -20,6 +20,7 @@ require __DIR__ . '/src/notifications.php';
 require __DIR__ . '/src/shop.php';
 require __DIR__ . '/src/cards.php';
 require __DIR__ . '/src/privacy.php';
+require __DIR__ . '/src/social.php';
 
 date_default_timezone_set('UTC');
 
@@ -57,6 +58,7 @@ try {
     register_shop_routes($router);
     register_card_routes($router);
     register_privacy_routes($router);
+    register_social_routes($router);
     $router->dispatch($method, $path);
 } catch (HttpError $e) {
     $payload = ['error' => $e->errorCode, 'message' => $e->getMessage()];

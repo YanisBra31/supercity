@@ -66,6 +66,26 @@ export const HELP: HelpTopic[] = [
     ],
   },
   {
+    title: 'Amis et notifications',
+    items: [
+      {
+        id: 'amis',
+        q: 'Comment ajouter un ami ?',
+        a: "Va sur son profil et touche « Ajouter en ami », ou cherche son pseudo dans Profil > Mes amis. Il reçoit ta demande et vous devenez amis dès qu'il l'accepte.",
+      },
+      {
+        id: 'statut',
+        q: 'Que voient mes amis de moi ?',
+        a: "Ton statut : « En match » pendant un match où tu es inscrit, « En ligne » si tu as ouvert l'appli il y a moins de 5 minutes, sinon depuis quand tu n'es pas venu, et ton prochain match de la semaine. Seuls tes amis le voient. Pour le cacher, va dans Réglages > Amis.",
+      },
+      {
+        id: 'centre',
+        q: 'Où retrouver mes notifications ?',
+        a: "Touche la cloche en haut de l'onglet Matchs. Scores à confirmer, défis, places libérées, matchs annulés et demandes d'ami y sont gardés 90 jours, même si tu as raté l'alerte sur ton téléphone.",
+      },
+    ],
+  },
+  {
     title: 'Grade et carte joueur',
     items: [
       {

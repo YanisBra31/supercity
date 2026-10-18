@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['notifications', 'friendships', 'grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('DELETE FROM cosmetics WHERE created_by IS NOT NULL');
@@ -856,6 +856,84 @@ api('POST', "/matches/$m4/ratings", ['ratings' => [['user_id' => $samId, 'stars'
 [$s, $pub] = api('GET', "/users/$samId", null, $lea);
 check('on peut changer sa note : un seul vote compté', $pub['card']['votes'] === 1 && $pub['card']['stats']['sho'] === 99, $pub['card']);
 
+echo "Amis et notifications\n";
+[$ana, $anaId] = user('Ana', 'ana@example.fr');
+[$bil, $bilId] = user('Bilal', 'bilal@example.fr');
+[$clo, $cloId] = user('Chloé', 'chloe@example.fr');
+[$s, $r] = api('GET', '/users?q=bil', null, $ana);
+check('recherche de joueurs par pseudo', $s === 200 && count($r['items']) === 1 && $r['items'][0]['id'] === $bilId && $r['items'][0]['friendship'] === 'none', $r);
+[$s, $r] = api('POST', "/users/$anaId/friend", null, $ana);
+check('on ne peut pas s\'ajouter soi-même', $s === 422, $r);
+[$s, $r] = api('POST', "/users/$bilId/friend", null, $ana);
+[$s2, $badge] = api('GET', '/me/badge', null, $bil);
+[$s3, $inbox] = api('GET', '/me/inbox', null, $bil);
+[$s4, $pub] = api('GET', "/users/$anaId", null, $bil);
+check('demande d\'ami : notifiée, visible dans la boîte, statut caché tant qu\'on n\'est pas amis', $s === 200 && $r['friendship'] === 'outgoing'
+    && $badge['friend_requests'] === 1 && $badge['unread'] === 1 && $inbox['items'][0]['kind'] === 'friend_request'
+    && $inbox['items'][0]['actor']['id'] === $anaId && $inbox['items'][0]['url'] === '/friends' && $pub['friendship'] === 'incoming' && $pub['presence'] === null, [$r, $badge, $inbox, $pub['friendship'] ?? $pub]);
+[$s, $r] = api('POST', "/users/$anaId/friend", null, $bil);
+[$s2, $inboxA] = api('GET', '/me/inbox', null, $ana);
+[$s3, $badge] = api('GET', '/me/badge', null, $bil);
+[$s4, $fr] = api('GET', '/me/friends', null, $ana);
+check('accepter : amis des deux côtés, l\'autre est prévenu', $r['friendship'] === 'friends' && $inboxA['items'][0]['kind'] === 'friend_accepted'
+    && $badge['unread'] === 0 && $badge['friend_requests'] === 0 && count($fr['friends']) === 1 && $fr['friends'][0]['id'] === $bilId
+    && $fr['friends'][0]['presence']['state'] === 'online', [$r, $inboxA, $badge, $fr]);
+api('PATCH', '/me/presence', ['visible' => false], $bil);
+[$s, $fr] = api('GET', '/me/friends', null, $ana);
+[$s2, $pub] = api('GET', "/users/$bilId", null, $ana);
+check('statut masqué : les amis ne le voient plus', $fr['friends'][0]['presence'] === null && $pub['friendship'] === 'friends' && $pub['presence'] === null, [$fr, $pub['presence'] ?? $pub]);
+[$s, $me] = api('PATCH', '/me/presence', ['visible' => true], $bil);
+check('le réglage revient dans le profil', $s === 200 && $me['show_presence'] === true, $me);
+[$s, $mNow] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $later], $ana);
+api('POST', "/matches/{$mNow['id']}/join", null, $bil);
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() - INTERVAL 10 MINUTE WHERE id = {$mNow['id']}");
+$pdo->exec("UPDATE users SET last_seen_at = UTC_TIMESTAMP() - INTERVAL 2 HOUR WHERE id = $cloId");
+[$s, $fr] = api('GET', '/me/friends', null, $ana);
+check('ami en plein match : statut « match » avec le terrain', $fr['friends'][0]['presence']['state'] === 'match'
+    && $fr['friends'][0]['presence']['match']['id'] === $mNow['id'] && $fr['friends'][0]['presence']['match']['venue'] === $v1['name'], $fr['friends'][0]['presence'] ?? $fr);
+$pdo->exec("UPDATE matches SET status = 'cancelled' WHERE id = {$mNow['id']}");
+[$s, $r] = api('POST', '/me/inbox/read', null, $ana);
+check('tout marquer comme lu', $s === 200 && $r['unread'] === 0, $r);
+
+// Liste d'attente qui avance, puis match annulé : les joueurs concernés sont prévenus.
+[$s, $mw] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $later], $ana);
+$pdo->exec("UPDATE matches SET max_players = 2 WHERE id = {$mw['id']}");
+api('POST', "/matches/{$mw['id']}/join", null, $bil);
+[$s, $r] = api('POST', "/matches/{$mw['id']}/join", null, $clo);
+api('DELETE', "/matches/{$mw['id']}/join", null, $bil);
+[$s2, $inboxC] = api('GET', '/me/inbox', null, $clo);
+check('liste d\'attente : le joueur promu est prévenu', $r['my_status'] === 'waitlist' && $inboxC['items'][0]['kind'] === 'waitlist'
+    && $inboxC['items'][0]['url'] === "/match/{$mw['id']}", [$r['my_status'] ?? $r, $inboxC]);
+api('POST', "/matches/{$mw['id']}/cancel", null, $ana);
+[$s, $inboxC] = api('GET', '/me/inbox', null, $clo);
+[$s2, $inboxB] = api('GET', '/me/inbox', null, $bil);
+check('match annulé : les inscrits sont prévenus, pas ceux qui sont partis', $inboxC['items'][0]['kind'] === 'cancelled'
+    && !in_array('cancelled', array_column($inboxB['items'], 'kind'), true), [$inboxC['items'][0] ?? $inboxC, array_column($inboxB['items'], 'kind')]);
+
+// Défis : le capitaine défié est prévenu, puis celui qui a lancé le défi.
+[$s, $tA] = api('POST', '/teams', ['name' => 'Ana FC', 'city' => 'Toulouse'], $ana);
+[$s, $tC] = api('POST', '/teams', ['name' => 'Chloé United', 'city' => 'Toulouse'], $clo);
+[$s, $ch] = api('POST', '/challenges', ['from_team_id' => $tA['id'], 'to_team_id' => $tC['id'], 'venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $later], $ana);
+[$s2, $inboxC] = api('GET', '/me/inbox', null, $clo);
+api('POST', "/challenges/{$ch['id']}/decline", null, $clo);
+[$s3, $inboxA] = api('GET', '/me/inbox', null, $ana);
+check('défi reçu puis refusé : chacun est prévenu', $s === 201 && $inboxC['items'][0]['kind'] === 'challenge' && str_contains($inboxC['items'][0]['body'], 'Ana FC')
+    && $inboxA['items'][0]['kind'] === 'challenge_declined', [$ch, $inboxC['items'][0] ?? $inboxC, $inboxA['items'][0] ?? $inboxA]);
+
+// Retirer un ami, et une demande annulée qui disparaît de la boîte de l'autre.
+[$s, $r] = api('DELETE', "/users/$bilId/friend", null, $ana);
+[$s2, $pub] = api('GET', "/users/$anaId", null, $bil);
+api('POST', "/users/$anaId/friend", null, $clo);
+api('DELETE', "/users/$anaId/friend", null, $clo);
+[$s3, $inboxA] = api('GET', '/me/inbox', null, $ana);
+[$s4, $fr] = api('GET', '/me/friends', null, $ana);
+check('retirer un ami, annuler une demande', $r['friendship'] === 'none' && $pub['friendship'] === 'none' && $fr['friends'] === [] && $fr['incoming'] === []
+    && !in_array('friend_request', array_column(array_filter($inboxA['items'], fn($n) => ($n['actor']['id'] ?? 0) === $cloId), 'kind'), true), [$r, $pub['friendship'] ?? $pub, $fr]);
+api('POST', "/users/$cloId/friend", null, $ana);
+[$s, $r] = api('GET', '/me/friends', null, $clo);
+[$s2, $r2] = api('POST', '/me/inbox/read', ['ids' => [$r['incoming'][0]['id'] ?? 0]], $clo);
+check('demande reçue listée à part', count($r['incoming']) === 1 && $r['incoming'][0]['id'] === $anaId && $r['friends'] === [] && $s2 === 200, $r);
+
 echo "RGPD\n";
 [$zoe, $zoeId] = user('Zoé', 'zoe@example.fr');
 api('POST', '/posts', ['body' => 'Qui joue jeudi ?'], $zoe);
@@ -870,7 +948,11 @@ check('copie des données : envoyée en pièce jointe à l\'adresse du compte', 
 [$s3, $r3] = api('DELETE', '/me', ['password' => PASS], $zoe);
 check('suppression : mot de passe exigé, bloquée par un match à venir', $s === 201 && $s2 === 422 && $s3 === 409 && $r3['error'] === 'deletion_blocked', [$r, $r3]);
 api('POST', "/matches/{$m['id']}/cancel", null, $zoe);
+api('POST', "/users/$anaId/friend", null, $zoe);
 [$s, $r] = api('DELETE', '/me', ['password' => PASS], $zoe);
+[$s6, $fr] = api('GET', '/me/friends', null, $ana);
+[$s7, $inboxA] = api('GET', '/me/inbox', null, $ana);
+check('compte supprimé : ses demandes d\'ami disparaissent', $fr['incoming'] === [] && !in_array($zoeId, array_column(array_column($inboxA['items'], 'actor'), 'id'), true), [$fr, $inboxA]);
 [$s2] = api('GET', '/me', null, $zoe);
 [$s3] = api('POST', '/auth/login', ['email' => 'zoe@example.fr', 'password' => PASS]);
 [$s4, $pub] = api('GET', "/users/$zoeId", null, $lea);

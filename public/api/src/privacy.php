@@ -29,6 +29,8 @@ function user_export(int $id): array
             'skill_moves' => $u['skill_moves'],
             'notify_events' => (bool)$u['notify_events'],
             'notify_streaks' => (bool)$u['notify_streaks'],
+            'show_presence' => (bool)$u['show_presence'],
+            'last_seen_at' => $u['last_seen_at'],
             'created_at' => $u['created_at'],
             'terms_accepted_at' => $u['terms_accepted_at'],
             'email_verified_at' => $u['email_verified_at'],
@@ -46,6 +48,12 @@ function user_export(int $id): array
         'payments' => $rows('SELECT match_id, amount_cents, fee_cents, status, refund_cents, created_at, paid_at, refunded_at FROM payments WHERE user_id = ?'),
         'cosmetics' => $rows('SELECT c.name, c.type, uc.acquired_at FROM user_cosmetics uc JOIN cosmetics c ON c.id = uc.cosmetic_id WHERE uc.user_id = ?'),
         'coins' => $rows('SELECT amount, reason, created_at FROM coin_ledger WHERE user_id = ? ORDER BY created_at'),
+        'friends' => query(
+            'SELECT u.display_name, f.status, IF(f.requester_id = ?, "envoyée", "reçue") AS request, f.created_at, f.accepted_at FROM friendships f
+             JOIN users u ON u.id = IF(f.requester_id = ?, f.addressee_id, f.requester_id) WHERE f.requester_id = ? OR f.addressee_id = ?',
+            [$id, $id, $id, $id]
+        )->fetchAll(),
+        'notifications' => $rows('SELECT kind, title, body, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY id'),
         'devices' => $rows('SELECT platform, lat, lng, updated_at FROM push_tokens WHERE user_id = ?'),
         'sessions' => $rows('SELECT created_at, last_used_at FROM auth_tokens WHERE user_id = ?'),
     ];
@@ -86,10 +94,13 @@ function delete_account(array $u): void
             }
         }
         query('DELETE FROM team_members WHERE user_id = ?', [$id]);
-        foreach (['auth_tokens', 'push_tokens', 'email_codes', 'post_likes', 'post_reports', 'user_cosmetics', 'coin_ledger', 'grade_bonus'] as $table) {
+        foreach (['auth_tokens', 'push_tokens', 'email_codes', 'post_likes', 'post_reports', 'user_cosmetics', 'coin_ledger', 'grade_bonus', 'notifications'] as $table) {
             query("DELETE FROM $table WHERE user_id = ?", [$id]);
         }
         query('DELETE FROM auth_attempts WHERE email = ?', [$email]);
+        query('DELETE FROM friendships WHERE requester_id = ? OR addressee_id = ?', [$id, $id]);
+        // Les notifications des autres qui citent son pseudo disparaissent aussi.
+        query('DELETE FROM notifications WHERE actor_id = ?', [$id]);
         query('DELETE FROM post_comments WHERE author_id = ?', [$id]);
         query('DELETE FROM posts WHERE author_id = ?', [$id]);
         query('DELETE FROM player_ratings WHERE rater_id = ? OR rated_id = ?', [$id, $id]);
@@ -99,6 +110,7 @@ function delete_account(array $u): void
                position = NULL, level = NULL, strong_foot = NULL, shirt_number = NULL, favorite_club = NULL, avatar_url = NULL,
                accent = "orange", site_role = "user", suspended_until = NULL, suspended_reason = NULL, notify_events = 0, notify_streaks = 0,
                frame_id = NULL, banner_id = NULL, title_id = NULL, card_stats = NULL, weak_foot = NULL, skill_moves = NULL,
+               last_seen_at = NULL, show_presence = 0,
                deleted_at = UTC_TIMESTAMP() WHERE id = ?',
             ["supprime-$id@supercity.invalid", password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $id]
         );

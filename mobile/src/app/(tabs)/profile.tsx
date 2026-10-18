@@ -1,12 +1,13 @@
-// Profil du joueur : son profil public tel que les autres le voient, avec ses boutons à soi (modifier, boutique, partager, réglages).
+// Profil du joueur : son profil public tel que les autres le voient, avec ses boutons à soi (modifier, amis, boutique, réglages).
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Share, View } from 'react-native';
+import { View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
 import { ProfileView } from '../../components/ProfileView';
 import { Banner, Button, ErrorText, IconButton, Kicker, Loading, s, Screen } from '../../components/ui';
 import { get, Match, Post, PublicProfile } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { useBadge } from '../../lib/badge';
 import { loadItem, saveItem } from '../../lib/storage';
 import { celebrate } from '../../components/Celebration';
 
@@ -16,6 +17,7 @@ export default function Profile() {
   const [pub, setPub] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [allMatches, setAllMatches] = useState(false);
+  const badge = useBadge();
 
   useFocusEffect(
     useCallback(() => {
@@ -43,8 +45,6 @@ export default function Profile() {
   if (!user) return null;
   if (!pub) return <Loading />;
 
-  const share = () => Share.share({ message: `${user.display_name} sur Supercity : supercity://user/${user.id}` });
-
   return (
     <Screen top>
       <ProfileView
@@ -56,7 +56,7 @@ export default function Profile() {
           <View style={s.row}>
             <Button title="Modifier" icon="pencil" variant="dark" onPress={() => router.push('/me/edit')} style={{ flex: 1 }} />
             <IconButton icon="bag-handle-outline" label="Boutique" onPress={() => router.push('/shop')} />
-            <IconButton icon="share-outline" label="Partager mon profil" onPress={share} />
+            <IconButton icon="people-outline" label="Mes amis" badge={badge.friend_requests} onPress={() => router.push('/friends')} />
             <IconButton icon="settings-outline" label="Réglages" onPress={() => router.push('/settings')} />
           </View>
         }

@@ -21,6 +21,7 @@ function current_user(): ?array
             );
             if ($row) {
                 query('UPDATE auth_tokens SET last_used_at = UTC_TIMESTAMP() WHERE id = ?', [$row['token_id']]);
+                touch_presence($row);
                 $user = $row;
             }
         }
@@ -137,6 +138,7 @@ function private_user(array $u): array
         'email' => $u['email'],
         'email_verified' => $u['email_verified_at'] !== null,
         'notifications' => notification_prefs($u),
+        'show_presence' => (bool)($u['show_presence'] ?? true),
         'coins' => coin_balance((int)$u['id']),
         'suspended_until' => suspension_of($u),
         'suspended_reason' => suspension_of($u) ? ($u['suspended_reason'] ?? null) : null,
@@ -368,6 +370,9 @@ function register_auth_routes(Router $r): void
             ], $teams),
             'member_since' => iso($u['created_at']),
             'card' => player_card($u, (int)$viewer['id'] === (int)$u['id']),
+            'friendship' => friendship_state((int)$viewer['id'], (int)$u['id']),
+            // Le statut (en ligne, en match) n'est montré qu'aux amis.
+            'presence' => are_friends((int)$viewer['id'], (int)$u['id']) ? presence_of($u) : null,
         ]);
     });
 }

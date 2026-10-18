@@ -1,4 +1,4 @@
-// Réglages des notifications : autorisation du téléphone et types d'alertes reçues.
+// Réglages des notifications : autorisation du téléphone et types d'alertes reçues. Et le statut montré aux amis.
 import { Ionicons } from '@expo/vector-icons';
 import { ComponentProps, useState } from 'react';
 import { Platform, Switch, Text, View } from 'react-native';
@@ -52,6 +52,28 @@ export function NotificationSettings({ user, onChange }: { user: Me; onChange: (
           <Button title="Activer sur ce téléphone" variant="ghost" icon="notifications-outline" onPress={async () => setPhone(await registerPush())} />
         )
       ) : null}
+      <ErrorText>{error}</ErrorText>
+    </Card>
+  );
+}
+
+/** Montrer ou non à ses amis qu'on est en ligne ou en match. */
+export function PresenceSetting({ user, onChange }: { user: Me; onChange: (u: Me) => void }) {
+  const [error, setError] = useState('');
+  const visible = user.show_presence ?? true;
+  const set = async (v: boolean) => {
+    setError('');
+    onChange({ ...user, show_presence: v });
+    try {
+      onChange(await patch<Me>('/me/presence', { visible: v }));
+    } catch (e) {
+      onChange({ ...user, show_presence: visible });
+      setError(e instanceof ApiError ? e.message : 'Réglage impossible.');
+    }
+  };
+  return (
+    <Card style={{ gap: 14 }}>
+      <Row icon="radio-outline" title="Montrer mon statut" text="Tes amis voient si tu es en ligne, en match, et ton prochain match." value={visible} onChange={set} />
       <ErrorText>{error}</ErrorText>
     </Card>
   );

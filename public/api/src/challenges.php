@@ -158,7 +158,11 @@ function register_challenge_routes(Router $r): void
                 $in['format'] ?? null, $in['starts_at'] ?? null, $in['duration_min'] ?? 60, $in['message'] ?? null,
             ]
         );
-        respond(201, challenge_view(load_challenge((int)db()->lastInsertId()), $uid));
+        $cid = (int)db()->lastInsertId();
+        $from = load_team($in['from_team_id']);
+        $to = load_team($in['to_team_id']);
+        notify([(int)$to['captain_id']], 'challenge', 'Défi reçu', "{$from['name']} défie {$to['name']}. Accepte ou refuse le défi.", '/teams', $uid);
+        respond(201, challenge_view(load_challenge($cid), $uid));
     });
 
     // Défis reçus et envoyés par les équipes dont je fais partie.
@@ -199,7 +203,7 @@ function register_challenge_routes(Router $r): void
         $user = require_user();
         $uid = (int)$user['id'];
         $in = validate(body())->string('message', 1, 300, false)->check();
-        transaction(function () use ($id, $uid, $in) {
+        $done = transaction(function () use ($id, $uid, $in) {
             $c = load_challenge((int)$id, true);
             require_captain((int)$c['to_team_id'], $uid, 'Seul le capitaine de l\'équipe défiée peut répondre.');
             if (challenge_status($c) !== 'pending') {
@@ -238,7 +242,11 @@ function register_challenge_routes(Router $r): void
             post_challenge_accepted($uid, $from, $to, $matchId);
             // Les autres défis en attente sur ce même match n'ont plus lieu d'être.
             query('UPDATE challenges SET status = "cancelled" WHERE match_id = ? AND status = "pending" AND id <> ?', [$matchId, $c['id']]);
+            return [$c, $matchId];
         });
+        [$c, $matchId] = $done;
+        $to = load_team((int)$c['to_team_id']);
+        notify([(int)$c['created_by']], 'challenge_accepted', 'Défi accepté', "{$to['name']} relève ton défi. Rendez-vous sur le terrain !", "/match/$matchId", $uid);
         respond(200, challenge_view(load_challenge((int)$id), $uid));
     });
 
@@ -255,6 +263,8 @@ function register_challenge_routes(Router $r): void
             'UPDATE challenges SET status = "declined", responded_by = ?, responded_at = UTC_TIMESTAMP(), response_message = ? WHERE id = ?',
             [$uid, $in['message'] ?? null, $c['id']]
         );
+        $to = load_team((int)$c['to_team_id']);
+        notify([(int)$c['created_by']], 'challenge_declined', 'Défi refusé', "{$to['name']} ne relève pas ton défi cette fois.", '/teams', $uid);
         respond(200, challenge_view(load_challenge((int)$id), $uid));
     });
 
