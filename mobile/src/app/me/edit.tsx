@@ -10,6 +10,7 @@ import { ApiError, CardStat, del, Foot, get, Me, patch, PlayerCard, Position, Pu
 import { useAuth } from '../../lib/auth';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
 import { pickSquareImage } from '../../lib/pickImage';
+import { HelpLink } from '../../components/HelpLink';
 
 export default function EditProfile() {
   const { user, updateProfile, setUser } = useAuth();
@@ -146,7 +147,7 @@ export default function EditProfile() {
         <>
           <Kicker>Ma carte joueur</Kicker>
           <Card style={{ gap: 10 }}>
-            <Text style={s.sub}>Estime-toi honnêtement : les joueurs qui jouent avec toi te noteront ensuite, et leurs votes prendront le relais.</Text>
+            <HelpLink q="carte">Comment sont calculées mes stats ?</HelpLink>
             {CARD_STATS.map((st) => (
               <View key={st.key} style={[s.row, { justifyContent: 'space-between' }]}>
                 <Text style={{ ...font.semibold, fontSize: 14, color: colors.ink }}>{st.label}</Text>

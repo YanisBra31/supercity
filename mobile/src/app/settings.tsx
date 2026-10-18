@@ -24,6 +24,9 @@ export default function Settings() {
       <Kicker>Notifications</Kicker>
       <NotificationSettings user={user} onChange={setUser} />
 
+      <Kicker>Aide</Kicker>
+      <Button title="Questions fréquentes" variant="dark" icon="help-circle-outline" onPress={() => router.push('/help')} />
+
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />

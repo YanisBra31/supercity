@@ -14,6 +14,7 @@ export function OrderSheet({
   lines,
   total,
   notes = [],
+  help,
   confirm,
   icon = 'card-outline',
   busy,
@@ -25,6 +26,8 @@ export function OrderSheet({
   lines: OrderLine[];
   total: OrderLine;
   notes?: string[];
+  /** Question de la page Aide à proposer sous le récapitulatif. */
+  help?: string;
   confirm: string;
   icon?: React.ComponentProps<typeof Ionicons>['name'];
   busy?: boolean;
@@ -32,6 +35,10 @@ export function OrderSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const go = (to: Parameters<typeof router.push>[0]) => {
+    onClose();
+    router.push(to);
+  };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
@@ -57,15 +64,16 @@ export function OrderSheet({
               {n}
             </Text>
           ))}
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => {
-              onClose();
-              router.push('/cgu');
-            }}
-          >
-            <Text style={st.link}>Conditions générales d'utilisation</Text>
-          </Pressable>
+          <View style={st.links}>
+            {help ? (
+              <Pressable accessibilityRole="link" onPress={() => go({ pathname: '/help', params: { q: help } })}>
+                <Text style={st.link}>Questions fréquentes</Text>
+              </Pressable>
+            ) : null}
+            <Pressable accessibilityRole="link" onPress={() => go('/cgu')}>
+              <Text style={st.link}>Conditions d'utilisation</Text>
+            </Pressable>
+          </View>
         </ScrollView>
         <Button title={confirm} icon={icon} loading={busy} onPress={onConfirm} />
         <Button title="Modifier" variant="ghost" onPress={onClose} />
@@ -88,5 +96,6 @@ const st = StyleSheet.create({
   totalLabel: { ...font.bold, fontSize: 16, color: colors.ink },
   totalValue: { ...font.black, fontSize: 22, color: colors.ink },
   note: { ...font.medium, fontSize: 13, lineHeight: 19, color: colors.dim },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
   link: { ...font.semibold, fontSize: 13, color: colors.orange2, textDecorationLine: 'underline' },
 });

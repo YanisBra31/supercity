@@ -41,7 +41,6 @@ export function NotificationSettings({ user, onChange }: { user: Me; onChange: (
     <Card style={{ gap: 14 }}>
       <Row icon="flash-outline" title="Événements bonus" text="Quand un événement fait gagner plus de points." value={prefs.events} onChange={(v) => set('events', v)} />
       <Row icon="flame-outline" title="Séries près de chez moi" text="Quand une équipe enchaîne les victoires sur un terrain du coin." value={prefs.streaks} onChange={(v) => set('streaks', v)} />
-      <Text style={s.sub}>Les scores à confirmer pour ton équipe te sont toujours envoyés.</Text>
       {Platform.OS !== 'web' ? (
         phone === 'denied' ? (
           <Text style={[s.sub, { color: colors.danger }]}>Les notifications sont bloquées pour Supercity. Autorise-les dans les réglages du téléphone.</Text>

@@ -40,6 +40,7 @@ import {
 import { useAuth } from "../lib/auth";
 import { celebrate } from "../components/Celebration";
 import { OrderSheet } from "../components/OrderSheet";
+import { HelpLink } from "../components/HelpLink";
 
 const SECTIONS: { type: CosmeticType; title: string }[] = [
   { type: "frame", title: "Cadres photo" },
@@ -278,10 +279,9 @@ export default function Shop() {
             <CoinAmount n={shop.coins} size={26} />
             <Text style={st.walletUnit}>pièces</Text>
           </View>
-          <Text style={[s.sub, { flex: 1 }]}>
-            Tu en gagnes {shop.coins_per_point} par point de grade : joue,
-            gagne, organise.
-          </Text>
+          <View style={{ flex: 1 }}>
+            <HelpLink q="pieces">Comment gagner des pièces ?</HelpLink>
+          </View>
         </View>
         {sel ? null : (
           <Text style={s.sub}>
@@ -326,9 +326,6 @@ export default function Shop() {
             </View>
           ) : null;
         })}
-        <Text style={[s.sub, { textAlign: "center" }]}>
-          Les cosmétiques ne changent ni ton grade ni tes points.
-        </Text>
         {sel ? <View style={{ height: 190 }} /> : null}
       </Screen>
 
@@ -380,9 +377,8 @@ export default function Shop() {
             { label: "Il t'en restera", value: `${shop.coins - sel.price}` },
           ]}
           total={{ label: "Prix", value: `${sel.price} pièces` }}
-          notes={[
-            "Les pièces se gagnent en jouant : aucun argent réel n'est débité. Un objet acheté reste à toi, il n'est ni remboursable ni échangeable.",
-          ]}
+          notes={["Aucun argent réel n'est débité. L'objet reste à toi, sans remboursement ni échange."]}
+          help="cosmetiques"
           confirm={`Confirmer l'achat · ${sel.price} pièces`}
           busy={busy}
           onClose={() => setConfirmBuy(false)}

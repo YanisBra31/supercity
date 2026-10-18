@@ -21,6 +21,7 @@ import { BonusBanner, KingCard, StreakBadge } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
 import { celebrate } from '../../components/Celebration';
 import { OrderSheet } from '../../components/OrderSheet';
+import { HelpLink } from '../../components/HelpLink';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -162,7 +163,7 @@ export default function MatchDetail() {
     <>
       <ErrorText>{error}</ErrorText>
       <Success>{msg}</Success>
-      {!closed && !inMatch && paid && m.spots_left === 0 ? <Text style={s.sub}>Si une place se libère, tu auras quelques heures pour la payer.</Text> : null}
+      {!closed && !inMatch && paid && m.spots_left === 0 ? <HelpLink q="attente">Comment marche la liste d'attente ?</HelpLink> : null}
       <View style={[s.row, { gap: 10 }]}>
         {primary}
         <IconButton icon="share-outline" label="Partager le match" onPress={share} />
@@ -178,10 +179,8 @@ export default function MatchDetail() {
           { label: 'Frais de service', value: euros(m.fee_cents) },
         ]}
         total={{ label: 'Total TTC', value: euros(total) }}
-        notes={[
-          "Annulation : ta place est remboursée si tu te désinscris plus de 24 h avant le match (les frais de service restent dus). Après, elle n'est plus remboursée.",
-          'Le paiement se fait sur la page sécurisée de Stripe.',
-        ]}
+        notes={["Remboursé si tu annules plus de 24 h avant le match, hors frais de service. Paiement sécurisé par Stripe."]}
+        help="annuler"
         confirm={`Confirmer et payer · ${euros(total)}`}
         busy={busy}
         onClose={() => setOrder(null)}
