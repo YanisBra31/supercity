@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['notifications', 'friendships', 'grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['job_runs', 'chat_reads', 'chat_messages', 'match_invites', 'notifications', 'friendships', 'grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('DELETE FROM cosmetics WHERE created_by IS NOT NULL');
@@ -718,7 +718,7 @@ check('jeton de notification invalide refusé', $s === 422, $r);
 api('POST', '/me/push-token', ['token' => 'ExponentPushToken[karimGone]', 'platform' => 'android', 'lat' => 43.6, 'lng' => 1.44], $karim);
 api('POST', '/me/push-token', ['token' => 'ExponentPushToken[sam]', 'platform' => 'android', 'lat' => 48.85, 'lng' => 2.35], $sam);
 [$s2, $r] = api('GET', '/me', null, $lea);
-check('téléphone enregistré, alertes activées par défaut', $s === 204 && $r['notifications'] === ['events' => true, 'streaks' => true], $r['notifications'] ?? $r);
+check('téléphone enregistré, alertes activées par défaut', $s === 204 && $r['notifications'] === ['events' => true, 'streaks' => true, 'friends' => true], $r['notifications'] ?? $r);
 $n0 = count($pushes());
 $more = [];
 foreach ([3, 2] as $d) {
@@ -747,7 +747,7 @@ $gone = $pdo->query("SELECT COUNT(*) FROM push_tokens WHERE token = 'ExponentPus
 check('un téléphone désinstallé est oublié', (int)$gone === 0, $gone);
 
 [$s, $r] = api('PATCH', '/me/notifications', ['events' => false], $lea);
-check('Léa coupe les alertes d\'événements', $s === 200 && $r === ['events' => false, 'streaks' => true], $r);
+check('Léa coupe les alertes d\'événements', $s === 200 && $r === ['events' => false, 'streaks' => true, 'friends' => true], $r);
 $n3 = count($pushes());
 [$s, $ev] = api('POST', '/mod/bonus-events', ['title' => 'Nuit du five', 'multiplier' => 3, 'starts_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('-1 minute')), 'ends_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 day'))], $yassin);
 $sent = $since($n3);
@@ -933,6 +933,62 @@ api('POST', "/users/$cloId/friend", null, $ana);
 [$s, $r] = api('GET', '/me/friends', null, $clo);
 [$s2, $r2] = api('POST', '/me/inbox/read', ['ids' => [$r['incoming'][0]['id'] ?? 0]], $clo);
 check('demande reçue listée à part', count($r['incoming']) === 1 && $r['incoming'][0]['id'] === $anaId && $r['friends'] === [] && $s2 === 200, $r);
+
+echo "Invitations, matchs des amis, discussions, rappels\n";
+$kinds = fn(string $tok) => array_column(api('GET', '/me/inbox', null, $tok)[1]['items'], 'kind');
+api('POST', "/users/$anaId/friend", null, $clo);
+api('POST', "/users/$anaId/friend", null, $bil);
+api('POST', "/users/$bilId/friend", null, $ana);
+[$s, $r] = api('PATCH', '/me/notifications', ['friends' => false], $bil);
+check('réglage « matchs de mes amis »', $s === 200 && $r['friends'] === false, $r);
+[$s, $mf] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $later], $ana);
+[$s2, $inboxC] = api('GET', '/me/inbox', null, $clo);
+check('un ami organise un match : prévenu, sauf s\'il a coupé ces alertes', $s === 201 && $inboxC['items'][0]['kind'] === 'friend_match'
+    && $inboxC['items'][0]['url'] === "/match/{$mf['id']}" && str_contains($inboxC['items'][0]['title'], 'Ana') && !in_array("/match/{$mf['id']}", array_column(api('GET', '/me/inbox', null, $bil)[1]['items'], 'url'), true), [$inboxC['items'][0] ?? $inboxC]);
+api('PATCH', '/me/notifications', ['friends' => true], $bil);
+[$s, $inv] = api('GET', "/matches/{$mf['id']}/invitable", null, $ana);
+check('amis à inviter listés', $s === 200 && count($inv['items']) === 2 && $inv['items'][0]['invite'] === 'available', $inv);
+[$s, $r] = api('POST', "/matches/{$mf['id']}/invite", ['user_ids' => [$bilId, $cloId, $samId]], $ana);
+[$s2, $r2] = api('POST', "/matches/{$mf['id']}/invite", ['user_ids' => [$bilId]], $ana);
+[$s3, $inboxB] = api('GET', '/me/inbox', null, $bil);
+[$s4, $inv] = api('GET', "/matches/{$mf['id']}/invitable", null, $ana);
+check('inviter des amis : seulement les amis, une seule fois', $s === 200 && $r['invited'] === 2 && $r2['invited'] === 0
+    && $inboxB['items'][0]['kind'] === 'invite' && array_unique(array_column($inv['items'], 'invite')) === ['invited'], [$r, $r2, $inboxB['items'][0] ?? $inboxB]);
+[$s, $r] = api('POST', "/matches/{$mf['id']}/invite", ['user_ids' => [$anaId]], $clo);
+check('il faut être dans le match pour inviter', $s === 403, $r);
+api('POST', "/matches/{$mf['id']}/join", null, $clo);
+check('l\'organisateur déjà dans le match n\'est pas prévenu qu\'un ami le rejoint', !in_array("/match/{$mf['id']}", array_column(api('GET', '/me/inbox', null, $ana)[1]['items'], 'url'), true), $kinds($ana));
+
+// Discussion du match : réservée aux joueurs, non lus, effacement.
+[$s, $r] = api('GET', "/chats/match/{$mf['id']}/messages", null, $bil);
+[$s2, $msg] = api('POST', "/chats/match/{$mf['id']}/messages", ['body' => 'Qui ramène le ballon ?'], $clo);
+[$s3, $view] = api('GET', "/matches/{$mf['id']}", null, $ana);
+check('discussion du match : fermée aux autres, message non lu pour l\'organisateur', $s === 403 && $s2 === 201 && $msg['mine'] === true && $view['chat_unread'] === 1, [$r, $msg, $view['chat_unread'] ?? null]);
+[$s, $chat] = api('GET', "/chats/match/{$mf['id']}/messages", null, $ana);
+[$s2, $view] = api('GET', "/matches/{$mf['id']}", null, $ana);
+check('lire la discussion remet les non lus à zéro', $s === 200 && count($chat['items']) === 1 && $chat['items'][0]['author']['id'] === $cloId
+    && $chat['items'][0]['mine'] === false && $chat['members_count'] === 2 && $view['chat_unread'] === 0, [$chat, $view['chat_unread'] ?? null]);
+[$s, $m2] = api('POST', "/chats/match/{$mf['id']}/messages", ['body' => 'Moi !'], $ana);
+[$s2, $chat] = api('GET', "/chats/match/{$mf['id']}/messages?after={$msg['id']}", null, $clo);
+[$s3] = api('POST', "/chats/match/{$mf['id']}/messages", ['body' => ''], $ana);
+check('nouveaux messages seulement, message vide refusé', count($chat['items']) === 1 && $chat['items'][0]['body'] === 'Moi !' && $s3 === 422, $chat);
+[$s, $r] = api('DELETE', "/chats/messages/{$msg['id']}", null, $ana);
+[$s2] = api('DELETE', "/chats/messages/{$msg['id']}", null, $clo);
+check('on n\'efface que ses propres messages', $s === 403 && $s2 === 204, $r);
+[$s, $r] = api('POST', "/chats/team/{$tA['id']}/messages", ['body' => 'Entraînement jeudi'], $bil);
+[$s2] = api('POST', "/chats/team/{$tA['id']}/messages", ['body' => 'Entraînement jeudi'], $ana);
+[$s3, $team] = api('GET', "/teams/{$tA['id']}", null, $ana);
+check('discussion d\'équipe : réservée aux membres', $s === 403 && $s2 === 201 && $team['chat_unread'] === 0, [$r, $team['chat_unread'] ?? null]);
+
+// Rappel 2 h avant : envoyé une fois aux inscrits.
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 90 MINUTE WHERE id = {$mf['id']}");
+$pdo->exec("UPDATE job_runs SET ran_at = '2000-01-01'");
+api('GET', '/me/badge', null, $clo);
+$pdo->exec("UPDATE job_runs SET ran_at = '2000-01-01'");
+api('GET', '/me/badge', null, $clo);
+$reminders = array_count_values($kinds($clo))['reminder'] ?? 0;
+check('rappel avant le match : une seule fois, aux joueurs inscrits', $reminders === 1 && in_array('reminder', $kinds($ana), true) && !in_array('reminder', $kinds($bil), true), $kinds($clo));
+$pdo->exec("UPDATE matches SET status = 'cancelled' WHERE id = {$mf['id']}");
 
 echo "RGPD\n";
 [$zoe, $zoeId] = user('Zoé', 'zoe@example.fr');

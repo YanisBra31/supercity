@@ -7,6 +7,8 @@ const ONLINE_MINUTES = 5;
 const INBOX_LIMIT = 50;
 const INBOX_KEEP_DAYS = 90;
 const FRIEND_PENDING_MAX = 50;
+const INVITE_MAX = 30;
+const REMINDER_MINUTES = 120;
 
 /**
  * Dépose une notification dans la boîte de réception de ces joueurs, et l'envoie sur leurs téléphones.
@@ -142,6 +144,103 @@ function presence_rank(?array $p): int
     };
 }
 
+
+/** Amis acceptés d'un joueur (identifiants), comptes supprimés exclus. */
+function friend_ids(int $uid): array
+{
+    return array_map('intval', array_column(query(
+        'SELECT u.id FROM friendships f JOIN users u ON u.id = IF(f.requester_id = ?, f.addressee_id, f.requester_id)
+         WHERE (f.requester_id = ? OR f.addressee_id = ?) AND f.status = "accepted" AND u.deleted_at IS NULL',
+        [$uid, $uid, $uid]
+    )->fetchAll(), 'id'));
+}
+
+/** « samedi 25 oct. à 20h00 à Five Toulouse » */
+function match_when_where(array $m): string
+{
+    $venue = one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']]);
+    return fr_when($m['starts_at']) . ' à ' . ($venue['name'] ?? 'Supercity');
+}
+
+/**
+ * Prévient les amis qu'un joueur organise ou rejoint un match public à venir où il reste de la place.
+ * Pas les amis déjà inscrits, déjà invités, déjà prévenus pour ce match, ni ceux qui ont coupé ces alertes.
+ */
+function notify_friends_of_match(int $matchId, array $user, bool $organizer): void
+{
+    try {
+        $m = load_match($matchId);
+        if ($m['visibility'] !== 'public' || $m['status'] !== 'open' || strtotime($m['starts_at'] . ' UTC') <= time()) {
+            return;
+        }
+        $friends = friend_ids((int)$user['id']);
+        if (!$friends) {
+            return;
+        }
+        $in = implode(',', array_fill(0, count($friends), '?'));
+        $url = "/match/$matchId";
+        $targets = array_column(query(
+            "SELECT u.id FROM users u WHERE u.id IN ($in) AND u.notify_friends = 1
+               AND NOT EXISTS (SELECT 1 FROM match_participants p WHERE p.match_id = ? AND p.user_id = u.id AND p.status <> 'withdrawn')
+               AND NOT EXISTS (SELECT 1 FROM match_invites i WHERE i.match_id = ? AND i.user_id = u.id)
+               AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = u.id AND n.kind = 'friend_match' AND n.url = ?)",
+            [...$friends, $matchId, $matchId, $url]
+        )->fetchAll(), 'id');
+        $left = max(0, (int)$m['max_players'] - registered_count($matchId));
+        $places = $left > 1 ? "Il reste $left places." : 'Il reste une place.';
+        notify(
+            $targets,
+            'friend_match',
+            $organizer ? "{$user['display_name']} organise un match" : "{$user['display_name']} va jouer",
+            'Match ' . match_when_where($m) . ". $places Rejoins-le !",
+            $url,
+            (int)$user['id']
+        );
+    } catch (Throwable $e) {
+        error_log('supercity notify friends: ' . $e->getMessage());
+    }
+}
+
+/** Rappel aux joueurs inscrits, 2 h avant le coup d'envoi. Sans doublon. */
+function send_match_reminders(): void
+{
+    $soon = query(
+        'SELECT * FROM matches WHERE reminded_at IS NULL AND status <> "cancelled"
+           AND starts_at > UTC_TIMESTAMP() AND starts_at <= UTC_TIMESTAMP() + INTERVAL ' . REMINDER_MINUTES . ' MINUTE'
+    )->fetchAll();
+    foreach ($soon as $m) {
+        if (query('UPDATE matches SET reminded_at = UTC_TIMESTAMP() WHERE id = ? AND reminded_at IS NULL', [$m['id']])->rowCount() !== 1) {
+            continue;
+        }
+        $players = array_column(query('SELECT user_id FROM match_participants WHERE match_id = ? AND status = "registered"', [$m['id']])->fetchAll(), 'user_id');
+        $at = (new DateTimeImmutable($m['starts_at'], new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('Europe/Paris'))->format('H\hi');
+        $venue = one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']]);
+        notify($players, 'reminder', "C'est bientôt l'heure", "Coup d'envoi à $at à " . ($venue['name'] ?? 'ton terrain') . ". Prends tes crampons !", "/match/{$m['id']}");
+    }
+}
+
+/**
+ * Tâches de fond (rappels, alertes, ménage), lancées au plus une fois par minute pour tout le monde.
+ * Appelées quand une appli demande ses pastilles, et par la tâche planifiée Hostinger si elle existe.
+ */
+function run_background_jobs(bool $force = false): void
+{
+    try {
+        query('INSERT IGNORE INTO job_runs (name, ran_at) VALUES ("background", "2000-01-01")');
+        $claimed = query(
+            'UPDATE job_runs SET ran_at = UTC_TIMESTAMP() WHERE name = "background"' . ($force ? '' : ' AND ran_at < UTC_TIMESTAMP() - INTERVAL 1 MINUTE')
+        )->rowCount() === 1;
+        if (!$claimed && !$force) {
+            return;
+        }
+        send_match_reminders();
+        run_notifications();
+        prune_chats();
+    } catch (Throwable $e) {
+        error_log('supercity jobs: ' . $e->getMessage());
+    }
+}
+
 function register_social_routes(Router $r): void
 {
     // Boîte de réception : les 50 dernières notifications. Le ménage se fait au passage (90 jours).
@@ -175,7 +274,66 @@ function register_social_routes(Router $r): void
 
     // Pastilles de l'appli, demandées régulièrement : elles gardent aussi le joueur « en ligne ».
     $r->get('/me/badge', function () {
-        respond(200, badge_counts((int)require_user()['id']));
+        $uid = (int)require_user()['id'];
+        run_background_jobs();
+        respond(200, badge_counts($uid));
+    });
+
+    // Amis à inviter à un match : déjà inscrits, déjà invités, ou disponibles.
+    $r->get('/matches/(\d+)/invitable', function (string $id) {
+        $uid = (int)require_user()['id'];
+        $m = load_match((int)$id);
+        $friends = friend_ids($uid);
+        $items = [];
+        foreach ($friends as $fid) {
+            $u = one('SELECT * FROM users WHERE id = ?', [$fid]);
+            $p = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ? AND status <> "withdrawn"', [$m['id'], $fid]);
+            $state = $p || (int)$m['organizer_id'] === $fid ? 'in' : (one('SELECT 1 AS x FROM match_invites WHERE match_id = ? AND user_id = ?', [$m['id'], $fid]) ? 'invited' : 'available');
+            $items[] = public_user($u) + ['invite' => $state, 'presence' => presence_of($u)];
+        }
+        usort($items, fn($a, $b) => [$a['invite'] !== 'available', $a['display_name']] <=> [$b['invite'] !== 'available', $b['display_name']]);
+        respond(200, ['items' => $items]);
+    });
+
+    // Inviter des amis : {"user_ids": [3, 4]}. Une invitation par ami et par match.
+    $r->post('/matches/(\d+)/invite', function (string $id) {
+        $user = require_user();
+        $uid = (int)$user['id'];
+        $m = load_match((int)$id);
+        if ($m['status'] === 'cancelled' || match_status($m) === 'played') {
+            throw new HttpError(409, 'match_closed', 'Ce match est terminé ou annulé.');
+        }
+        $in_match = (int)$m['organizer_id'] === $uid
+            || one('SELECT 1 AS x FROM match_participants WHERE match_id = ? AND user_id = ? AND status <> "withdrawn"', [$m['id'], $uid]);
+        if (!$in_match) {
+            forbidden('Rejoins le match pour pouvoir y inviter tes amis.');
+        }
+        $ids = body()['user_ids'] ?? null;
+        if (!is_array($ids) || !$ids) {
+            throw new HttpError(422, 'validation_failed', 'Choisis au moins un ami.', ['user_ids' => 'Liste attendue.']);
+        }
+        $ids = array_slice(array_values(array_unique(array_map('intval', $ids))), 0, INVITE_MAX);
+        $friends = friend_ids($uid);
+        $sent = [];
+        foreach ($ids as $fid) {
+            if (!in_array($fid, $friends, true) || (int)$m['organizer_id'] === $fid
+                || one('SELECT 1 AS x FROM match_participants WHERE match_id = ? AND user_id = ? AND status <> "withdrawn"', [$m['id'], $fid])) {
+                continue;
+            }
+            if (query('INSERT IGNORE INTO match_invites (match_id, user_id, invited_by) VALUES (?, ?, ?)', [$m['id'], $fid, $uid])->rowCount() === 1) {
+                $sent[] = $fid;
+            }
+        }
+        $left = max(0, (int)$m['max_players'] - registered_count((int)$m['id']));
+        notify(
+            $sent,
+            'invite',
+            "{$user['display_name']} t'invite à jouer",
+            'Match ' . match_when_where($m) . '. ' . ($left > 0 ? ($left > 1 ? "Il reste $left places." : 'Il reste une place.') : "C'est complet, mais la liste d'attente est ouverte."),
+            "/match/{$m['id']}",
+            $uid
+        );
+        respond(200, ['invited' => count($sent)]);
     });
 
     // Montrer ou non son statut (en ligne, en match) à ses amis.

@@ -29,6 +29,7 @@ function user_export(int $id): array
             'skill_moves' => $u['skill_moves'],
             'notify_events' => (bool)$u['notify_events'],
             'notify_streaks' => (bool)$u['notify_streaks'],
+            'notify_friends' => (bool)$u['notify_friends'],
             'show_presence' => (bool)$u['show_presence'],
             'last_seen_at' => $u['last_seen_at'],
             'created_at' => $u['created_at'],
@@ -54,6 +55,8 @@ function user_export(int $id): array
             [$id, $id, $id, $id]
         )->fetchAll(),
         'notifications' => $rows('SELECT kind, title, body, created_at, read_at FROM notifications WHERE user_id = ? ORDER BY id'),
+        'messages' => $rows('SELECT scope, scope_id, body, created_at FROM chat_messages WHERE author_id = ? ORDER BY id'),
+        'match_invites_sent' => $rows('SELECT match_id, user_id, created_at FROM match_invites WHERE invited_by = ?'),
         'devices' => $rows('SELECT platform, lat, lng, updated_at FROM push_tokens WHERE user_id = ?'),
         'sessions' => $rows('SELECT created_at, last_used_at FROM auth_tokens WHERE user_id = ?'),
     ];
@@ -94,13 +97,15 @@ function delete_account(array $u): void
             }
         }
         query('DELETE FROM team_members WHERE user_id = ?', [$id]);
-        foreach (['auth_tokens', 'push_tokens', 'email_codes', 'post_likes', 'post_reports', 'user_cosmetics', 'coin_ledger', 'grade_bonus', 'notifications'] as $table) {
+        foreach (['auth_tokens', 'push_tokens', 'email_codes', 'post_likes', 'post_reports', 'user_cosmetics', 'coin_ledger', 'grade_bonus', 'notifications', 'chat_reads'] as $table) {
             query("DELETE FROM $table WHERE user_id = ?", [$id]);
         }
         query('DELETE FROM auth_attempts WHERE email = ?', [$email]);
         query('DELETE FROM friendships WHERE requester_id = ? OR addressee_id = ?', [$id, $id]);
         // Les notifications des autres qui citent son pseudo disparaissent aussi.
         query('DELETE FROM notifications WHERE actor_id = ?', [$id]);
+        query('DELETE FROM match_invites WHERE user_id = ? OR invited_by = ?', [$id, $id]);
+        query('DELETE FROM chat_messages WHERE author_id = ?', [$id]);
         query('DELETE FROM post_comments WHERE author_id = ?', [$id]);
         query('DELETE FROM posts WHERE author_id = ?', [$id]);
         query('DELETE FROM player_ratings WHERE rater_id = ? OR rated_id = ?', [$id, $id]);
@@ -108,7 +113,7 @@ function delete_account(array $u): void
         query(
             'UPDATE users SET email = ?, password_hash = ?, display_name = "Joueur supprimé", birth_date = NULL, city = NULL, bio = NULL,
                position = NULL, level = NULL, strong_foot = NULL, shirt_number = NULL, favorite_club = NULL, avatar_url = NULL,
-               accent = "orange", site_role = "user", suspended_until = NULL, suspended_reason = NULL, notify_events = 0, notify_streaks = 0,
+               accent = "orange", site_role = "user", suspended_until = NULL, suspended_reason = NULL, notify_events = 0, notify_streaks = 0, notify_friends = 0,
                frame_id = NULL, banner_id = NULL, title_id = NULL, card_stats = NULL, weak_foot = NULL, skill_moves = NULL,
                last_seen_at = NULL, show_presence = 0,
                deleted_at = UTC_TIMESTAMP() WHERE id = ?',

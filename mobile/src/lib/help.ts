@@ -81,7 +81,22 @@ export const HELP: HelpTopic[] = [
       {
         id: 'centre',
         q: 'Où retrouver mes notifications ?',
-        a: "Touche la cloche en haut de l'onglet Matchs. Scores à confirmer, défis, places libérées, matchs annulés et demandes d'ami y sont gardés 90 jours, même si tu as raté l'alerte sur ton téléphone.",
+        a: "Touche la cloche en haut de l'onglet Matchs. Invitations, rappels, scores à confirmer, défis, places libérées, matchs annulés et demandes d'ami y sont gardés 90 jours, même si tu as raté l'alerte sur ton téléphone.",
+      },
+      {
+        id: 'inviter',
+        q: 'Comment inviter mes amis à un match ?',
+        a: "Rejoins le match, puis touche « Inviter des amis » sur sa page et coche ceux que tu veux. Chaque ami ne reçoit qu'une invitation par match. Tes amis sont aussi prévenus quand tu organises ou rejoins un match public où il reste de la place ; chacun peut couper ces alertes dans Réglages.",
+      },
+      {
+        id: 'discussion',
+        q: 'Comment discuter avec les joueurs du match ou mon équipe ?',
+        a: "Touche « Discussion » sur la page du match (pour les joueurs inscrits et l'organisateur) ou de ton équipe. Un appui long sur un de tes messages permet de l'effacer. Les discussions des matchs sont effacées 90 jours après le match.",
+      },
+      {
+        id: 'rappel',
+        q: 'Est-ce que je reçois un rappel avant mes matchs ?',
+        a: "Oui : une notification part 2 heures avant le coup d'envoi de chaque match où tu es inscrit.",
       },
     ],
   },

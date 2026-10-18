@@ -22,6 +22,9 @@ const ICONS: Record<string, IconName> = {
   streak: 'flame-outline',
   friend_request: 'person-add-outline',
   friend_accepted: 'people-outline',
+  friend_match: 'football-outline',
+  invite: 'mail-open-outline',
+  reminder: 'alarm-outline',
 };
 
 function Row({ n, index }: { n: InboxItem; index: number }) {
@@ -112,7 +115,7 @@ export default function Notifications() {
         <Empty
           icon="notifications-outline"
           title="Rien de neuf pour l'instant"
-          text="Scores à confirmer, défis, places libérées, demandes d'ami : tout arrivera ici."
+          text="Invitations, rappels, scores à confirmer, défis, demandes d'ami : tout arrivera ici."
           action={{ title: 'Trouver des amis', icon: 'person-add-outline', onPress: () => router.push('/friends') }}
         />
       ) : null}

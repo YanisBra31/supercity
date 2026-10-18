@@ -22,6 +22,7 @@ import { useAuth } from '../../lib/auth';
 import { celebrate } from '../../components/Celebration';
 import { OrderSheet } from '../../components/OrderSheet';
 import { HelpLink } from '../../components/HelpLink';
+import { InviteSheet } from '../../components/InviteSheet';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -43,6 +44,7 @@ export default function MatchDetail() {
   // Récapitulatif ouvert avant de payer : inscription payante ou place à régler.
   const [order, setOrder] = useState<'join' | 'pay' | null>(null);
   const [msg, setMsg] = useState('');
+  const [inviting, setInviting] = useState(false);
   const { user } = useAuth();
   const moderator = user?.site_role === 'moderator' || user?.site_role === 'admin';
 
@@ -226,6 +228,28 @@ export default function MatchDetail() {
         </View>
         )}
       </Hero>
+
+      {m.chat_unread != null || (!closed && (inMatch || m.is_organizer)) ? (
+        <View style={{ gap: 10 }}>
+          {m.chat_unread != null ? (
+            <Button
+              title={m.chat_unread ? `Discussion du match · ${m.chat_unread} nouveau${m.chat_unread > 1 ? 'x' : ''}` : 'Discussion du match'}
+              icon="chatbubbles-outline"
+              variant={m.chat_unread ? 'primary' : 'dark'}
+              onPress={() => router.push(`/chat/match/${m.id}`)}
+            />
+          ) : null}
+          {!closed && (inMatch || m.is_organizer) ? (
+            <Button title="Inviter des amis" icon="person-add-outline" variant="ghost" onPress={() => setInviting(true)} />
+          ) : null}
+        </View>
+      ) : null}
+      <InviteSheet
+        matchId={m.id}
+        visible={inviting}
+        onClose={() => setInviting(false)}
+        onSent={(n) => setMsg(n ? `${n} ami${n > 1 ? 's' : ''} invité${n > 1 ? 's' : ''} !` : 'Ces amis étaient déjà invités.')}
+      />
 
       {m.home_team || m.away_team ? (
         <Gradient tone="night" style={{ borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
