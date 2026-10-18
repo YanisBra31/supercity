@@ -1,5 +1,5 @@
 // Écran d'accueil avant connexion : dégradé, terrain qui se trace, blason, ballon.
-// En mode sombre : fond nuit et blason noir, le bouton principal passe en orange.
+// En mode sombre : fond nuit, le bouton principal passe en orange.
 import { router } from 'expo-router';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ export default function Welcome() {
       <SafeAreaView style={st.safe}>
         <View style={st.top}>
           <FadeIn index={0}>
-            <Image source={isDark ? require('../../../assets/logo-noir.png') : require('../../../assets/splash-icon.png')} style={st.crest} resizeMode="contain" />
+            <Image source={require('../../../assets/splash-icon.png')} style={st.crest} resizeMode="contain" />
           </FadeIn>
           <FadeIn index={2} style={{ alignItems: 'center', gap: 6 }}>
             <Kicker color={isDark ? colors.orange1 : colors.chalk}>Le foot amateur, réinventé</Kicker>

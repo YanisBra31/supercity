@@ -8,11 +8,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "fr.supercity.app",
-      "icon": {
-        "light": "./assets/icon.png",
-        "dark": "./assets/icon-dark.png"
-      }
+      "bundleIdentifier": "fr.supercity.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -63,8 +59,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ff5223",
           "dark": {
-            "image": "./assets/logo-noir.png",
-            "backgroundColor": "#000000"
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#1f1a17"
           }
         }
       ]
