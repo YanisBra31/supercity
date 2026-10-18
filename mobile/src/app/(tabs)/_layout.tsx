@@ -6,6 +6,7 @@ import { ColorValue, View } from 'react-native';
 import { brand } from '../../components/brand';
 import { colors, font } from '../../components/ui';
 import { header } from '../../components/header';
+import { useWebLayout } from '../../components/WebFrame';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const icon =
@@ -22,6 +23,8 @@ export default function TabsLayout() {
   // Pastille sur l'onglet Équipes : défis reçus qui attendent une réponse.
   const [pending, setPending] = useState(0);
   const path = usePathname();
+  // Sur ordinateur, le menu de gauche remplace la barre d'onglets.
+  const sidebar = useWebLayout() !== 'phone';
   useEffect(() => {
     get<{ received: { can_respond: boolean }[] }>('/me/challenges')
       .then((r) => setPending(r.received.filter((c) => c.can_respond).length))
@@ -34,7 +37,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: brand.orange1,
         tabBarInactiveTintColor: 'rgba(255,248,241,.55)',
-        tabBarStyle: { backgroundColor: colors.night, borderTopWidth: 0, height: 66, paddingTop: 8 },
+        tabBarStyle: sidebar ? { display: 'none' } : { backgroundColor: colors.night, borderTopWidth: 0, height: 66, paddingTop: 8 },
         tabBarLabelStyle: { ...font.semibold, fontSize: 11 },
         sceneStyle: { backgroundColor: colors.bg },
       }}

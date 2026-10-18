@@ -1,12 +1,16 @@
 // Écran d'accueil avant connexion : dégradé, terrain qui se trace, blason, ballon.
 // En mode sombre : fond nuit, le bouton principal passe en orange.
 import { router } from 'expo-router';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BouncingBall, FadeIn, Gradient, PitchLines } from '../../components/brand';
 import { Button, colors, font, isDark, Kicker } from '../../components/ui';
+import { DesktopWelcome } from '../../components/DesktopWelcome';
+import { useWebLayout } from '../../components/WebFrame';
 
 export default function Welcome() {
+  const layout = useWebLayout();
+  if (layout !== 'phone') return <DesktopWelcome />;
   return (
     <Gradient tone={isDark ? 'night' : 'orange'} style={{ flex: 1 }}>
       <View style={st.pitch} pointerEvents="none">
@@ -33,6 +37,11 @@ export default function Welcome() {
           </View>
           <Button title="Créer mon compte" variant={isDark ? 'primary' : 'dark'} onPress={() => router.push('/register')} />
           <Button title="J'ai déjà un compte" variant="light" onPress={() => router.push('/login')} />
+          {Platform.OS === 'web' ? (
+            <Text style={st.discover} onPress={() => globalThis.location?.assign('/decouvrir/')}>
+              Découvrir Supercity
+            </Text>
+          ) : null}
         </FadeIn>
       </SafeAreaView>
     </Gradient>
@@ -47,5 +56,6 @@ const st = StyleSheet.create({
   brand: { ...font.black, fontSize: 46, lineHeight: 54, color: colors.chalk, letterSpacing: -1.5 },
   tagline: { ...font.medium, fontSize: 17, lineHeight: 25, color: colors.chalk, textAlign: 'center', maxWidth: 320 },
   // Sur grand écran (web), les boutons gardent une largeur de téléphone.
+  discover: { ...font.semibold, fontSize: 14, color: colors.chalk, textAlign: 'center', opacity: 0.85, textDecorationLine: 'underline' },
   bottom: { gap: 12, paddingBottom: 8, width: '100%', maxWidth: 420, alignSelf: 'center' },
 });
