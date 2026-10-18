@@ -77,7 +77,6 @@ export default function NewPost() {
       ) : null}
       <ErrorText>{error}</ErrorText>
       <Button title="Publier" icon="send" onPress={submit} loading={loading} disabled={!body.trim() && !image} />
-      <Text style={[s.sub, { textAlign: 'center', fontSize: 12 }]}>Reste fair-play : les publications signalées plusieurs fois sont masquées.</Text>
     </Screen>
   );
 }

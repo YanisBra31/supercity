@@ -20,6 +20,8 @@ import { ScoreCard } from '../../components/ScoreCard';
 import { BonusBanner, KingCard, StreakBadge } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
 import { celebrate } from '../../components/Celebration';
+import { OrderSheet } from '../../components/OrderSheet';
+import { HelpLink } from '../../components/HelpLink';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -38,6 +40,8 @@ export default function MatchDetail() {
   const [rivals, setRivals] = useState<Rival[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Récapitulatif ouvert avant de payer : inscription payante ou place à régler.
+  const [order, setOrder] = useState<'join' | 'pay' | null>(null);
   const [msg, setMsg] = useState('');
   const { user } = useAuth();
   const moderator = user?.site_role === 'moderator' || user?.site_role === 'admin';
@@ -112,6 +116,14 @@ export default function MatchDetail() {
     Share.share({
       message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
     });
+  const join = () =>
+    act(async () => {
+      const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
+      const after = await pay(r.checkout_url, r);
+      if (after.my_status === 'registered') celebrate({ title: 'Tu joues !', text: `${whenLabel(after.starts_at)} · ${after.venue.name}`, icon: 'football' });
+      return after;
+    });
+  const payPlace = () => act(async () => pay((await post<{ checkout_url: string }>(`/matches/${m.id}/pay`, { return_url: returnUrl(`match/${m.id}`) })).checkout_url, m));
   // Action principale, fixée en bas : s'inscrire, payer sa place, noter les joueurs, ou l'état du match.
   const primary = m.ratings_left != null ? (
     <Button
@@ -131,7 +143,7 @@ export default function MatchDetail() {
       icon="card-outline"
       loading={busy}
       style={{ flex: 1 }}
-      onPress={() => act(async () => pay((await post<{ checkout_url: string }>(`/matches/${m.id}/pay`, { return_url: returnUrl(`match/${m.id}`) })).checkout_url, m))}
+      onPress={() => setOrder('pay')}
     />
   ) : inMatch ? (
     <View style={[st.state, { flex: 1 }]}>
@@ -144,25 +156,40 @@ export default function MatchDetail() {
       icon="football"
       loading={busy}
       style={{ flex: 1 }}
-      onPress={() =>
-        act(async () => {
-          const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
-          const after = await pay(r.checkout_url, r);
-          if (after.my_status === 'registered') celebrate({ title: 'Tu joues !', text: `${whenLabel(after.starts_at)} · ${after.venue.name}`, icon: 'football' });
-          return after;
-        })
-      }
+      onPress={() => (paid && !m.my_paid && m.spots_left > 0 ? setOrder('join') : join())}
     />
   );
   const footer = (
     <>
       <ErrorText>{error}</ErrorText>
       <Success>{msg}</Success>
-      {!closed && !inMatch && paid && m.spots_left === 0 ? <Text style={s.sub}>Si une place se libère, tu auras quelques heures pour la payer.</Text> : null}
+      {!closed && !inMatch && paid && m.spots_left === 0 ? <HelpLink q="attente">Comment marche la liste d'attente ?</HelpLink> : null}
       <View style={[s.row, { gap: 10 }]}>
         {primary}
         <IconButton icon="share-outline" label="Partager le match" onPress={share} />
       </View>
+      <OrderSheet
+        visible={order !== null}
+        title="Ta place pour ce match"
+        lines={[
+          { label: 'Match', value: `${m.title ?? formatLabel(m.format)} · ${formatShort(m.format)}` },
+          { label: 'Quand', value: whenLabel(m.starts_at) },
+          { label: 'Où', value: m.venue.name },
+          { label: 'Place', value: euros(m.price_cents) },
+          { label: 'Frais de service', value: euros(m.fee_cents) },
+        ]}
+        total={{ label: 'Total TTC', value: euros(total) }}
+        notes={["Remboursé si tu annules plus de 24 h avant le match, hors frais de service. Paiement sécurisé par Stripe."]}
+        help="annuler"
+        confirm={`Confirmer et payer · ${euros(total)}`}
+        busy={busy}
+        onClose={() => setOrder(null)}
+        onConfirm={() => {
+          const next = order === 'join' ? join : payPlace;
+          setOrder(null);
+          next();
+        }}
+      />
     </>
   );
 
