@@ -23,3 +23,10 @@ export async function openStripe(url: string, back: string): Promise<boolean> {
 export function euros(cents: number): string {
   return `${(cents / 100).toFixed(cents % 100 ? 2 : 0).replace('.', ',')} €`;
 }
+
+/** Politique de confidentialité, publiée sur le site (la même adresse sert aux fiches des stores). */
+export const PRIVACY_URL = 'https://supercity.fr/confidentialite/';
+
+export function openPrivacy() {
+  WebBrowser.openBrowserAsync(PRIVACY_URL).catch(() => undefined);
+}

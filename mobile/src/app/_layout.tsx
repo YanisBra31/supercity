@@ -65,6 +65,7 @@ function RootStack() {
         <Stack.Screen name="inventory" options={{ title: 'Mon inventaire' }} />
         <Stack.Screen name="me/edit" options={{ title: 'Modifier mon profil' }} />
         <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
+        <Stack.Screen name="account" options={{ title: 'Mes données' }} />
         <Stack.Screen name="rate/[id]" options={{ title: 'Noter les joueurs' }} />
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
       </Stack.Protected>
