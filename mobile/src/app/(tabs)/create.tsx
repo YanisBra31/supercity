@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { defaultTime, firstOpenDay, WhenField } from '../../components/WhenPicker';
+import { celebrate } from '../../components/Celebration';
 import { Button, Card, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
@@ -99,6 +100,7 @@ export default function CreateMatch() {
       setMinutes(defaultTime(day));
       setDescription('');
       setTitle('');
+      celebrate({ title: 'Match publié !', text: 'Les joueurs du coin peuvent s\'inscrire.', icon: 'megaphone' });
       router.push(`/match/${m.id}`);
     } catch (e) {
       setError(e instanceof ApiError ? Object.values(e.fields)[0] ?? e.message : 'Création impossible.');

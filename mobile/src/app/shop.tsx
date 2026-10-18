@@ -38,6 +38,7 @@ import {
   Shop as ShopData,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { celebrate } from "../components/Celebration";
 
 const SECTIONS: { type: CosmeticType; title: string }[] = [
   { type: "frame", title: "Cadres photo" },
@@ -93,6 +94,13 @@ export default function Shop() {
   // Essayage : l'objet sélectionné remplace ce qui est porté dans sa case.
   const look = { ...shop.equipped, ...(sel ? { [sel.type]: sel } : {}) };
   const trying = sel && !sel.equipped;
+
+  // Achat réussi : un peu de fête.
+  const bought = async (req: Promise<ShopData>) => {
+    const r = await req;
+    if (sel) celebrate({ title: sel.price ? "C'est à toi !" : 'Débloqué !', text: sel.name, icon: 'sparkles' });
+    return r;
+  };
 
   const run = async (fn: () => Promise<ShopData>, done: string) => {
     setBusy(true);
@@ -156,7 +164,7 @@ export default function Shop() {
           loading={busy}
           onPress={() =>
             run(
-              () => post(`/shop/${sel.id}/buy`),
+              () => bought(post(`/shop/${sel.id}/buy`)),
               "Débloqué ! Équipe-le pour le montrer.",
             )
           }
@@ -176,7 +184,7 @@ export default function Shop() {
         loading={busy}
         onPress={() =>
           run(
-            () => post(`/shop/${sel.id}/buy`),
+            () => bought(post(`/shop/${sel.id}/buy`)),
             "Acheté ! Équipe-le pour le montrer.",
           )
         }

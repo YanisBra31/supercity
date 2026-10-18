@@ -17,6 +17,7 @@ import { Splash } from '../components/brand';
 import { header } from '../components/header';
 import { colors } from '../components/ui';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { CelebrationHost } from '../components/Celebration';
 import { registerPush } from '../lib/push';
 
 /** Joueur connecté : inscrit le téléphone aux alertes, et ouvre l'écran visé quand on touche une notification. */
@@ -103,6 +104,7 @@ function Gate() {
   return (
     <View style={{ flex: 1 }}>
       {loaded ? <RootStack /> : null}
+      <CelebrationHost />
       {gone ? null : (
         <Animated.View
           pointerEvents="none"

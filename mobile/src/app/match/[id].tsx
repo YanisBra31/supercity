@@ -19,6 +19,7 @@ import { GradeBadge, RoleBadge } from '../../components/Grade';
 import { ScoreCard } from '../../components/ScoreCard';
 import { BonusBanner, KingCard, StreakBadge } from '../../components/Streak';
 import { useAuth } from '../../lib/auth';
+import { celebrate } from '../../components/Celebration';
 
 function confirm(title: string, message: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);
@@ -146,7 +147,9 @@ export default function MatchDetail() {
       onPress={() =>
         act(async () => {
           const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
-          return pay(r.checkout_url, r);
+          const after = await pay(r.checkout_url, r);
+          if (after.my_status === 'registered') celebrate({ title: 'Tu joues !', text: `${whenLabel(after.starts_at)} · ${after.venue.name}`, icon: 'football' });
+          return after;
         })
       }
     />
