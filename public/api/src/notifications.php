@@ -180,7 +180,11 @@ function notify_score_reported(array $m, int $byTeam): void
 
 function notification_prefs(array $u): array
 {
-    return ['events' => (bool)($u['notify_events'] ?? true), 'streaks' => (bool)($u['notify_streaks'] ?? true)];
+    return [
+        'events' => (bool)($u['notify_events'] ?? true),
+        'streaks' => (bool)($u['notify_streaks'] ?? true),
+        'friends' => (bool)($u['notify_friends'] ?? true),
+    ];
 }
 
 function register_notification_routes(Router $r): void
@@ -223,7 +227,10 @@ function register_notification_routes(Router $r): void
 
     $r->patch('/me/notifications', function () {
         $user = require_user();
-        $in = validate(body(), true)->bool('events', false)->bool('streaks', false)->check();
+        $in = validate(body(), true)->bool('events', false)->bool('streaks', false)->bool('friends', false)->check();
+        if (isset($in['friends'])) {
+            query('UPDATE users SET notify_friends = ? WHERE id = ?', [(int)$in['friends'], $user['id']]);
+        }
         if (isset($in['events'])) {
             query('UPDATE users SET notify_events = ? WHERE id = ?', [(int)$in['events'], $user['id']]);
         }
@@ -233,13 +240,13 @@ function register_notification_routes(Router $r): void
         respond(200, notification_prefs(one('SELECT * FROM users WHERE id = ?', [$user['id']])));
     });
 
-    // Facultatif : une tâche planifiée Hostinger peut appeler cette adresse pour envoyer les alertes sans attendre qu'un joueur ouvre l'appli.
+    // Tâche planifiée Hostinger (toutes les 15 minutes) : envoie rappels et alertes même quand personne n'a l'appli ouverte.
     $r->get('/cron/notifications', function () {
         $key = config()['cron_key'] ?? '';
         if ($key === '' || !hash_equals($key, (string)($_GET['key'] ?? ''))) {
             forbidden('Clé de tâche planifiée invalide.');
         }
-        run_notifications();
+        run_background_jobs(true);
         respond(200, ['ok' => true]);
     });
 }

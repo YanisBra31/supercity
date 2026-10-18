@@ -129,6 +129,8 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'score' => score_view($m, $viewerId),
         'bonus' => $bonus ? bonus_event_view($bonus) : null,
         // Match fini : le joueur peut noter les autres pendant 7 jours ; combien il lui en reste.
+        // Messages non lus de la discussion du match, pour ceux qui y ont accès.
+        'chat_unread' => $viewerId !== null && ($isOrganizer || ($mine && $mine['status'] !== 'withdrawn')) ? chat_unread('match', $id, $viewerId) : null,
         'ratings_left' => rating_open($m, $viewerId)
             ? (int)one(
                 'SELECT COUNT(*) AS n FROM match_participants p LEFT JOIN player_ratings r ON r.match_id = p.match_id AND r.rater_id = ? AND r.rated_id = p.user_id
@@ -277,6 +279,7 @@ function register_match_routes(Router $r): void
             refresh_match($id);
             return $id;
         });
+        notify_friends_of_match($id, $user, true);
         respond(201, match_view(load_match($id), $uid, true));
     });
 
@@ -491,6 +494,9 @@ function register_match_routes(Router $r): void
                 });
                 throw $e;
             }
+        }
+        if (!$pay && (one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [(int)$id, $uid])['status'] ?? null) === 'registered') {
+            notify_friends_of_match((int)$id, $user, false);
         }
         respond(200, match_view(load_match((int)$id), $uid, true) + ['checkout_url' => $checkout]);
     });

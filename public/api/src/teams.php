@@ -50,6 +50,7 @@ function team_view(array $t, ?int $viewerId, bool $withMembers = false): array
     // Le code d'invitation n'est visible que par les membres.
     if ($role !== null) {
         $out['invite_code'] = $t['invite_code'];
+        $out['chat_unread'] = chat_unread('team', (int)$t['id'], $viewerId);
     }
     if ($withMembers) {
         $rows = query(
