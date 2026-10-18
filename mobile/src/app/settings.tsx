@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { Button, colors, font, Kicker, s, Screen } from '../components/ui';
 import { useAuth } from '../lib/auth';
+import { openPrivacy } from '../lib/pay';
 
 export default function Settings() {
   const { user, logout, setUser } = useAuth();
@@ -29,10 +30,14 @@ export default function Settings() {
 
       <Kicker>Sécurité</Kicker>
       <Button title="Changer mon mot de passe" variant="dark" icon="lock-closed-outline" onPress={() => router.push('/password')} />
+      <Button title="Mes données et mon compte" variant="dark" icon="shield-outline" onPress={() => router.push('/account')} />
       <Button title="Se déconnecter" variant="ghost" onPress={logout} />
-      <View style={[s.row, { justifyContent: 'center', gap: 18 }]}>
+      <View style={[s.row, { justifyContent: 'center', flexWrap: 'wrap', columnGap: 18, rowGap: 8 }]}>
         <Text style={st.legal} onPress={() => router.push('/cgu')}>
           Conditions d'utilisation
+        </Text>
+        <Text style={st.legal} onPress={openPrivacy}>
+          Confidentialité
         </Text>
         <Text style={st.legal} onPress={() => router.push('/mentions')}>
           Mentions légales

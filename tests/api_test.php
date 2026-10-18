@@ -856,6 +856,31 @@ api('POST', "/matches/$m4/ratings", ['ratings' => [['user_id' => $samId, 'stars'
 [$s, $pub] = api('GET', "/users/$samId", null, $lea);
 check('on peut changer sa note : un seul vote compté', $pub['card']['votes'] === 1 && $pub['card']['stats']['sho'] === 99, $pub['card']);
 
+echo "RGPD\n";
+[$zoe, $zoeId] = user('Zoé', 'zoe@example.fr');
+api('POST', '/posts', ['body' => 'Qui joue jeudi ?'], $zoe);
+[$s, $r] = api('POST', '/me/export', null, $zoe);
+$mails = array_map(fn($l) => json_decode($l, true), file($config['mail_log']));
+$last = end($mails);
+$data = json_decode($last['attachment']['content'] ?? 'null', true);
+check('copie des données : envoyée en pièce jointe à l\'adresse du compte', $s === 202 && $last['to'] === 'zoe@example.fr'
+    && $data['account']['email'] === 'zoe@example.fr' && $data['posts'][0]['body'] === 'Qui joue jeudi ?', [$r, $last['attachment']['name'] ?? null]);
+[$s, $m] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $later], $zoe);
+[$s2, $r] = api('DELETE', '/me', ['password' => 'mauvais'], $zoe);
+[$s3, $r3] = api('DELETE', '/me', ['password' => PASS], $zoe);
+check('suppression : mot de passe exigé, bloquée par un match à venir', $s === 201 && $s2 === 422 && $s3 === 409 && $r3['error'] === 'deletion_blocked', [$r, $r3]);
+api('POST', "/matches/{$m['id']}/cancel", null, $zoe);
+[$s, $r] = api('DELETE', '/me', ['password' => PASS], $zoe);
+[$s2] = api('GET', '/me', null, $zoe);
+[$s3] = api('POST', '/auth/login', ['email' => 'zoe@example.fr', 'password' => PASS]);
+[$s4, $pub] = api('GET', "/users/$zoeId", null, $lea);
+[$s5, $feed] = api('GET', "/feed?author_id=$zoeId", null, $lea);
+$row = $pdo->query("SELECT email, birth_date, deleted_at FROM users WHERE id = $zoeId")->fetch(PDO::FETCH_ASSOC);
+check('compte supprimé : plus de connexion, plus de nom, plus de publications', $s === 204 && $s2 === 401 && $s3 === 401
+    && $pub['display_name'] === 'Joueur supprimé' && ($feed['items'] ?? null) === [] && !str_contains($row['email'], 'zoe') && $row['birth_date'] === null && $row['deleted_at'] !== null, [$r, $pub['display_name'] ?? $pub, $row]);
+[$s, $r] = api('POST', '/auth/register', ['email' => 'zoe@example.fr', 'password' => PASS, 'display_name' => 'Zoé', 'birth_date' => '1998-05-12', 'accept_terms' => true]);
+check('l\'adresse est libérée : on peut se réinscrire', $s === 201, $r);
+
 echo "Divers\n";
 [$s, $r] = api('GET', '/matches/999999', null, $lea);
 check('match introuvable : 404', $s === 404, $r);

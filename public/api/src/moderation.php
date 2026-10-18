@@ -84,7 +84,7 @@ function register_moderation_routes(Router $r): void
             respond(200, ['items' => []]);
         }
         $like = '%' . addcslashes($q, '%_\\') . '%';
-        $rows = query('SELECT * FROM users WHERE display_name LIKE ? OR email LIKE ? ORDER BY display_name LIMIT 30', [$like, $like])->fetchAll();
+        $rows = query('SELECT * FROM users WHERE deleted_at IS NULL AND (display_name LIKE ? OR email LIKE ?) ORDER BY display_name LIMIT 30', [$like, $like])->fetchAll();
         respond(200, ['items' => array_map(fn($u) => public_user($u) + ['email' => $u['email']], $rows)]);
     });
 

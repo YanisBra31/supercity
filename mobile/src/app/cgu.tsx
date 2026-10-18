@@ -2,6 +2,7 @@
 import { Link } from 'expo-router';
 import { Text, View } from 'react-native';
 import { colors, font, Kicker, Screen, Title } from '../components/ui';
+import { openPrivacy } from '../lib/pay';
 
 const SECTIONS: [string, string][] = [
   [
@@ -22,11 +23,11 @@ const SECTIONS: [string, string][] = [
   ],
   [
     'Tes données',
-    "On conserve ton e-mail, ton pseudo, ta date de naissance (jamais affichée) et les infos de profil que tu choisis de remplir. Ta position sert à chercher les matchs proches. Si tu actives les notifications, une position approchée (à 1 km près) est gardée pour t'alerter de ce qui se passe près de chez toi. Tes données ne sont ni vendues ni partagées avec des annonceurs.",
+    "On garde ce qu'il faut pour faire tourner l'appli : ton compte, ton profil, ton activité et, si tu l'autorises, une position approchée pour les alertes. Tes données ne sont ni vendues ni utilisées pour de la publicité. Tout est détaillé dans la politique de confidentialité.",
   ],
   [
     'Tes droits',
-    "Conformément au RGPD, tu peux consulter, corriger ou supprimer tes données à tout moment depuis ton profil ou en écrivant à l'équipe Supercity. Les mots de passe sont chiffrés et nous ne les connaissons pas.",
+    "Conformément au RGPD, tu peux corriger ton profil avec « Modifier », recevoir une copie de tes données ou supprimer ton compte dans Réglages > Mes données et mon compte, ou écrire à contact@supercity.fr. Les mots de passe sont chiffrés et nous ne les connaissons pas.",
   ],
   [
     'Paiements et boutique',
@@ -38,7 +39,7 @@ const SECTIONS: [string, string][] = [
 export default function Cgu() {
   return (
     <Screen>
-      <Title kicker="Version du 13 octobre 2026" sub="Le résumé de nos règles du jeu, en clair.">
+      <Title kicker="Version du 18 octobre 2026" sub="Le résumé de nos règles du jeu, en clair.">
         Conditions d'utilisation
       </Title>
       {SECTIONS.map(([title, text], i) => (
@@ -47,6 +48,9 @@ export default function Cgu() {
           <Text style={{ ...font.regular, fontSize: 14, lineHeight: 22, color: colors.ink }}>{text}</Text>
         </View>
       ))}
+      <Text onPress={openPrivacy} style={{ ...font.bold, color: colors.orange2, fontSize: 14 }}>
+        Lire la politique de confidentialité
+      </Text>
       <Link href="/mentions" style={{ ...font.bold, color: colors.orange2, fontSize: 14 }}>
         Voir les mentions légales
       </Link>

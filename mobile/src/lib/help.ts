@@ -126,7 +126,7 @@ export const HELP: HelpTopic[] = [
       {
         id: 'compte',
         q: 'Comment supprimer mon compte ?',
-        a: `Écris-nous à ${HELP_EMAIL} depuis l'adresse de ton compte et nous le supprimons.`,
+        a: "Va dans Réglages > « Mes données et mon compte », puis « Supprimer mon compte » et confirme avec ton mot de passe. C'est définitif. Au même endroit, tu peux d'abord recevoir une copie de toutes tes données par e-mail.",
       },
     ],
   },

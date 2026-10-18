@@ -6,6 +6,7 @@ import { Button, colors, ErrorText, Field, font, Screen, Title } from '../../com
 import { ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { passwordRules } from '../../lib/password';
+import { openPrivacy } from '../../lib/pay';
 
 export default function Register() {
   const { register } = useAuth();
@@ -67,7 +68,11 @@ export default function Register() {
         <Link href="/cgu" style={{ ...font.bold, color: colors.orange2 }}>
           conditions d'utilisation
         </Link>{' '}
-        et la politique de confidentialité de Supercity.
+        et la{' '}
+        <Text style={{ ...font.bold, color: colors.orange2 }} onPress={openPrivacy}>
+          politique de confidentialité
+        </Text>{' '}
+        de Supercity.
       </Checkbox>
       <ErrorText>{error}</ErrorText>
       <Button title="Créer mon compte" onPress={submit} loading={loading} />

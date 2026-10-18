@@ -100,13 +100,16 @@ function age_from(string $date): int
     return (new DateTimeImmutable($date))->diff(new DateTimeImmutable('today'))->y;
 }
 
-/** Envoie un e-mail : version texte, et version mise en page (HTML) si fournie, pour les messageries qui l'affichent. */
-function send_mail(string $to, string $subject, string $text, ?string $html = null): void
+/**
+ * Envoie un e-mail : version texte, et version mise en page (HTML) si fournie, pour les messageries qui l'affichent.
+ * Une pièce jointe éventuelle : ['name' => ..., 'type' => ..., 'content' => ...].
+ */
+function send_mail(string $to, string $subject, string $text, ?string $html = null, ?array $attachment = null): void
 {
     $c = config();
     if (!empty($c['mail_log'])) {
         // Environnement de test : on écrit l'e-mail dans un fichier au lieu de l'envoyer.
-        file_put_contents($c['mail_log'], json_encode(['to' => $to, 'subject' => $subject, 'text' => $text, 'html' => $html]) . "\n", FILE_APPEND);
+        file_put_contents($c['mail_log'], json_encode(['to' => $to, 'subject' => $subject, 'text' => $text, 'html' => $html, 'attachment' => $attachment]) . "\n", FILE_APPEND);
         return;
     }
     $from = $c['mail_from'] ?? 'Supercity <contact@supercity.fr>';
@@ -129,6 +132,17 @@ function send_mail(string $to, string $subject, string $text, ?string $html = nu
         // Fins de ligne en \n : smtp_send() les passe en \r\n, et mail() les adapte lui-même.
         $part = fn(string $type, string $content) => "--$boundary\nContent-Type: $type; charset=UTF-8\nContent-Transfer-Encoding: base64\n\n" . chunk_split(base64_encode($content), 76, "\n");
         $body = $part('text/plain', $text) . $part('text/html', $html) . "--$boundary--\n";
+    }
+    if ($attachment !== null) {
+        // Le message ci-dessus devient la première partie, la pièce jointe la seconde.
+        $mixed = 'sc-' . bin2hex(random_bytes(12));
+        $inner = array_values(array_filter($headers, fn($h) => str_starts_with($h, 'Content-')));
+        $headers = array_values(array_filter($headers, fn($h) => !str_starts_with($h, 'Content-')));
+        $headers[] = "Content-Type: multipart/mixed; boundary=\"$mixed\"";
+        $name = preg_replace('/[^A-Za-z0-9._-]/', '', $attachment['name']);
+        $body = "--$mixed\n" . implode("\n", $inner) . "\n\n" . $body
+            . "--$mixed\nContent-Type: {$attachment['type']}; name=\"$name\"\nContent-Transfer-Encoding: base64\nContent-Disposition: attachment; filename=\"$name\"\n\n"
+            . chunk_split(base64_encode($attachment['content']), 76, "\n") . "--$mixed--\n";
     }
     if (!empty($c['smtp']['host'])) {
         try {
