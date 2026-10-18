@@ -39,6 +39,7 @@ import {
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { celebrate } from "../components/Celebration";
+import { OrderSheet } from "../components/OrderSheet";
 
 const SECTIONS: { type: CosmeticType; title: string }[] = [
   { type: "frame", title: "Cadres photo" },
@@ -51,12 +52,16 @@ function daysLeft(iso: string) {
   return d <= 1 ? "Dernier jour" : `Plus que ${d} jours`;
 }
 
+const TYPE_LABELS: Record<CosmeticType, string> = { frame: "Cadre", banner: "Bannière", title: "Titre" };
+
 export default function Shop() {
   const { user, setUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [shop, setShop] = useState<ShopData | null>(null);
   const [sel, setSel] = useState<Cosmetic | null>(null);
   const [busy, setBusy] = useState(false);
+  // Récapitulatif avant d'acheter avec des pièces.
+  const [confirmBuy, setConfirmBuy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
@@ -182,12 +187,7 @@ export default function Shop() {
         title={`Acheter pour ${sel.price} pièces`}
         icon="bag-check"
         loading={busy}
-        onPress={() =>
-          run(
-            () => bought(post(`/shop/${sel.id}/buy`)),
-            "Acheté ! Équipe-le pour le montrer.",
-          )
-        }
+        onPress={() => setConfirmBuy(true)}
       />
     );
   };
@@ -368,6 +368,32 @@ export default function Shop() {
           </View>
           {action()}
         </View>
+      ) : null}
+      {sel && !sel.owned && sel.price > 0 ? (
+        <OrderSheet
+          visible={confirmBuy}
+          title={sel.name}
+          icon="bag-check"
+          lines={[
+            { label: "Objet", value: `${TYPE_LABELS[sel.type]} · ${RARITY[sel.rarity].label}` },
+            { label: "Tes pièces", value: `${shop.coins}` },
+            { label: "Il t'en restera", value: `${shop.coins - sel.price}` },
+          ]}
+          total={{ label: "Prix", value: `${sel.price} pièces` }}
+          notes={[
+            "Les pièces se gagnent en jouant : aucun argent réel n'est débité. Un objet acheté reste à toi, il n'est ni remboursable ni échangeable.",
+          ]}
+          confirm={`Confirmer l'achat · ${sel.price} pièces`}
+          busy={busy}
+          onClose={() => setConfirmBuy(false)}
+          onConfirm={() => {
+            setConfirmBuy(false);
+            run(
+              () => bought(post(`/shop/${sel.id}/buy`)),
+              "Acheté ! Équipe-le pour le montrer.",
+            );
+          }}
+        />
       ) : null}
     </View>
   );
