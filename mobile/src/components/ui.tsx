@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ComponentProps, ReactNode, useState } from 'react';
 import {
+  Appearance,
   Image,
   Pressable,
   ScrollView,
@@ -16,20 +17,43 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AccentName, BallLoader, BouncingBall, brand, FadeIn, Gradient } from './brand';
 
+// Mode sombre : suit le réglage du téléphone au lancement de l'appli. Le dégradé orange, la nuit et la craie ne changent pas ;
+// seuls les fonds, les cartes, les traits et le texte courant s'inversent. « white » est la couleur des cartes.
+export const isDark = Appearance.getColorScheme() === 'dark';
+
 export const colors = {
   orange1: brand.orange1,
   orange2: brand.orange2,
   night: brand.night,
   night2: brand.night2,
   chalk: brand.chalk,
-  ink: '#1f1a17',
-  dim: '#5c524c',
-  line: '#f0dccb',
-  tint: '#fff1e4',
-  bg: '#fff8f1',
-  white: '#ffffff',
-  danger: '#c62828',
-  success: '#2e7d32',
+  ...(isDark
+    ? {
+        ink: '#f4ebe3',
+        dim: '#b3a59a',
+        line: '#3a302b',
+        tint: '#2c231f',
+        bg: '#141110',
+        white: '#221c19',
+        danger: '#ff6b5b',
+        success: '#5cc068',
+        successBg: '#1d2e1f',
+        dangerBg: '#3a1d19',
+        greyBg: '#2e2723',
+      }
+    : {
+        ink: '#1f1a17',
+        dim: '#5c524c',
+        line: '#f0dccb',
+        tint: '#fff1e4',
+        bg: '#fff8f1',
+        white: '#ffffff',
+        danger: '#c62828',
+        success: '#2e7d32',
+        successBg: '#e7f4e8',
+        dangerBg: '#fdecea',
+        greyBg: '#efe9e4',
+      }),
 };
 
 export const font = {
@@ -164,7 +188,7 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
         <View
           style={[
             s.button,
-            variant === 'dark' && { backgroundColor: colors.night },
+            variant === 'dark' && { backgroundColor: isDark ? colors.night2 : colors.night },
             variant !== 'dark' && s.buttonGhost,
             variant === 'light' && { borderColor: colors.chalk },
             variant === 'danger' && { borderColor: colors.danger },
@@ -302,7 +326,7 @@ export function ErrorText({ children }: { children: ReactNode }) {
 export function Success({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <View style={[s.errorBox, { backgroundColor: '#e7f4e8' }]}>
+    <View style={[s.errorBox, { backgroundColor: colors.successBg }]}>
       <Ionicons name="checkmark-circle" size={18} color={colors.success} />
       <Text style={[s.error, { flex: 1, color: colors.success }]}>{children}</Text>
     </View>
@@ -344,7 +368,7 @@ export function Loading() {
 }
 
 export function Pill({ text, tone = 'orange', icon }: { text: string; tone?: 'orange' | 'dark' | 'green' | 'grey'; icon?: IconName }) {
-  const bg = { orange: colors.tint, dark: colors.night, green: '#e7f4e8', grey: '#efe9e4' }[tone];
+  const bg = { orange: colors.tint, dark: colors.night, green: colors.successBg, grey: colors.greyBg }[tone];
   const fg = { orange: colors.orange2, dark: colors.chalk, green: colors.success, grey: colors.dim }[tone];
   return (
     <View style={[s.pill, { backgroundColor: bg }, icon && { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
@@ -475,10 +499,10 @@ export const s = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  inputFocus: { borderColor: colors.orange2, backgroundColor: '#fffdfb' },
+  inputFocus: { borderColor: colors.orange2, backgroundColor: colors.white },
   inputText: { ...font.regular, flex: 1, minWidth: 0, width: '100%', fontSize: 15, color: colors.ink, paddingVertical: 12, outlineStyle: 'none' } as never,
   error: { ...font.medium, color: colors.danger, fontSize: 13 },
-  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fdecea', borderRadius: 12, padding: 10 },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.dangerBg, borderRadius: 12, padding: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 15,
