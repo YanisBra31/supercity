@@ -1,11 +1,12 @@
-// Ajouter un terrain : on cherche son adresse (ou, sur place, on prend la position du téléphone).
+// Ajouter un terrain : on le cherche par son nom (« Parc des Princes ») ou son adresse, ou, sur place, on prend la position du téléphone.
+// Les terrains déjà sur Supercity qui correspondent sont proposés en premier, pour éviter les doublons.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { AddressSearch } from '../../components/AddressSearch';
-import { Button, Chips, colors, ErrorText, Field, font, Label, s, Screen } from '../../components/ui';
-import { ApiError, post, Surface, Venue } from '../../lib/api';
+import { Button, Card, Chips, colors, ErrorText, Field, font, Label, s, Screen } from '../../components/ui';
+import { ApiError, get, post, Surface, Venue } from '../../lib/api';
 import { Place } from '../../lib/address';
 import { SURFACES } from '../../lib/format';
 import { Coords, getPosition, getSearchCenter } from '../../lib/location';
@@ -30,7 +31,17 @@ export default function NewVenue() {
     getSearchCenter().then((c) => setNear(c.coords));
   }, []);
 
+  // Terrains déjà sur Supercity dont le nom ou l'adresse correspond à la recherche.
+  const [known, setKnown] = useState<Venue[]>([]);
+  const searchKnown = (q: string) => {
+    if (q.trim().length < 3) return setKnown([]);
+    get<{ items: Venue[] }>('/venues', { q: q.trim(), limit: 3 })
+      .then((r) => setKnown(r.items.slice(0, 3)))
+      .catch(() => setKnown([]));
+  };
+
   const fromAddress = (p: Place) => {
+    if (p.kind === 'poi') setName((n) => n || p.name);
     setAddress(p.kind === 'housenumber' || p.kind === 'street' ? p.name : p.label);
     setCity(p.city ?? '');
     setCoords({ lat: p.lat, lng: p.lng });
@@ -42,7 +53,7 @@ export default function NewVenue() {
     setLocating(true);
     const pos = await getPosition();
     setLocating(false);
-    if (!pos) return setError('Position introuvable : autorise la localisation ou cherche l’adresse.');
+    if (!pos) return setError('Position introuvable : autorise la localisation ou cherche le terrain.');
     setCoords(pos);
     setSource('gps');
     setError('');
@@ -51,7 +62,7 @@ export default function NewVenue() {
   const submit = async () => {
     setError('');
     setFields({});
-    if (!coords) return setError('Cherche l’adresse du terrain pour le placer sur la carte.');
+    if (!coords) return setError('Cherche le terrain par son nom ou son adresse pour le placer sur la carte.');
     setLoading(true);
     try {
       const v = await post<Venue>('/venues', { name, address, city: city || null, surface, covered, lat: coords.lat, lng: coords.lng });
@@ -69,9 +80,37 @@ export default function NewVenue() {
 
   return (
     <Screen>
-      <Field label="Nom du terrain" value={name} onChangeText={setName} error={fields.name} placeholder="City stade de la Reynerie" />
-      <AddressSearch label="Adresse du terrain" placeholder="Rue, code postal ou ville" near={near} onSelect={fromAddress} />
-      <Button title={locating ? 'Localisation…' : 'Je suis sur place : utiliser ma position'} variant="ghost" icon="navigate-outline" onPress={fromGps} loading={locating} />
+      <AddressSearch
+        label="Cherche le terrain"
+        placeholder="Nom du stade ou adresse"
+        near={near}
+        places
+        onSelect={fromAddress}
+        onChangeText={searchKnown}
+      />
+      {known.length ? (
+        <View style={{ gap: 8 }}>
+          <Text style={[s.sub, font.semibold]}>Déjà sur Supercity :</Text>
+          {known.map((v) => (
+            <Card
+              key={v.id}
+              onPress={() => {
+                setLastVenue(v);
+                router.back();
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            >
+              <Ionicons name="football" size={20} color={colors.orange2} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...font.bold, color: colors.ink }}>{v.name}</Text>
+                <Text style={s.sub} numberOfLines={1}>{v.address}</Text>
+              </View>
+              <Text style={{ ...font.semibold, color: colors.orange2 }}>Choisir</Text>
+            </Card>
+          ))}
+        </View>
+      ) : null}
+      <Button title={locating ? 'Localisation…' : 'Je suis sur place'} variant="ghost" icon="navigate-outline" onPress={fromGps} loading={locating} />
 
       {coords ? (
         <View style={[s.row, { gap: 8 }]}>
@@ -82,6 +121,7 @@ export default function NewVenue() {
         </View>
       ) : null}
 
+      <Field label="Nom du terrain" value={name} onChangeText={setName} error={fields.name} placeholder="City stade de la Reynerie" />
       <Field label="Adresse affichée" value={address} onChangeText={setAddress} error={fields.address} placeholder="12 rue des Sports" />
       <Field label="Ville" value={city} onChangeText={setCity} error={fields.city} />
       <Label>Surface</Label>

@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Place, searchAddress } from '../lib/address';
+import { Place, searchAddress, searchPlaces } from '../lib/address';
 import { Coords } from '../lib/location';
 import { colors, font, Label, s } from './ui';
 
@@ -12,6 +12,7 @@ const ICONS: Record<Place['kind'], keyof typeof Ionicons.glyphMap> = {
   street: 'git-commit-outline',
   locality: 'location-outline',
   municipality: 'business-outline',
+  poi: 'football-outline',
 };
 
 export function AddressSearch({
@@ -20,14 +21,20 @@ export function AddressSearch({
   near,
   initial = '',
   autoFocus,
+  places,
   onSelect,
+  onChangeText,
 }: {
   label?: string;
   placeholder?: string;
   near?: Coords | null;
   initial?: string;
   autoFocus?: boolean;
+  /** Cherche aussi les lieux par leur nom (stades, gymnases...), pas seulement les adresses. */
+  places?: boolean;
   onSelect: (p: Place) => void;
+  /** Le texte tapé, pour chercher en parallèle ailleurs (terrains déjà sur Supercity). */
+  onChangeText?: (q: string) => void;
 }) {
   const [q, setQ] = useState(initial);
   const [items, setItems] = useState<Place[]>([]);
@@ -46,7 +53,7 @@ export function AddressSearch({
     const ctrl = new AbortController();
     setBusy(true);
     const t = setTimeout(() => {
-      searchAddress(q, near, ctrl.signal)
+      (places ? searchPlaces : searchAddress)(q, near, ctrl.signal)
         .then((r) => {
           setItems(r);
           setFailed(false);
@@ -77,7 +84,10 @@ export function AddressSearch({
         <Ionicons name="search" size={18} color={colors.dim} />
         <TextInput
           value={q}
-          onChangeText={setQ}
+          onChangeText={(t) => {
+            setQ(t);
+            onChangeText?.(t);
+          }}
           placeholder={placeholder}
           placeholderTextColor="#a59a92"
           autoCorrect={false}
@@ -89,7 +99,7 @@ export function AddressSearch({
         />
         {busy ? <ActivityIndicator size="small" color={colors.orange2} /> : null}
         {q && !busy ? (
-          <Pressable onPress={() => setQ('')} hitSlop={10} accessibilityLabel="Effacer">
+          <Pressable onPress={() => { setQ(''); onChangeText?.(''); }} hitSlop={10} accessibilityLabel="Effacer">
             <Ionicons name="close-circle" size={18} color={colors.dim} />
           </Pressable>
         ) : null}
@@ -109,14 +119,16 @@ export function AddressSearch({
                   {p.name}
                 </Text>
                 <Text style={st.sub} numberOfLines={1}>
-                  {[p.postcode, p.city].filter(Boolean).join(' ')}
+                  {[p.kind === 'poi' && p.category ? p.category.charAt(0).toUpperCase() + p.category.slice(1) : null, [p.postcode, p.city].filter(Boolean).join(' ')]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Text>
               </View>
             </Pressable>
           ))}
         </View>
       ) : waiting && !busy ? (
-        <Text style={st.sub}>{failed ? 'Recherche indisponible, vérifie ta connexion.' : 'Aucune adresse trouvée.'}</Text>
+        <Text style={st.sub}>{failed ? 'Recherche indisponible, vérifie ta connexion.' : places ? 'Aucun lieu trouvé : essaie avec l\'adresse ou la ville.' : 'Aucune adresse trouvée.'}</Text>
       ) : null}
     </View>
   );

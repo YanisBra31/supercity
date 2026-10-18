@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PlaceButton, PlaceSheet } from '../../components/AddressSearch';
 import { defaultTime, firstOpenDay, WhenField } from '../../components/WhenPicker';
 import { celebrate } from '../../components/Celebration';
+import { Select } from '../../components/Select';
 import { Button, Card, Chips, colors, ErrorText, Field, Label, PageHeader, s, Screen, font } from '../../components/ui';
 import { ApiError, Format, get, Match, MyOrganization, post, Team, Venue } from '../../lib/api';
 import { euros } from '../../lib/pay';
@@ -14,6 +15,11 @@ import { Coords, getSearchCenter, setSearchPlace } from '../../lib/location';
 import { takeLastVenue } from '../../lib/venueStore';
 
 const TOURNAMENT_HOURS = [2, 3, 4, 6, 8, 10];
+// Prix proposés : gratuit, puis de 1 € à 10 € par 50 centimes, puis par euro jusqu'à 50 €.
+const PRICE_OPTIONS = [0, ...Array.from({ length: 19 }, (_, i) => 100 + i * 50), ...Array.from({ length: 40 }, (_, i) => 1100 + i * 100)].map((c) => ({
+  value: c,
+  label: c ? euros(c) : 'Gratuit',
+}));
 
 export default function CreateMatch() {
   const [format, setFormat] = useState<Format>('city5');
@@ -47,6 +53,14 @@ export default function CreateMatch() {
   const players = maxPlayers ?? (isTournament ? teamSize * 8 : formatPlayers);
   const maxAllowed = isTournament ? 200 : 30;
   const step = isTournament ? teamSize : 1;
+  // Match : de 2 à 30 joueurs. Tournoi : des équipes complètes, jusqu'à 200 joueurs.
+  const playerOptions = Array.from({ length: Math.floor(maxAllowed / step) }, (_, i) => (i + 1) * step)
+    .filter((n) => n >= 2)
+    .map((n) => ({
+      value: n,
+      label: `${n} joueurs`,
+      hint: isTournament ? `${n / teamSize} équipe${n / teamSize > 1 ? 's' : ''} de ${teamSize}` : n === formatPlayers ? `Format ${FORMATS.find((f) => f.value === format)!.short}` : undefined,
+    }));
   const payouts = pro ? org!.payouts : null;
   const payout = payouts ? price - Math.round((price * payouts.commission_percent) / 100) : 0;
 
@@ -219,22 +233,16 @@ export default function CreateMatch() {
         </>
       ) : null}
 
-      <Label>Nombre de joueurs</Label>
-      <View style={s.row}>
-        <Button title="−" variant="ghost" onPress={() => setMaxPlayers(Math.max(2, players - step))} style={{ width: 54 }} />
-        <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 50, textAlign: 'center' }}>{players}</Text>
-        <Button title="+" variant="ghost" onPress={() => setMaxPlayers(Math.min(maxAllowed, players + step))} style={{ width: 54 }} />
-      </View>
-      {isTournament ? <Text style={s.sub}>Soit {Math.floor(players / teamSize)} équipes de {teamSize}.</Text> : null}
+      <Select
+        label={isTournament ? 'Nombre de joueurs (équipes complètes)' : 'Nombre de joueurs'}
+        value={players}
+        onChange={setMaxPlayers}
+        options={playerOptions}
+      />
 
       {payouts?.enabled ? (
         <>
-          <Label>Prix de la place</Label>
-          <View style={s.row}>
-            <Button title="−" variant="ghost" onPress={() => setPrice((p) => (p <= 100 ? 0 : p - 50))} style={{ width: 54 }} />
-            <Text style={{ fontSize: 22, ...font.extrabold, minWidth: 90, textAlign: 'center', color: price ? colors.ink : colors.success }}>{price ? euros(price) : 'Gratuit'}</Text>
-            <Button title="+" variant="ghost" onPress={() => setPrice((p) => Math.min(5000, p < 100 ? 100 : p + 50))} style={{ width: 54 }} />
-          </View>
+          <Select label="Prix de la place" value={price} onChange={setPrice} options={PRICE_OPTIONS} />
           {price > 0 ? (
             payouts.ready ? (
               <Text style={s.sub}>

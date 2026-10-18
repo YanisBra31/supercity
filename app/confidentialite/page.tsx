@@ -119,8 +119,8 @@ export default function Confidentialite() {
           Transferts encadrés par les clauses contractuelles types ou le cadre de protection des données UE-États-Unis.
         </li>
         <li>
-          La Géoplateforme de l&apos;IGN (France) : quand tu tapes une adresse pour ajouter un terrain, le texte saisi
-          lui est envoyé pour trouver le lieu.
+          La Géoplateforme de l&apos;IGN (France) : quand tu cherches un terrain par son nom ou son adresse pour l&apos;ajouter, le
+          texte saisi lui est envoyé pour trouver le lieu.
         </li>
         <li>
           Apple (Plans) ou Google (Maps) : affichage de la carte des terrains sur ton téléphone.
