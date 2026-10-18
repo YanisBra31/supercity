@@ -2,6 +2,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
+import { celebrate } from '../../components/Celebration';
 import { CARD_STATS, Stars } from '../../components/PlayerCard';
 import { Avatar, Button, Card, Chip, colors, Empty, ErrorText, font, Loading, PageHeader, s, Screen } from '../../components/ui';
 import { ApiError, CardStat, get, post, RatingPlayer } from '../../lib/api';
@@ -32,6 +33,7 @@ export default function RatePlayers() {
     setSaving(true);
     try {
       await post(`/matches/${id}/ratings`, { ratings: given.map(([pid, v]) => ({ user_id: Number(pid), stars: v.stars, best: v.best })) });
+      celebrate({ title: 'Merci pour tes notes !', text: 'Les cartes des joueurs sont à jour.', icon: 'star' });
       router.back();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Envoi impossible.');

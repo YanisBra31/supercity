@@ -1,6 +1,7 @@
 // Carte joueur façon FUT : note globale, poste, photo, six stats et étoiles (pied faible, gestes techniques).
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gradient } from './brand';
 import { Avatar, colors, font } from './ui';
 import { CardStat, PlayerCard as Card, Position } from '../lib/api';
@@ -41,8 +42,23 @@ export function Stars({ n, size = 12, color, onPick }: { n: number; size?: numbe
 
 export function PlayerCardView({ card, name, uri, position }: { card: Card; name: string; uri: string | null; position: Position | null }) {
   const t = tier(card.overall);
+  // La carte se retourne en arrivant, comme quand on ouvre un pack.
+  const flip = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(flip, { toValue: 1, duration: 750, delay: 150, easing: Easing.out(Easing.back(1.4)), useNativeDriver: typeof document === 'undefined' }).start();
+  }, [flip]);
   return (
     <View style={{ alignItems: 'center', gap: 8 }}>
+      <Animated.View
+        style={{
+          opacity: flip.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
+          transform: [
+            { perspective: 900 },
+            { rotateY: flip.interpolate({ inputRange: [0, 1], outputRange: ['-90deg', '0deg'] }) },
+            { scale: flip.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) },
+          ],
+        }}
+      >
       <Gradient colors={t.stops} style={st.card}>
         <View style={st.top}>
           <View style={{ alignItems: 'center' }}>
@@ -73,6 +89,7 @@ export function PlayerCardView({ card, name, uri, position }: { card: Card; name
           </View>
         </View>
       </Gradient>
+      </Animated.View>
       <Text style={st.caption}>
         {card.estimated
           ? `Estimation du joueur · ${card.votes}/3 votes pour la confirmer`

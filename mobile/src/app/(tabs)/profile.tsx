@@ -1,12 +1,14 @@
 // Profil du joueur : son profil public tel que les autres le voient, avec ses boutons à soi (modifier, boutique, partager, réglages).
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Share, View } from 'react-native';
 import { MatchCard } from '../../components/MatchCard';
 import { ProfileView } from '../../components/ProfileView';
 import { Banner, Button, ErrorText, IconButton, Kicker, Loading, s, Screen } from '../../components/ui';
 import { get, Match, Post, PublicProfile } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { loadItem, saveItem } from '../../lib/storage';
+import { celebrate } from '../../components/Celebration';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -23,6 +25,20 @@ export default function Profile() {
       get<{ items: Post[] }>('/feed', { author_id: user.id, limit: 10 }).then((r) => setPosts(r.items)).catch(() => undefined);
     }, [user])
   );
+
+  // Nouveau grade ou carte tout juste confirmée depuis la dernière visite : on fête ça une fois.
+  useEffect(() => {
+    if (!pub?.grade) return;
+    const grade = pub.grade;
+    (async () => {
+      const key = `seen_${pub.id}`;
+      const seen = JSON.parse((await loadItem(key)) ?? 'null') as { grade: number; card: boolean } | null;
+      const now = { grade: grade.level, card: !!pub.card && !pub.card.estimated };
+      if (seen && now.grade > seen.grade) celebrate({ title: `Nouveau grade : ${grade.label}`, text: 'Bien joué, continue comme ça.', icon: 'trophy' });
+      else if (seen && now.card && !seen.card) celebrate({ title: 'Ta carte est confirmée', text: `Tes coéquipiers t'ont noté ${pub.card!.overall}.`, icon: 'star' });
+      if (!seen || now.grade !== seen.grade || now.card !== seen.card) await saveItem(key, JSON.stringify(now));
+    })().catch(() => undefined);
+  }, [pub]);
 
   if (!user) return null;
   if (!pub) return <Loading />;
