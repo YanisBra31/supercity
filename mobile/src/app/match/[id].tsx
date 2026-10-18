@@ -8,7 +8,7 @@ import { Gradient, Hero } from '../../components/brand';
 import { Avatar, Button, Card, colors, ErrorText, IconButton, Label, Loading, Pill, s, Screen, Success, TeamCrest, font } from '../../components/ui';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../../lib/api';
 import { euros, openStripe, returnUrl } from '../../lib/pay';
-import { distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
+import { dayLabel, distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../../lib/format';
 
 /** 90 min, 4 h, 2 h 30 */
 function durationLabel(min: number): string {
@@ -172,9 +172,14 @@ export default function MatchDetail() {
       <Hero
         colors={cancelled ? ['#a59a93', '#5c524c'] : undefined}
         kicker={`${m.kind === 'tournament' ? 'Tournoi' : formatLabel(m.format)} · ${formatShort(m.format)}`}
-        title={m.title ?? whenLabel(m.starts_at)}
-        sub={[m.title ? whenLabel(m.starts_at) : null, durationLabel(m.duration_min), levelLabel(m.level), `organisé par ${m.organization?.name ?? m.organizer.display_name}`].filter(Boolean).join(' · ')}
+        title={m.title ?? ''}
       >
+        {/* L'heure du coup d'envoi en très gros : c'est ce qu'on cherche en premier. */}
+        <Text style={st.bigDay}>{dayLabel(new Date(m.starts_at))}</Text>
+        <Text style={st.bigTime}>{timeLabel(new Date(m.starts_at))}</Text>
+        <Text style={st.heroSub}>
+          {[durationLabel(m.duration_min), levelLabel(m.level), `organisé par ${m.organization?.name ?? m.organizer.display_name}`].join(' · ')}
+        </Text>
         {cancelled ? (
           <View style={st.cancelled}>
             <Ionicons name="close-circle" size={18} color={colors.chalk} />
@@ -367,6 +372,9 @@ export default function MatchDetail() {
 }
 
 const st = StyleSheet.create({
+  bigDay: { ...font.extrabold, fontSize: 20, lineHeight: 24, color: colors.chalk, marginTop: 2 },
+  bigTime: { ...font.black, fontSize: 64, lineHeight: 68, color: colors.chalk, letterSpacing: -2.5, marginTop: -2 },
+  heroSub: { ...font.regular, fontSize: 14, lineHeight: 20, color: colors.chalk, opacity: 0.92 },
   cancelled: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, backgroundColor: colors.night, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   cancelledText: { ...font.bold, fontSize: 13, color: colors.chalk },
   state: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52 },

@@ -259,6 +259,6 @@ const st = StyleSheet.create({
   hero: { borderRadius: 24, padding: 22, paddingTop: 26, overflow: 'hidden', gap: 6 },
   heroPitch: { position: 'absolute', right: -70, top: -20, transform: [{ rotate: '-12deg' }] },
   heroKicker: { fontFamily: 'Poppins_600SemiBold', fontSize: 11, letterSpacing: 2.4, textTransform: 'uppercase', color: brand.night },
-  heroTitle: { fontFamily: 'Poppins_800ExtraBold', fontSize: 28, lineHeight: 34, color: brand.chalk, letterSpacing: -0.5 },
+  heroTitle: { fontFamily: 'Poppins_900Black', fontSize: 30, lineHeight: 36, color: brand.chalk, letterSpacing: -0.9 },
   heroSub: { fontFamily: 'Poppins_400Regular', fontSize: 14, lineHeight: 20, color: brand.chalk, opacity: 0.92 },
 });
