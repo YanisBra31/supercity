@@ -1,7 +1,7 @@
 // Détail d'un match : infos, joueurs, inscription.
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { statusPill } from '../../components/MatchCard';
 import { Gradient, Hero } from '../../components/brand';
@@ -56,9 +56,12 @@ export default function MatchDetail() {
     }
   }, [id]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Rechargé au retour sur l'écran (après avoir noté les joueurs, par exemple).
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const act = async (fn: () => Promise<Match>) => {
     setBusy(true);
@@ -108,8 +111,16 @@ export default function MatchDetail() {
     Share.share({
       message: `${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : supercity://match/${m.id}`,
     });
-  // Action principale, fixée en bas : s'inscrire, payer sa place, ou l'état du match.
-  const primary = closed ? (
+  // Action principale, fixée en bas : s'inscrire, payer sa place, noter les joueurs, ou l'état du match.
+  const primary = m.ratings_left != null ? (
+    <Button
+      title={m.ratings_left ? `Noter les joueurs · ${m.ratings_left}` : 'Revoir mes notes'}
+      icon="star"
+      variant={m.ratings_left ? 'primary' : 'ghost'}
+      onPress={() => router.push(`/rate/${m.id}`)}
+      style={{ flex: 1 }}
+    />
+  ) : closed ? (
     <View style={[st.state, { flex: 1 }]}>
       <Text style={st.stateText}>{cancelled ? 'Ce match a été annulé.' : 'Match terminé.'}</Text>
     </View>

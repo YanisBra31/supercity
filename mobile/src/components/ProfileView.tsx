@@ -1,4 +1,4 @@
-// Profil public d'un joueur, tel que tout le monde le voit. L'onglet Profil affiche le même, avec ses boutons à soi.
+// Profil public d'un joueur, tel que tout le monde le voit : bannière, carte FUT, grade, infos, équipes, publications. L'onglet Profil affiche le même, avec ses boutons à soi.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ReactNode } from 'react';
@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FadeIn, Hero } from './brand';
 import { BannerPattern, bannerColors, FramedAvatar, TitleTag } from './Cosmetics';
 import { GradeBadge, GradeCard, RoleBadge } from './Grade';
+import { PlayerCardView } from './PlayerCard';
 import { PostCard } from './PostCard';
 import { Card, colors, font, Kicker, Pill, s, TeamCrest } from './ui';
 import { Post, PublicProfile } from '../lib/api';
@@ -89,6 +90,7 @@ export function ProfileView({
       </Hero>
       {actions}
       {children}
+      {p.card ? <PlayerCardView card={p.card} name={p.display_name} uri={p.avatar_url} position={p.position} /> : null}
       <GradeCard grade={p.grade} />
 
       <Card index={0} style={{ gap: 12 }}>

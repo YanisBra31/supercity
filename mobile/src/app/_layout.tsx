@@ -63,6 +63,7 @@ function RootStack() {
         <Stack.Screen name="shop" options={{ title: 'Boutique' }} />
         <Stack.Screen name="me/edit" options={{ title: 'Modifier mon profil' }} />
         <Stack.Screen name="settings" options={{ title: 'Réglages' }} />
+        <Stack.Screen name="rate/[id]" options={{ title: 'Noter les joueurs' }} />
         <Stack.Screen name="org/[id]" options={{ title: 'Pro' }} />
       </Stack.Protected>
       <Stack.Screen name="cgu" options={{ title: "Conditions d'utilisation", presentation: 'modal' }} />
