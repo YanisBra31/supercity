@@ -17,12 +17,12 @@ export default function Welcome() {
             <Image source={require('../../../assets/splash-icon.png')} style={st.crest} resizeMode="contain" />
           </FadeIn>
           <FadeIn index={2} style={{ alignItems: 'center', gap: 6 }}>
-            <Kicker color={colors.night}>Le foot amateur, réinventé</Kicker>
+            <Kicker color={colors.chalk}>Le foot amateur, réinventé</Kicker>
             <Text style={st.brand}>Supercity</Text>
           </FadeIn>
           <FadeIn index={4}>
             <Text style={st.tagline}>
-              Trouve un match, monte ton équipe, défie les autres. <Text style={{ color: colors.night }}>Partout, sur tous les terrains.</Text>
+              Trouve un match, monte ton équipe, défie les autres. <Text style={font.extrabold}>Partout, sur tous les terrains.</Text>
             </Text>
           </FadeIn>
         </View>
@@ -45,5 +45,6 @@ const st = StyleSheet.create({
   crest: { width: 150, height: 150 },
   brand: { ...font.black, fontSize: 46, lineHeight: 54, color: colors.chalk, letterSpacing: -1.5 },
   tagline: { ...font.medium, fontSize: 17, lineHeight: 25, color: colors.chalk, textAlign: 'center', maxWidth: 320 },
-  bottom: { gap: 12, paddingBottom: 8 },
+  // Sur grand écran (web), les boutons gardent une largeur de téléphone.
+  bottom: { gap: 12, paddingBottom: 8, width: '100%', maxWidth: 420, alignSelf: 'center' },
 });

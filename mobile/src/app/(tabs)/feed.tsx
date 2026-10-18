@@ -80,7 +80,12 @@ export default function Feed() {
             <BouncingBall size={26} />
           </View>
         ) : (
-          <Empty icon="newspaper-outline" title="Rien pour l'instant" text={scope === 'teams' ? 'Tes coéquipiers n’ont encore rien publié. Lance le mouvement !' : 'Sois le premier à publier.'} />
+          <Empty
+            icon="newspaper-outline"
+            title="Rien pour l'instant"
+            text={scope === 'teams' ? 'Tes coéquipiers n’ont encore rien publié. Lance le mouvement !' : 'Sois le premier à publier.'}
+            action={{ title: 'Publier', icon: 'create-outline', onPress: () => router.push('/post/new') }}
+          />
         )
       }
       ListFooterComponent={items?.length && more ? <View style={{ alignItems: 'center', paddingVertical: 16 }}><BouncingBall size={18} /></View> : null}

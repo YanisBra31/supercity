@@ -309,7 +309,18 @@ export function Success({ children }: { children: ReactNode }) {
   );
 }
 
-export function Empty({ icon, title, text }: { icon?: IconName; title: string; text?: string }) {
+export function Empty({
+  icon,
+  title,
+  text,
+  action,
+}: {
+  icon?: IconName;
+  title: string;
+  text?: string;
+  /** Le prochain pas à faire, pour ne jamais laisser un écran vide sans issue. */
+  action?: { title: string; icon?: IconName; onPress: () => void };
+}) {
   return (
     <FadeIn style={s.empty}>
       {icon ? (
@@ -319,6 +330,7 @@ export function Empty({ icon, title, text }: { icon?: IconName; title: string; t
       ) : null}
       <Text style={s.emptyTitle}>{title}</Text>
       {text ? <Text style={[s.sub, { textAlign: 'center', maxWidth: 300 }]}>{text}</Text> : null}
+      {action ? <Button title={action.title} icon={action.icon} variant="dark" onPress={action.onPress} style={{ marginTop: 6, alignSelf: 'center' }} /> : null}
     </FadeIn>
   );
 }
@@ -331,11 +343,12 @@ export function Loading() {
   );
 }
 
-export function Pill({ text, tone = 'orange' }: { text: string; tone?: 'orange' | 'dark' | 'green' | 'grey' }) {
+export function Pill({ text, tone = 'orange', icon }: { text: string; tone?: 'orange' | 'dark' | 'green' | 'grey'; icon?: IconName }) {
   const bg = { orange: colors.tint, dark: colors.night, green: '#e7f4e8', grey: '#efe9e4' }[tone];
   const fg = { orange: colors.orange2, dark: colors.chalk, green: colors.success, grey: colors.dim }[tone];
   return (
-    <View style={[s.pill, { backgroundColor: bg }]}>
+    <View style={[s.pill, { backgroundColor: bg }, icon && { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+      {icon ? <Ionicons name={icon} size={12} color={fg} /> : null}
       <Text style={[s.pillText, { color: fg }]}>{text}</Text>
     </View>
   );
