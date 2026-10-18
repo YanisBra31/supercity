@@ -440,7 +440,7 @@ export const s = StyleSheet.create({
   screen: { flexGrow: 1, backgroundColor: colors.bg, padding: 20, gap: 16 },
   kicker: { ...font.semibold, fontSize: 11, letterSpacing: 2.4, textTransform: 'uppercase' },
   title: { ...font.extrabold, fontSize: 30, lineHeight: 38, color: colors.ink, letterSpacing: -0.6 },
-  pageTitle: { ...font.extrabold, fontSize: 28, lineHeight: 34, color: colors.ink, letterSpacing: -0.6 },
+  pageTitle: { ...font.black, fontSize: 34, lineHeight: 40, color: colors.ink, letterSpacing: -1.2 },
   iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, borderWidth: 1, borderColor: colors.line },
   dock: { paddingHorizontal: 20, paddingTop: 12, gap: 8, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line },
   sub: { ...font.regular, fontSize: 14, color: colors.dim, lineHeight: 21 },

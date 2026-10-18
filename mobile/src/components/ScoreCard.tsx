@@ -20,7 +20,7 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
       <Text numberOfLines={1} style={{ ...font.semibold, fontSize: 13, color: colors.dim }}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         {btn('remove', value - 1)}
-        <Text style={{ ...font.black, fontSize: 30, color: colors.ink, minWidth: 36, textAlign: 'center' }}>{value}</Text>
+        <Text style={{ ...font.black, fontSize: 44, lineHeight: 50, color: colors.ink, minWidth: 48, letterSpacing: -1, textAlign: 'center' }}>{value}</Text>
         {btn('add', value + 1)}
       </View>
     </View>
