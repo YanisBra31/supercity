@@ -155,6 +155,7 @@ export default function Matches() {
               icon="football-outline"
               title="Aucun match pour ces filtres"
               text={count || filters.when !== 'all' ? 'Retire un filtre ou élargis la zone.' : 'Élargis la zone, ou organise le premier match du coin.'}
+              action={{ title: 'Organiser un match', icon: 'add-circle', onPress: () => router.push('/create') }}
             />
           )
         }

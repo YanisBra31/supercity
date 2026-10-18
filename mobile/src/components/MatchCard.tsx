@@ -12,13 +12,15 @@ const DAYS = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
 export function statusPill(m: Match) {
-  if (m.status === 'cancelled') return <Pill text="Annulé" tone="grey" />;
-  if (m.status === 'played') return <Pill text="Joué" tone="grey" />;
-  if (m.my_status === 'registered') return <Pill text="Inscrit" tone="green" />;
-  if (m.my_status === 'pending') return <Pill text="À payer" />;
-  if (m.my_status === 'waitlist') return <Pill text="Liste d'attente" tone="dark" />;
-  if (m.status === 'full') return <Pill text="Complet" tone="dark" />;
-  return <Pill text={`${m.spots_left} place${m.spots_left > 1 ? 's' : ''}`} />;
+  // Mon statut d'abord (ce que je dois faire), puis l'état du match.
+  if (m.status === 'cancelled') return <Pill text="Annulé" tone="grey" icon="close-circle" />;
+  if (m.status === 'played') return m.ratings_left ? <Pill text="À noter" icon="star" /> : <Pill text="Terminé" tone="grey" icon="flag" />;
+  if (m.my_status === 'registered') return <Pill text="Je joue" tone="green" icon="checkmark-circle" />;
+  if (m.my_status === 'pending') return <Pill text="À payer" icon="card" />;
+  if (m.my_status === 'waitlist') return <Pill text="Liste d'attente" tone="dark" icon="hourglass" />;
+  if (m.status === 'full') return <Pill text="Complet" tone="dark" icon="lock-closed" />;
+  if (m.spots_left <= 2) return <Pill text={`Plus que ${m.spots_left} place${m.spots_left > 1 ? 's' : ''}`} icon="flame" />;
+  return <Pill text={`${m.spots_left} places`} tone="grey" />;
 }
 
 // Bloc date façon ticket : jour, numéro, mois, heure, sur le dégradé.
