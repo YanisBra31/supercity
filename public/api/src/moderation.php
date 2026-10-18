@@ -123,6 +123,18 @@ function register_moderation_routes(Router $r): void
         query('UPDATE users SET site_role = ? WHERE id = ?', [$in['role'], $target['id']]);
         respond(200, moderated_user((int)$target['id']));
     });
+
+    // Donner (ou reprendre) des points de grade, à soi-même aussi : { amount }.
+    $r->post('/admin/users/(\d+)/points', function (string $id) {
+        $admin = require_role('admin');
+        $target = one('SELECT * FROM users WHERE id = ?', [(int)$id]) ?? not_found('Joueur');
+        $in = validate(body())->int('amount', -1000, 1000)->check();
+        if ($in['amount'] === 0) {
+            throw new HttpError(422, 'validation_failed', 'Montant nul.', ['amount' => 'Montant non nul attendu.']);
+        }
+        query('INSERT INTO grade_bonus (user_id, amount, created_by) VALUES (?, ?, ?)', [$target['id'], $in['amount'], $admin['id']]);
+        respond(200, moderated_user((int)$target['id']));
+    });
 }
 
 function moderated_user(int $id): array

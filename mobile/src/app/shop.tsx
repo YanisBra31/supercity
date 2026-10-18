@@ -1,5 +1,6 @@
 // Boutique : cadres, bannières et titres payés en pièces gagnées en jouant. On essaie avant d'acheter.
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -279,8 +280,18 @@ export default function Shop() {
             <CoinAmount n={shop.coins} size={26} />
             <Text style={st.walletUnit}>pièces</Text>
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, gap: 8 }}>
             <HelpLink q="pieces">Comment gagner des pièces ?</HelpLink>
+            <Pressable
+              onPress={() => router.push("/inventory")}
+              accessibilityRole="button"
+              style={[s.row, { gap: 5 }]}
+            >
+              <Ionicons name="file-tray-full-outline" size={16} color={colors.ink} />
+              <Text style={st.inv}>
+                Mon inventaire · {shop.items.filter((i) => i.owned).length}
+              </Text>
+            </Pressable>
           </View>
         </View>
         {sel ? null : (
@@ -402,6 +413,7 @@ const st = StyleSheet.create({
     lineHeight: 28,
     color: colors.chalk,
   },
+  inv: { ...font.bold, fontSize: 13, color: colors.ink },
   wallet: {
     flexDirection: "row",
     alignItems: "center",

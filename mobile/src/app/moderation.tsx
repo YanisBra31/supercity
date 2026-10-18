@@ -7,7 +7,7 @@ import { GradeBadge, RoleBadge } from '../components/Grade';
 import { ModDisputes, ModEvents } from '../components/ModSeries';
 import { ModShop } from '../components/ModShop';
 import { Avatar, Button, Card, Chips, colors, Empty, ErrorText, font, Kicker, Loading, s, Screen, Success } from '../components/ui';
-import { ApiError, del, get, ModReport, ModUser, post, Role } from '../lib/api';
+import { ApiError, del, get, Me, ModReport, ModUser, post, Role } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { timeAgo } from '../lib/format';
 
@@ -28,7 +28,7 @@ function confirm(title: string, message: string): Promise<boolean> {
 }
 
 export default function Moderation() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [tab, setTab] = useState<'reports' | 'users' | 'events' | 'disputes' | 'shop'>('reports');
   const [reports, setReports] = useState<ModReport[] | null>(null);
   const [q, setQ] = useState('');
@@ -36,6 +36,8 @@ export default function Moderation() {
   const [days, setDays] = useState(7);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  // Montant tapé par l'admin pour chaque joueur (points de grade ou pièces, négatif pour reprendre).
+  const [amounts, setAmounts] = useState<Record<number, string>>({});
   const admin = user?.site_role === 'admin';
 
   const loadReports = useCallback(async () => {
@@ -65,6 +67,17 @@ export default function Moderation() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Action impossible.');
     }
+  };
+
+  // Admin : donner ou reprendre des points de grade ou des pièces, à n'importe qui (soi compris).
+  const grant = (u: ModUser, what: 'points' | 'coins') => {
+    const n = Number(amounts[u.id]);
+    const label = what === 'points' ? `point${Math.abs(n) > 1 ? 's' : ''} de grade` : `pièce${Math.abs(n) > 1 ? 's' : ''}`;
+    return act(async () => {
+      await post(`/admin/users/${u.id}/${what}`, { amount: n });
+      setAmounts({ ...amounts, [u.id]: '' });
+      if (u.id === user?.id) setUser(await get<Me>('/me'));
+    }, n > 0 ? `${n} ${label} pour ${u.display_name}.` : `${-n} ${label} repris à ${u.display_name}.`);
   };
 
   const search = async (text: string) => {
@@ -189,6 +202,38 @@ export default function Moderation() {
                   onChange={(v) => v && v !== u.site_role && act(() => post(`/admin/users/${u.id}/role`, { role: v as Role }), `${u.display_name} est maintenant ${v === 'admin' ? 'admin' : v === 'moderator' ? 'modérateur' : 'joueur'}.`)}
                 />
               ) : null}
+              {admin ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={st.meta}>
+                    {u.grade?.points ?? 0} point{(u.grade?.points ?? 0) > 1 ? 's' : ''} de grade. Mets un nombre négatif pour en reprendre.
+                  </Text>
+                  <View style={[s.row, { gap: 8 }]}>
+                    <TextInput
+                      value={amounts[u.id] ?? ''}
+                      onChangeText={(t) => setAmounts({ ...amounts, [u.id]: t.replace(/[^0-9-]/g, '') })}
+                      placeholder="Ex. 50"
+                      placeholderTextColor="#a59a92"
+                      keyboardType="numbers-and-punctuation"
+                      accessibilityLabel={`Montant pour ${u.display_name}`}
+                      style={st.amount}
+                    />
+                    <Button
+                      title="Points de grade"
+                      icon="trophy-outline"
+                      variant="ghost"
+                      disabled={!Number(amounts[u.id])}
+                      onPress={() => grant(u, 'points')}
+                    />
+                  </View>
+                  <Button
+                    title="Pièces"
+                    icon="wallet-outline"
+                    variant="ghost"
+                    disabled={!Number(amounts[u.id])}
+                    onPress={() => grant(u, 'coins')}
+                  />
+                </View>
+              ) : null}
             </Card>
           ))}
           {q.trim().length >= 2 && !found.length ? <Text style={s.sub}>Aucun joueur trouvé.</Text> : null}
@@ -206,6 +251,7 @@ export default function Moderation() {
 }
 
 const st = StyleSheet.create({
+  amount: { width: 96, ...font.semibold, fontSize: 15, color: colors.ink, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11 },
   name: { ...font.bold, fontSize: 15, color: colors.ink },
   meta: { ...font.regular, fontSize: 12.5, color: colors.dim },
   body: { ...font.regular, fontSize: 15, lineHeight: 21, color: colors.ink },
