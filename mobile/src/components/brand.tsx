@@ -1,7 +1,7 @@
 // Éléments de marque repris du site : ballon, chargement, dégradé, lignes de terrain, apparitions.
 import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode, useEffect, useRef } from 'react';
-import { Animated, Easing, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Animated, Appearance, Easing, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 
 export const brand = {
@@ -166,10 +166,10 @@ export function WaveWord({ text = 'Supercity', size = 22, color = brand.chalk }:
   );
 }
 
-// Écran de chargement plein écran, sur le dégradé orange.
+// Écran de chargement plein écran, sur le dégradé orange (nuit en mode sombre, dans la suite de l'écran de lancement noir).
 export function Splash() {
   return (
-    <Gradient style={st.splash}>
+    <Gradient tone={Appearance.getColorScheme() === 'dark' ? 'night' : 'orange'} style={st.splash}>
       <BallLoader />
       <WaveWord />
     </Gradient>

@@ -177,7 +177,7 @@ export default function CreateMatch() {
       <Label>Terrain</Label>
       {venue ? (
         <Card style={{ borderColor: colors.orange2, borderWidth: 2 }} onPress={() => setVenue(null)}>
-          <Text style={{ ...font.extrabold, fontSize: 16 }}>{venue.name}</Text>
+          <Text style={{ ...font.extrabold, fontSize: 16, color: colors.ink }}>{venue.name}</Text>
           <Text style={s.sub}>{venue.address}</Text>
           <Text style={{ color: colors.orange2, ...font.semibold }}>Changer de terrain</Text>
         </Card>
@@ -187,7 +187,7 @@ export default function CreateMatch() {
           <Field label="Chercher un terrain" value={q} onChangeText={(t) => { setQ(t); loadVenues(t); }} placeholder="Nom ou adresse" />
           {venues.map((v) => (
             <Card key={v.id} onPress={() => setVenue(v)}>
-              <Text style={{ ...font.bold }}>{v.name}</Text>
+              <Text style={{ ...font.bold, color: colors.ink }}>{v.name}</Text>
               <Text style={s.sub}>
                 {surfaceLabel(v.surface)}
                 {v.distance_km !== null ? ` · ${distanceLabel(v.distance_km)}` : ''} · {v.address}
