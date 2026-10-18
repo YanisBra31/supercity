@@ -12,7 +12,7 @@ import { useAuth } from '../lib/auth';
 type Hover = { pressed: boolean; hovered?: boolean };
 
 const FOOTER: [string, () => void][] = [
-  ['Le site', () => globalThis.location?.assign('/')],
+  ['Découvrir Supercity', () => globalThis.location?.assign('/decouvrir/')],
   ['Aide', () => router.push('/help')],
   ['Conditions', () => router.push('/cgu')],
   ['Confidentialité', () => globalThis.open?.('/confidentialite/', '_blank')],

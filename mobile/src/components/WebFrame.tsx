@@ -188,8 +188,8 @@ function Rail() {
         <Text style={st.link} onPress={() => globalThis.open?.('/confidentialite/', '_blank')}>
           Confidentialité
         </Text>
-        <Text style={st.link} onPress={() => globalThis.location?.assign('/')}>
-          Le site
+        <Text style={st.link} onPress={() => globalThis.location?.assign('/decouvrir/')}>
+          Découvrir Supercity
         </Text>
         <Text style={[st.link, { textDecorationLine: 'none' }]}>© Supercity 2026</Text>
       </View>

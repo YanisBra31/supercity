@@ -7,13 +7,13 @@ export default function LegalPage({ title, children }: { title: string; children
   return (
     <>
       <header className="nav nav--simple">
-        <Link className="nav__brand" href="/" aria-label="Supercity, accueil">
+        <Link className="nav__brand" href="/decouvrir/" aria-label="Supercity, présentation">
           <Image src="/logo-blanc.png" alt="" width={34} height={42} />
           <span>Supercity</span>
         </Link>
-        <Link className="nav__cta" href="/#rejoindre">
-          Rejoindre
-        </Link>
+        <a className="nav__cta" href="/app/">
+          Ouvrir l&apos;appli
+        </a>
       </header>
       <main className="legal">
         <h1>{title}</h1>
