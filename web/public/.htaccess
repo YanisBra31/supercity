@@ -2,6 +2,8 @@
 # qui affiche ensuite le bon écran (/app/match/12, /app/user/3…).
 RewriteEngine On
 RewriteBase /app/
+# Un fichier de page manquant (ancienne version) répond 404 au lieu de renvoyer la page d'accueil.
+RewriteRule ^assets/ - [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.html [L]
 

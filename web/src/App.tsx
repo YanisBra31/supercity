@@ -3,6 +3,7 @@ import { lazy, ReactNode, Suspense } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './lib/auth';
 import { useBadgePolling } from './lib/badge';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { AppShell } from './ui/Layout';
 import { Loading } from './ui/ui';
 import Forgot from './pages/auth/Forgot';
@@ -85,6 +86,7 @@ export function App() {
     <BrowserRouter basename="/app">
       <AuthProvider>
         <Root>
+          <ErrorBoundary>
           <Suspense fallback={<Loading />}>
           <Routes>
             <Route element={<Guest />}>
@@ -130,6 +132,7 @@ export function App() {
             </Route>
           </Routes>
           </Suspense>
+          </ErrorBoundary>
         </Root>
       </AuthProvider>
     </BrowserRouter>
