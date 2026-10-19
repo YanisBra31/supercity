@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth';
 import { useBadge } from '../lib/badge';
 import { formatLabel, whenLabel } from '../lib/format';
 import { PresenceDot } from './social';
+import { ErrorBoundary } from './ErrorBoundary';
 import { Avatar, Icon, Loading } from './ui';
 
 type Nav = { to: string; label: string; icon: Icon; badge?: 'unread' | 'friend_requests'; end?: boolean };
@@ -161,9 +162,12 @@ export function AppShell() {
       <Side />
       <main className="main" id="contenu">
         {/* Les pages se chargent à la demande : le menu reste affiché pendant ce temps. */}
-        <Suspense fallback={<Loading />}>
-          <Outlet />
-        </Suspense>
+        {/* Une page qui plante n'emporte pas le menu ; changer de page efface l'erreur. */}
+        <ErrorBoundary key={pathname}>
+          <Suspense fallback={<Loading />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </main>
       <Rail />
       <TabBar />
