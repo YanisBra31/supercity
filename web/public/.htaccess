@@ -1,0 +1,16 @@
+# Appli web Supercity, servie sous /app : toute adresse qui n'est pas un fichier ouvre l'appli,
+# qui affiche ensuite le bon écran (/app/match/12, /app/user/3…).
+RewriteEngine On
+RewriteBase /app/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.html [L]
+
+# Les fichiers du dossier assets changent de nom à chaque version : on peut les garder longtemps en cache.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|ttf|png|jpg|svg)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <Files "index.html">
+    Header set Cache-Control "no-cache"
+  </Files>
+</IfModule>

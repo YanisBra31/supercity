@@ -1,0 +1,209 @@
+/* Styles des pages : social (fil, publications, équipes, défis, notifications, amis, discussions, profil public) */
+
+/* ───────── Menu « … » ───────── */
+.menu { position: relative; }
+.icon-btn--flat { width: 36px; height: 36px; border-color: transparent; background: transparent; color: var(--dim); }
+.icon-btn--flat:hover { background: var(--tint); border-color: transparent; color: var(--ink); }
+.menu__list {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 230px;
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(31, 26, 23, 0.18);
+  animation: pop 0.15s var(--ease);
+}
+.menu__item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 10px;
+  background: none; text-align: left; font-weight: 600; font-size: 14px;
+}
+.menu__item:hover { background: var(--tint); }
+.menu__item--danger { color: var(--danger); }
+
+/* ───────── Publications ───────── */
+.post { padding: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.post__head { padding: 14px 14px 0; }
+.post__author { font-weight: 700; font-size: 15px; text-decoration: none; }
+.post__author:hover, .post__meta a:hover { text-decoration: underline; }
+.post__meta { font-size: 12.5px; color: var(--dim); }
+.post__meta a { text-decoration: none; }
+.post__body { padding: 0 14px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post__body--challenge { font-weight: 700; }
+.post__image { display: block; background: var(--tint); }
+.post__image img { width: 100%; max-height: 560px; object-fit: cover; }
+.post__match {
+  margin: 0 14px; padding: 12px; border-radius: 14px; display: flex; align-items: center; gap: 10px;
+  background: var(--grad-night); color: var(--chalk); text-decoration: none;
+  transition: transform 0.15s var(--ease);
+}
+.post__match:hover { transform: translateY(-1px); }
+.post__match b { display: block; font-weight: 800; font-size: 14px; }
+.post__match span span { display: block; font-size: 12px; opacity: 0.8; }
+.post__actions { padding: 0 8px 8px; gap: 4px; }
+.post__act {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 0; border-radius: 999px;
+  background: none; font-weight: 600; font-size: 14px; color: var(--ink);
+}
+button.post__act:hover { background: var(--tint); color: var(--orange-2); }
+.post__act.is-on { color: var(--orange-2); }
+.post__pop { animation: like-pop 0.35s var(--ease); }
+@keyframes like-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+.composer-link { gap: 12px; padding: 12px; border-radius: 20px; }
+
+.post-preview { position: relative; }
+.post-preview img { width: 100%; max-height: 420px; object-fit: cover; border-radius: 18px; background: var(--tint); }
+.post-preview .icon-btn { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; }
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px;
+  border: 2px dashed var(--line); border-radius: 18px; background: var(--card); color: var(--orange-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone b { color: var(--ink); }
+.dropzone:hover, .dropzone.is-over { border-color: var(--orange-1); background: var(--tint); }
+
+/* Commentaires */
+.comment { align-items: flex-start; }
+.comment__bubble { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; }
+.comment__bubble p { font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment__author { font-weight: 700; font-size: 13px; text-decoration: none; }
+.comment__author:hover { text-decoration: underline; }
+.comment__time { font-size: 11.5px; color: var(--dim); }
+.comment__del { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.comment-box input {
+  flex: 1; min-width: 0; padding: 10px 16px; border-radius: 999px; border: 1.5px solid var(--line);
+  background: var(--card); font-size: 15px; outline: none;
+}
+.comment-box input:focus { border-color: var(--orange-1); }
+.comment-box .icon-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* ───────── Équipes et défis ───────── */
+.vs { display: flex; align-items: center; gap: 8px; padding: 14px; border-radius: 16px; background: var(--grad-night); color: var(--chalk); }
+.vs__side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.vs__side b { font-weight: 800; font-size: 13.5px; overflow-wrap: anywhere; }
+.vs__text { font-weight: 900; font-size: 24px; color: var(--orange-1); }
+.challenge__bubble { margin: 0; padding: 12px; border-radius: 14px; background: var(--tint); }
+.challenge__bubble p { font-weight: 500; font-size: 14px; line-height: 1.45; }
+.challenge__bubble cite { font-style: normal; font-weight: 600; font-size: 12px; color: var(--dim); }
+
+.team-row { gap: 14px; }
+.team-row__name { font-size: 17px; font-weight: 800; }
+.team-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.result-row { gap: 12px; padding: 10px 14px; }
+.result-row b { display: block; }
+.result-row__res { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 12px; color: #fff; flex-shrink: 0; }
+.result-row__res--V { background: var(--success); }
+.result-row__res--N { background: #9e9e9e; }
+.result-row__res--D { background: var(--danger); }
+.result-row__score { font-weight: 900; font-size: 18px; white-space: nowrap; }
+.invite__code {
+  display: inline-flex; align-items: center; gap: 12px; align-self: flex-start; padding: 0; border: 0; background: none;
+  color: var(--orange-1); font-size: 32px; font-weight: 900; letter-spacing: 4px;
+}
+.invite__code svg { opacity: 0.6; }
+.invite__code:hover svg { opacity: 1; }
+.member { padding: 12px 14px; }
+.member__link { text-decoration: none; color: inherit; }
+.member__link:hover b { text-decoration: underline; }
+.crest-btn { padding: 0; border: 0; background: none; border-radius: 30%; }
+.crest-btn:hover { transform: scale(1.04); }
+.venue-pick { display: flex; flex-direction: column; gap: 2px; }
+.venue-pick.is-on { border: 2px solid var(--orange-2); }
+
+/* ───────── Notifications ───────── */
+.notif {
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 18px;
+  background: var(--card); border: 1px solid var(--line); text-decoration: none; color: inherit;
+}
+a.notif { transition: border-color 0.15s; }
+a.notif:hover { border-color: var(--orange-1); }
+.notif.is-new { background: var(--tint); border-color: var(--orange-1); }
+.notif__icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: var(--orange-2); flex-shrink: 0; }
+.notif.is-new .notif__icon { background: var(--card); }
+.notif__kind {
+  position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--orange-2); color: var(--chalk); border: 2px solid var(--card);
+}
+.notif__title { font-size: 14.5px; }
+.notif__time { font-size: 12px; font-weight: 500; color: var(--dim); white-space: nowrap; }
+.notif__body { display: block; font-size: 13.5px; line-height: 1.4; color: var(--dim); }
+.notif__new { width: 9px; height: 9px; border-radius: 50%; background: var(--orange-2); flex-shrink: 0; }
+
+/* ───────── Amis ───────── */
+.searchbox {
+  display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 16px;
+  border: 1.5px solid var(--line); background: var(--card); color: var(--dim);
+}
+.searchbox:focus-within { border-color: var(--orange-1); }
+.searchbox input { flex: 1; min-width: 0; padding: 13px 0; border: 0; background: none; outline: none; font-weight: 500; font-size: 15px; color: var(--ink); }
+.searchbox .spinner { border-color: var(--line); border-top-color: var(--orange-2); }
+
+/* ───────── Discussions ───────── */
+.topbar__sub { font-size: 13px; font-weight: 600; color: inherit; opacity: 0.9; text-decoration: none; white-space: nowrap; }
+.topbar__sub:hover { text-decoration: underline; }
+.chat { display: flex; flex-direction: column; gap: 10px; min-height: 40vh; }
+.chat__day { text-align: center; font-size: 12px; font-weight: 600; color: var(--dim); margin: 6px 0; }
+.chat__line { display: flex; align-items: flex-end; gap: 8px; }
+.chat__line.is-mine { justify-content: flex-end; }
+.chat__line.is-same { margin-top: -6px; }
+.chat__avatar { width: 32px; flex-shrink: 0; }
+.chat__bubble {
+  max-width: 78%; padding: 8px 14px; border-radius: 18px; border-bottom-left-radius: 6px;
+  background: var(--card); border: 1px solid var(--line);
+}
+.chat__bubble p { font-size: 15px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat__bubble time { display: block; text-align: right; font-size: 10.5px; font-weight: 500; color: var(--dim); }
+.chat__author { display: block; font-size: 12.5px; color: var(--orange-2); }
+.is-mine .chat__bubble { background: var(--orange-2); border-color: var(--orange-2); color: var(--chalk); border-bottom-left-radius: 18px; border-bottom-right-radius: 6px; }
+.is-mine .chat__bubble time { color: rgba(255, 248, 241, 0.75); }
+.chat__del {
+  width: 30px; height: 30px; border-radius: 50%; border: 0; background: none; color: var(--dim);
+  display: grid; place-items: center; opacity: 0; transition: opacity 0.15s; align-self: center;
+}
+.chat__line:hover .chat__del, .chat__del:focus-visible { opacity: 1; }
+.chat__del:hover { background: var(--tint); color: var(--danger); }
+@media (hover: none) { .chat__del { opacity: 0.6; } }
+.chat-composer { display: flex; align-items: flex-end; gap: 10px; }
+.chat-composer textarea {
+  flex: 1; min-width: 0; resize: none; max-height: 140px; padding: 10px 16px; border-radius: 22px;
+  border: 1.5px solid var(--line); background: var(--card); font-size: 15px; line-height: 1.4; outline: none;
+}
+.chat-composer textarea:focus { border-color: var(--orange-1); }
+.chat-composer__send {
+  width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--orange-2); color: var(--chalk);
+}
+.chat-composer__send:disabled { opacity: 0.45; cursor: default; }
+
+/* ───────── Profil public ───────── */
+.profile-hero { color: var(--chalk); }
+.profile-hero__head { position: relative; display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.profile-hero__avatar { padding: 0; border: 0; background: none; border-radius: 50%; }
+.profile-hero__avatar:hover { transform: scale(1.03); }
+.profile-hero__name { font-size: 24px; line-height: 1.25; font-weight: 800; overflow-wrap: anywhere; }
+.profile-hero__bio { font-size: 13px; line-height: 1.4; }
+.profile-hero__shirt { position: relative; display: grid; place-items: center; color: var(--night); }
+.profile-hero__shirt b { position: absolute; top: 14px; font-weight: 900; font-size: 17px; color: var(--chalk); }
+.profile-hero__stats { position: relative; display: flex; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid rgba(255, 248, 241, 0.3); }
+.profile-hero__stats > div { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.profile-hero__stats dd { margin: 0; font-weight: 900; font-size: 22px; }
+.profile-hero__stats dt { font-weight: 500; font-size: 11.5px; opacity: 0.85; }
+
+.pcards { display: flex; flex-direction: column; gap: 10px; }
+.pcards__tabs { display: flex; gap: 22px; padding: 0 4px; }
+.pcards__tab {
+  padding: 0 0 5px; border: 0; background: none; font-weight: 700; font-size: 15px; color: var(--dim);
+  border-bottom: 3px solid transparent;
+}
+.pcards__tab:hover { color: var(--ink); }
+.pcards__tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--orange-2); }
+.pcards__panel { animation: pop 0.2s var(--ease); }
+
+.facts { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.facts__row { justify-content: space-between; }
+.facts dt { font-weight: 500; font-size: 14px; color: var(--dim); gap: 8px; }
+.facts dt svg { color: var(--orange-2); }
+.facts dd { margin: 0; font-weight: 700; font-size: 14px; text-align: right; }
+.facts dd.is-empty { color: var(--dim); }
+
+/* La discussion occupe la hauteur de l'écran : la zone de saisie reste en bas. */
+.chat { min-height: calc(100vh - 58px - 32px - 70px); justify-content: flex-end; }
+@media (max-width: 759px) { .chat { min-height: calc(100vh - 58px - 32px - 70px - var(--tabbar)); } }
