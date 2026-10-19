@@ -155,8 +155,11 @@ function Rail() {
 
 export function AppShell() {
   const { pathname } = useLocation();
-  // Nouvelle page : on repart du haut.
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Nouvelle page : on repart du haut. Entre accolades : les navigateurs récents renvoient une promesse
+  // depuis scrollTo, et React la prendrait pour une fonction de nettoyage (« l is not a function »).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
     <div className="shell">
       <Side />
