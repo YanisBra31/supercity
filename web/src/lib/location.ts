@@ -8,16 +8,23 @@ let cached: Coords | null = null;
 export function getPosition(): Promise<Coords | null> {
   if (cached) return Promise.resolve(cached);
   if (!navigator.geolocation) return Promise.resolve(null);
-  return new Promise((resolve) =>
+  return new Promise((resolve) => {
+    // Le délai du navigateur ne court qu'une fois l'accès accordé : si le joueur laisse la demande ouverte,
+    // on n'attend pas plus de 6 s pour afficher les matchs sans position.
+    const giveUp = setTimeout(() => resolve(null), 6000);
     navigator.geolocation.getCurrentPosition(
       (p) => {
+        clearTimeout(giveUp);
         cached = { lat: p.coords.latitude, lng: p.coords.longitude };
         resolve(cached);
       },
-      () => resolve(null),
+      () => {
+        clearTimeout(giveUp);
+        resolve(null);
+      },
       { maximumAge: 10 * 60 * 1000, timeout: 10000 }
-    )
-  );
+    );
+  });
 }
 
 const PLACE_KEY = 'supercity_search_place';

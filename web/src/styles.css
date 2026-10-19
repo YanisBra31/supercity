@@ -375,12 +375,14 @@ img {
   text-transform: uppercase;
   color: var(--dim);
 }
-.row {
+.row,
+.card.row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.stack {
+.stack,
+.card.stack {
   display: flex;
   flex-direction: column;
   gap: 10px;

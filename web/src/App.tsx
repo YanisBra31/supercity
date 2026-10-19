@@ -1,5 +1,5 @@
 // Routes de l'appli web. Adresses identiques à l'appli mobile (/match/12, /user/3…) : les liens des notifications marchent partout.
-import { ReactNode } from 'react';
+import { lazy, ReactNode, Suspense } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './lib/auth';
 import { useBadgePolling } from './lib/badge';
@@ -10,36 +10,36 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Welcome from './pages/auth/Welcome';
 import Verify from './pages/auth/Verify';
-import Matches from './pages/Matches';
-import MatchDetail from './pages/MatchDetail';
-import Create from './pages/Create';
-import VenueNew from './pages/VenueNew';
-import Rate from './pages/Rate';
-import Feed from './pages/Feed';
-import PostNew from './pages/PostNew';
-import PostDetail from './pages/PostDetail';
-import Teams from './pages/Teams';
-import TeamDetail from './pages/TeamDetail';
-import TeamEdit from './pages/TeamEdit';
-import TeamFind from './pages/TeamFind';
-import ChallengeNew from './pages/ChallengeNew';
-import Notifications from './pages/Notifications';
-import Friends from './pages/Friends';
-import Chat from './pages/Chat';
-import UserProfile from './pages/UserProfile';
-import Profile from './pages/Profile';
-import MeEdit from './pages/MeEdit';
-import Settings from './pages/Settings';
-import Password from './pages/Password';
-import Account from './pages/Account';
-import Shop from './pages/Shop';
-import Inventory from './pages/Inventory';
-import Pro from './pages/Pro';
-import Org from './pages/Org';
-import Moderation from './pages/Moderation';
-import Help from './pages/Help';
-import Cgu from './pages/Cgu';
-import Mentions from './pages/Mentions';
+const Matches = lazy(() => import('./pages/Matches'));
+const MatchDetail = lazy(() => import('./pages/MatchDetail'));
+const Create = lazy(() => import('./pages/Create'));
+const VenueNew = lazy(() => import('./pages/VenueNew'));
+const Rate = lazy(() => import('./pages/Rate'));
+const Feed = lazy(() => import('./pages/Feed'));
+const PostNew = lazy(() => import('./pages/PostNew'));
+const PostDetail = lazy(() => import('./pages/PostDetail'));
+const Teams = lazy(() => import('./pages/Teams'));
+const TeamDetail = lazy(() => import('./pages/TeamDetail'));
+const TeamEdit = lazy(() => import('./pages/TeamEdit'));
+const TeamFind = lazy(() => import('./pages/TeamFind'));
+const ChallengeNew = lazy(() => import('./pages/ChallengeNew'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Friends = lazy(() => import('./pages/Friends'));
+const Chat = lazy(() => import('./pages/Chat'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const Profile = lazy(() => import('./pages/Profile'));
+const MeEdit = lazy(() => import('./pages/MeEdit'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Password = lazy(() => import('./pages/Password'));
+const Account = lazy(() => import('./pages/Account'));
+const Shop = lazy(() => import('./pages/Shop'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Pro = lazy(() => import('./pages/Pro'));
+const Org = lazy(() => import('./pages/Org'));
+const Moderation = lazy(() => import('./pages/Moderation'));
+const Help = lazy(() => import('./pages/Help'));
+const Cgu = lazy(() => import('./pages/Cgu'));
+const Mentions = lazy(() => import('./pages/Mentions'));
 
 /** Pages réservées aux joueurs connectés : sinon, connexion, puis retour sur la page demandée. */
 function Private() {
@@ -85,6 +85,7 @@ export function App() {
     <BrowserRouter basename="/app">
       <AuthProvider>
         <Root>
+          <Suspense fallback={<Loading />}>
           <Routes>
             <Route element={<Guest />}>
               <Route path="login" element={<Login />} />
@@ -128,6 +129,7 @@ export function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          </Suspense>
         </Root>
       </AuthProvider>
     </BrowserRouter>

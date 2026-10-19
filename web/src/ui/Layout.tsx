@@ -1,7 +1,7 @@
 // Cadre de l'appli connectée : menu à gauche (ordinateur), contenu au centre, colonne de droite (grand écran),
 // barre d'onglets en bas (téléphone). Toutes les pages s'affichent dedans, réglages et pages légales compris.
 import { ArrowLeft, Bell, Heart, Newspaper, Plus, PlusCircle, Settings, Trophy, User, Users } from 'lucide-react';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import icon from '../assets/icon.png';
 import { Friends, get, Match } from '../lib/api';
@@ -9,7 +9,7 @@ import { useAuth } from '../lib/auth';
 import { useBadge } from '../lib/badge';
 import { formatLabel, whenLabel } from '../lib/format';
 import { PresenceDot } from './social';
-import { Avatar, Icon } from './ui';
+import { Avatar, Icon, Loading } from './ui';
 
 type Nav = { to: string; label: string; icon: Icon; badge?: 'unread' | 'friend_requests'; end?: boolean };
 
@@ -160,7 +160,10 @@ export function AppShell() {
     <div className="shell">
       <Side />
       <main className="main" id="contenu">
-        <Outlet />
+        {/* Les pages se chargent à la demande : le menu reste affiché pendant ce temps. */}
+        <Suspense fallback={<Loading />}>
+          <Outlet />
+        </Suspense>
       </main>
       <Rail />
       <TabBar />

@@ -5,7 +5,7 @@ RewriteBase /app/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.html [L]
 
-# Les fichiers du dossier _expo changent de nom à chaque version : on peut les garder longtemps en cache.
+# Les fichiers du dossier assets changent de nom à chaque version : on peut les garder longtemps en cache.
 <IfModule mod_headers.c>
   <FilesMatch "\.(js|css|ttf|png|jpg|svg)$">
     Header set Cache-Control "public, max-age=604800"
