@@ -6,4 +6,6 @@ export default defineConfig({
   base: '/app/',
   plugins: [react()],
   server: { port: 5173 },
+  // dist/app : le dossier à déposer tel quel dans public_html.
+  build: { outDir: 'dist/app' },
 });
