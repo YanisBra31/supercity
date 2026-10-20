@@ -149,6 +149,7 @@ function Rail() {
         <a href="/confidentialite/">Confidentialité</a>
         <Link to="/mentions">Mentions légales</Link>
         <a href="/decouvrir/">Découvrir Supercity</a>
+        <a href="/guides/">Guides</a>
         {adsReady ? (
           <button type="button" className="link" onClick={openCookieChoices}>
             Cookies
