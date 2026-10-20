@@ -9,7 +9,7 @@ import { useAuth } from '../lib/auth';
 import { useBadge } from '../lib/badge';
 import { formatLabel, whenLabel } from '../lib/format';
 import { PresenceDot } from './social';
-import { Ad, adsOn, openCookieChoices } from './Ad';
+import { Ad, adsReady, openCookieChoices } from './Ad';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Avatar, Icon, Loading } from './ui';
 
@@ -149,7 +149,7 @@ function Rail() {
         <a href="/confidentialite/">Confidentialité</a>
         <Link to="/mentions">Mentions légales</Link>
         <a href="/decouvrir/">Découvrir Supercity</a>
-        {adsOn ? (
+        {adsReady ? (
           <button type="button" className="link" onClick={openCookieChoices}>
             Cookies
           </button>

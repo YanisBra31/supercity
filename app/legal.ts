@@ -11,7 +11,7 @@ export const legal = {
   adresse: "31400 Toulouse, France",
   email: "contact@supercity.fr",
   directeurPublication: "Yanis Yahia",
-  derniereMiseAJour: "18 octobre 2026",
+  derniereMiseAJour: "20 octobre 2026",
 };
 
 export const hebergeur = {
