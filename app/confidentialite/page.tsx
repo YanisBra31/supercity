@@ -1,3 +1,4 @@
+import { adsOn } from "../ads";
 import type { Metadata } from "next";
 import LegalPage from "../components/LegalPage";
 import { hebergeur, legal } from "../legal";
@@ -15,7 +16,8 @@ export default function Confidentialite() {
       <p>
         Cette page explique quelles données personnelles Supercity collecte sur le site supercity.fr et dans
         l&apos;appli Supercity, ce qu&apos;on en fait et comment tu gardes la main dessus. En bref : on garde ce
-        qu&apos;il faut pour faire tourner l&apos;appli, rien n&apos;est vendu ni utilisé pour de la publicité, et tu
+        qu&apos;il faut pour faire tourner l&apos;appli, rien n&apos;est vendu
+        {adsOn ? ", les publicités ne déposent de cookie qu'avec ton accord" : " ni utilisé pour de la publicité"}, et tu
         peux récupérer ou supprimer tes données depuis l&apos;appli.
       </p>
 
@@ -79,8 +81,9 @@ export default function Confidentialite() {
         </li>
       </ul>
       <p>
-        Tes données ne sont ni vendues, ni louées, ni utilisées pour de la publicité. L&apos;appli n&apos;utilise pas
-        d&apos;outil de mesure d&apos;audience ni de traceur publicitaire.
+        {adsOn
+          ? "Tes données de compte (profil, matchs, messages…) ne sont ni vendues, ni louées, ni transmises aux régies publicitaires. Le site et l'appli web affichent des publicités Google : voir « Publicité et cookies » plus bas. L'appli n'utilise pas d'outil de mesure d'audience."
+          : "Tes données ne sont ni vendues, ni louées, ni utilisées pour de la publicité. L'appli n'utilise pas d'outil de mesure d'audience ni de traceur publicitaire."}
       </p>
 
       <h2>Combien de temps</h2>
@@ -125,6 +128,13 @@ export default function Confidentialite() {
         <li>
           Apple (Plans) ou Google (Maps) : affichage de la carte des terrains sur ton téléphone.
         </li>
+        {adsOn ? (
+          <li>
+            Google Ireland Ltd (AdSense) : affichage des publicités sur le site et l&apos;appli web, et recueil de ton choix
+            sur les cookies. Google agit alors comme responsable de ses propres traitements, voir sa{" "}
+            <a href="https://policies.google.com/technologies/partner-sites?hl=fr">page dédiée</a>.
+          </li>
+        ) : null}
       </ul>
 
       <h2>Tes droits</h2>
@@ -158,13 +168,37 @@ export default function Confidentialite() {
         d&apos;attente, si tu as moins de 15 ans, demande l&apos;accord d&apos;un de tes parents.
       </p>
 
-      <h2>Cookies</h2>
-      <p>
-        Le site ne dépose aucun cookie, ni de mesure d&apos;audience, ni de publicité, et ne charge aucun service tiers
-        (les polices sont servies par le site lui-même). Si cela change, cette page sera mise à jour et ton accord
-        sera demandé avant tout dépôt de cookie non essentiel. L&apos;appli web (supercity.fr/app) garde seulement ta
-        session dans ton navigateur, ce qui est nécessaire pour rester connecté.
-      </p>
+      {adsOn ? (
+        <>
+          <h2>Publicité et cookies</h2>
+          <p>
+            Pour rester gratuit, Supercity affiche des publicités fournies par Google AdSense sur le site et dans
+            l&apos;appli web, toujours signalées par la mention « Publicité ». Aucune publicité n&apos;apparaît dans les
+            formulaires, les paiements ni les discussions.
+          </p>
+          <p>
+            À ta première visite, un message de Google te demande si tu acceptes les cookies publicitaires. Si tu
+            refuses, des publicités non personnalisées peuvent quand même s&apos;afficher, avec seulement les cookies
+            nécessaires à leur fonctionnement (lutte contre la fraude, limite d&apos;affichage). Tu peux changer d&apos;avis à
+            tout moment avec le lien « Gérer mes cookies » en bas du site ou dans les réglages de l&apos;appli. Ton choix
+            est gardé 13 mois au plus.
+          </p>
+          <p>
+            Pour le reste, l&apos;appli web garde seulement ta session dans ton navigateur, ce qui est nécessaire pour
+            rester connecté. L&apos;appli mobile n&apos;affiche pas de publicité.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2>Cookies</h2>
+          <p>
+            Le site ne dépose aucun cookie, ni de mesure d&apos;audience, ni de publicité, et ne charge aucun service tiers
+            (les polices sont servies par le site lui-même). Si cela change, cette page sera mise à jour et ton accord
+            sera demandé avant tout dépôt de cookie non essentiel. L&apos;appli web (supercity.fr/app) garde seulement ta
+            session dans ton navigateur, ce qui est nécessaire pour rester connecté.
+          </p>
+        </>
+      )}
 
       <h2>Changements</h2>
       <p>

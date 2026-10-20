@@ -1047,3 +1047,11 @@ dialog.sheet[open] {
 
 /* Aide et pages légales vues sans être connecté : colonne centrée. */
 .solo { max-width: 720px; margin: 0 auto; min-height: 100vh; background: var(--card); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+
+/* ---------- Publicité ---------- */
+.ad { display: block; min-width: 0; }
+.ad__label { display: block; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+.ad .adsbygoogle { min-height: 90px; border-radius: 12px; overflow: hidden; }
+.rail .ad { padding: 12px; }
+/* Pas d'annonce à montrer (ou bloqueur de pub) : l'emplacement disparaît. */
+.ad:has(ins[data-ad-status='unfilled']) { display: none; }

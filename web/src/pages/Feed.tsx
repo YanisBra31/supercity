@@ -1,10 +1,11 @@
 // Fil d'actualité : publications de tous les joueurs ou de mes équipes.
 import { Image as ImageIcon, Newspaper, PenSquare } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ApiError, get, Post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { TabPage } from '../ui/Layout';
+import { Ad } from '../ui/Ad';
 import { PostCard } from '../ui/PostCard';
 import { Avatar, Ball, ButtonLink, Chips, Empty, ErrorText, Loading, PageHeader } from '../ui/ui';
 
@@ -91,8 +92,11 @@ export default function Feed() {
           }
         />
       ) : null}
-      {items?.map((p) => (
-        <PostCard key={p.id} p={p} onChange={update} onRemove={remove} />
+      {items?.map((p, i) => (
+        <Fragment key={p.id}>
+          <PostCard p={p} onChange={update} onRemove={remove} />
+          {i % 6 === 2 ? <Ad /> : null}
+        </Fragment>
       ))}
       <div ref={sentinel} />
       {items?.length && more ? (

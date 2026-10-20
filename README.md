@@ -26,6 +26,8 @@ En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'h
 3. Vérifier `app/legal.ts` (éditeur, adresse, contact) : il alimente les mentions légales et la politique de confidentialité.
 4. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).
 5. Appli web (dossier `web/`, écrite pour les navigateurs) : `cd web && npm install && npm run build`, puis déposer le dossier `web/dist/app` dans `public_html` (elle s'ouvre sur `supercity.fr/app`, et appelle l'API du même site ; `supercity.fr` y renvoie directement, la présentation est sur `/decouvrir/`). Le dossier `app` n'est pas dans `out/` : ne pas l'effacer en redéposant le site.
+6. Publicités (Google AdSense) : renseigner `client` (« ca-pub-… ») et `slot` (bloc d'annonces « Display » adaptatif) dans `ads.config.json`, puis reconstruire le site et l'appli web. Activer aussi le message RGPD de Google dans AdSense > Confidentialité et messages : c'est lui qui demande l'accord pour les cookies. Laissés vides, aucune publicité ni cookie n'est chargé. `supercity.fr/ads.txt` et la politique de confidentialité se mettent à jour d'eux-mêmes.
+7. Référencement : ajouter `https://supercity.fr` dans Google Search Console, puis y envoyer `https://supercity.fr/sitemap.xml`. La page à faire connaître est `/decouvrir/` ; l'accueil (qui renvoie vers l'appli) et l'appli sont en « noindex ».
 
 ## Tester l'API
 

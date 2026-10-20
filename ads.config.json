@@ -1,0 +1,5 @@
+{
+  "_aide": "Identifiants Google AdSense (publics, ils apparaissent dans le code des pages). client : « ca-pub-… » (Compte > Informations sur le compte). slot : l'identifiant d'un bloc d'annonces « Display » adaptatif (Annonces > Par bloc d'annonces). Laissés vides, aucune publicité ni cookie n'est chargé.",
+  "client": "",
+  "slot": ""
+}

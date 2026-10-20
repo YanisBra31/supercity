@@ -5,6 +5,7 @@ import Waitlist from "../components/Waitlist";
 import Motion from "../components/Motion";
 import Loader, { Ball } from "../components/Loader";
 import Footer from "../components/Footer";
+import { AdBlock } from "../components/Ads";
 
 const steps = [
   {
@@ -84,7 +85,12 @@ function Words({ text, start = 0 }: { text: string; start?: number }) {
   );
 }
 
-export const metadata: Metadata = { alternates: { canonical: "/decouvrir/" } };
+export const metadata: Metadata = {
+  title: { absolute: "Supercity · Trouve un match de foot près de chez toi (city, futsal, 5, 8 ou 11)" },
+  description:
+    "Supercity, l'appli gratuite du foot amateur : trouve un match de city ou de futsal près de chez toi, organise le tien, monte ton équipe et défie celles du quartier.",
+  alternates: { canonical: "/decouvrir/" },
+};
 
 // Présentation de Supercity. L'adresse principale (supercity.fr) ouvre directement l'appli.
 export default function Home() {
@@ -264,6 +270,7 @@ export default function Home() {
         </section>
       </main>
 
+      <AdBlock />
       <Footer />
     </>
   );
