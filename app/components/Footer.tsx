@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookieLink } from "./Ads";
 
 export default function Footer() {
   return (
@@ -7,6 +8,7 @@ export default function Footer() {
       <nav className="footer__links" aria-label="Informations légales">
         <Link href="/mentions-legales/">Mentions légales</Link>
         <Link href="/confidentialite/">Confidentialité</Link>
+        <CookieLink />
         <span>© Supercity 2026</span>
       </nav>
     </footer>

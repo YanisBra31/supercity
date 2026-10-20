@@ -411,3 +411,10 @@ html.js .format__pitch * { stroke-dashoffset: 1; }
   .dot { left: var(--x); top: var(--y); opacity: .9; transform: none; }
   .app__phone, .hero__pitch, .join__poster img, .hero__crest img { transform: none; translate: none; }
 }
+
+/* Publicité (Google AdSense) et lien de gestion des cookies */
+.ad { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+.ad__label { display: block; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; opacity: .55; margin-bottom: 6px; }
+.footer__btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.footer__btn:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 3px; }
+.ad:has(ins[data-ad-status='unfilled']) { display: none; }

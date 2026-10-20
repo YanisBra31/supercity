@@ -1,6 +1,6 @@
 // Recherche des matchs autour du joueur, en liste ou regroupés par terrain.
 import { Bell, List, MailWarning, MapPin, PlusCircle, RefreshCw, Volleyball } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Place } from '../lib/address';
 import { ApiError, BonusEvent, get, Match } from '../lib/api';
@@ -10,6 +10,7 @@ import { distanceLabel, whenLabel } from '../lib/format';
 import { Coords, getSearchCenter, setSearchPlace } from '../lib/location';
 import { PlaceButton, PlaceSheet } from '../ui/AddressSearch';
 import { TabPage } from '../ui/Layout';
+import { Ad } from '../ui/Ad';
 import { MatchCard } from '../ui/MatchCard';
 import { ActiveFilters, activeCount, DEFAULT_FILTERS, FilterButton, Filters, FilterSheet, whenRange, WhenBar } from '../ui/match/filters';
 import { BonusBanner } from '../ui/streak';
@@ -188,7 +189,12 @@ export default function Matches() {
           }
         />
       ) : null}
-      {items?.length ? view === 'list' ? <div className="match-list">{items.map((m) => <MatchCard key={m.id} match={m} />)}</div> : <ByVenue matches={items} /> : null}
+      {items?.length ? view === 'list' ? <div className="match-list">{items.map((m, i) => (
+            <Fragment key={m.id}>
+              <MatchCard match={m} />
+              {i === 3 ? <Ad /> : null}
+            </Fragment>
+          ))}</div> : <ByVenue matches={items} /> : null}
 
       <FilterSheet open={sheet} value={filters} hasCoords={!!coords} onApply={setFilters} onClose={() => setSheet(false)} />
       <PlaceSheet open={placeSheet} near={coords} onPick={choosePlace} onClose={() => setPlaceSheet(false)} />

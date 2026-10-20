@@ -1,5 +1,9 @@
 // supercity.fr ouvre directement l'appli : écran de connexion, ou l'accueil si on est déjà connecté.
-// La présentation du projet est sur /decouvrir/.
+// La présentation du projet est sur /decouvrir/ : c'est elle que les moteurs de recherche doivent garder.
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { robots: { index: false, follow: true }, alternates: { canonical: "/decouvrir/" } };
+
 export default function Root() {
   return (
     <>

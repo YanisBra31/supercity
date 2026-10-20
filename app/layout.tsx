@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import { AdScript } from "./components/Ads";
 import { SITE_URL } from "./legal";
 
 const poppins = Poppins({
@@ -21,12 +22,11 @@ export const metadata: Metadata = {
   },
   description,
   applicationName: "Supercity",
-  alternates: { canonical: "/" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Supercity · Le foot amateur, partout, sur tous les terrains",
     description: "Crée ton équipe. Organise tes matchs. Partout, sur tous les terrains.",
-    url: "/",
+    url: "/decouvrir/",
     siteName: "Supercity",
     locale: "fr_FR",
     type: "website",
@@ -45,7 +45,17 @@ const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
     { "@type": "WebSite", name: "Supercity", url: SITE_URL, inLanguage: "fr-FR" },
-    { "@type": "Organization", name: "Supercity", url: SITE_URL, logo: `${SITE_URL}/logo-blanc.png` },
+    { "@type": "Organization", name: "Supercity", url: SITE_URL, logo: `${SITE_URL}/logo-blanc.png`, email: "contact@supercity.fr" },
+    {
+      "@type": "WebApplication",
+      name: "Supercity",
+      url: `${SITE_URL}/app/`,
+      applicationCategory: "SportsApplication",
+      operatingSystem: "Tous (navigateur web)",
+      inLanguage: "fr-FR",
+      description,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+    },
   ],
 };
 
@@ -61,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {children}
+        <AdScript />
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 // Réglages : modération, espace pro, notifications, amis, aide, sécurité, informations légales, déconnexion.
-import { Bell, Briefcase, ChevronRight, CircleHelp, Flame, Heart, Lock, LogOut, Radio, Shield, ShieldCheck, Users, Zap } from 'lucide-react';
+import { Bell, Briefcase, ChevronRight, CircleHelp, Cookie, Flame, Heart, Lock, LogOut, Radio, Shield, ShieldCheck, Users, Zap } from 'lucide-react';
 import { ReactNode, useState } from 'react';
+import { adsOn, openCookieChoices } from '../ui/Ad';
 import { Link, useNavigate } from 'react-router';
 import { ApiError, Me, NotificationPrefs, patch } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -8,7 +9,7 @@ import { Page } from '../ui/Layout';
 import { ErrorText, Icon, Kicker } from '../ui/ui';
 
 /** Ligne de menu : icône, titre, sous-titre, flèche. */
-function Row({ icon: I, title, text, to, href }: { icon: Icon; title: string; text?: string; to?: string; href?: string }) {
+function Row({ icon: I, title, text, to, href, onClick }: { icon: Icon; title: string; text?: string; to?: string; href?: string; onClick?: () => void }) {
   const inner = (
     <>
       <I size={22} aria-hidden className="set-row__icon" />
@@ -19,6 +20,12 @@ function Row({ icon: I, title, text, to, href }: { icon: Icon; title: string; te
       <ChevronRight size={18} aria-hidden style={{ color: 'var(--dim)' }} />
     </>
   );
+  if (onClick)
+    return (
+      <button type="button" className="set-row" onClick={onClick}>
+        {inner}
+      </button>
+    );
   return href ? (
     <a href={href} className="set-row">
       {inner}
@@ -130,6 +137,7 @@ export default function Settings() {
         <Row icon={Shield} title="Conditions d'utilisation" to="/cgu" />
         <Row icon={Shield} title="Politique de confidentialité" href="/confidentialite/" />
         <Row icon={Shield} title="Mentions légales" to="/mentions" />
+        {adsOn ? <Row icon={Cookie} title="Gérer mes cookies" text="Revoir ton choix pour les publicités." onClick={openCookieChoices} /> : null}
       </Group>
       <button
         type="button"
