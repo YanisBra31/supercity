@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node -e \"require('fs').copyFileSync('ads.config.json', 'public/foot/ads.json')\"",
     "build": "next build",
     "start": "next start"
   },

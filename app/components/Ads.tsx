@@ -1,7 +1,6 @@
 "use client";
 // Bloc de publicité Google AdSense, et lien « Gérer mes cookies » qui rouvre le choix de consentement.
 // Le message de consentement lui-même est celui de Google (activé dans AdSense > Confidentialité et messages).
-import Script from "next/script";
 import { useEffect } from "react";
 import { ADS, adsOn } from "../ads";
 
@@ -10,9 +9,10 @@ type AdWindow = Window & {
   googlefc?: { callbackQueue?: (() => void)[]; showRevocationMessage?: () => void };
 };
 
+// Balise écrite telle quelle dans le HTML de chaque page : c'est là que le robot d'AdSense la cherche pour valider le site.
 export function AdScript() {
   if (!adsOn) return null;
-  return <Script async strategy="afterInteractive" crossOrigin="anonymous" src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS.client}`} />;
+  return <script async crossOrigin="anonymous" src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS.client}`} />;
 }
 
 export function AdBlock() {

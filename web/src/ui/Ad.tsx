@@ -6,7 +6,10 @@ import config from '../../../ads.config.json';
 
 const CLIENT = config.client.trim();
 const SLOT = config.slot.trim();
-export const adsOn = CLIENT.startsWith('ca-pub-') && SLOT !== '';
+// Compte AdSense renseigné : le script de Google (et son message sur les cookies) est chargé.
+export const adsReady = CLIENT.startsWith('ca-pub-');
+// Bloc d'annonces renseigné en plus : les emplacements s'affichent.
+export const adsOn = adsReady && SLOT !== '';
 
 type AdWindow = Window & {
   adsbygoogle?: unknown[];
@@ -26,7 +29,7 @@ function loadScript() {
 
 /** Chargé au démarrage de l'appli, pour que le choix des cookies s'affiche dès la première visite. */
 export function initAds() {
-  if (adsOn) loadScript();
+  if (adsReady) loadScript();
 }
 
 /** Un emplacement publicitaire, signalé comme tel. */
