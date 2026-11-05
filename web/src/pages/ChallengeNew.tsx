@@ -59,6 +59,14 @@ function VenuePicker({ value, onChange }: { value: Venue | null; onChange: (v: V
 /** Valeur pour <input type="datetime-local"> (heure locale). */
 const localInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
+/** Prochain quart d'heure : avec step=900, le navigateur n'accepte que min + n × 15 min. */
+const nextQuarter = () => {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15);
+  return d;
+};
+
 export default function ChallengeNew() {
   const [params] = useSearchParams();
   const to = params.get('to') ?? '';
@@ -166,7 +174,7 @@ export default function ChallengeNew() {
             <Kicker>{open.length ? 'Ou sur un nouveau créneau' : 'Le créneau proposé'}</Kicker>
             <Label>Format</Label>
             <Chips options={FORMATS.map((f) => ({ value: f.value, label: f.label }))} value={format} onChange={(v) => v && setFormat(v)} />
-            <Field label="Jour et heure" type="datetime-local" value={when} min={localInput(new Date())} step={900} onChange={(e) => setWhen(e.target.value)} />
+            <Field label="Jour et heure" type="datetime-local" value={when} min={localInput(nextQuarter())} step={900} onChange={(e) => setWhen(e.target.value)} />
             <Label>Terrain</Label>
             <VenuePicker value={venue} onChange={setVenue} />
           </>
