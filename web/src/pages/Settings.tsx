@@ -1,7 +1,7 @@
 // Réglages : modération, espace pro, notifications, amis, aide, sécurité, informations légales, déconnexion.
 import { Bell, Briefcase, ChevronRight, CircleHelp, Cookie, Flame, Heart, Lock, LogOut, Radio, Shield, ShieldCheck, Users, Zap } from 'lucide-react';
 import { ReactNode, useState } from 'react';
-import { adsOn, openCookieChoices } from '../ui/Ad';
+import { adsReady, openCookieChoices } from '../ui/Ad';
 import { Link, useNavigate } from 'react-router';
 import { ApiError, Me, NotificationPrefs, patch } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -137,7 +137,7 @@ export default function Settings() {
         <Row icon={Shield} title="Conditions d'utilisation" to="/cgu" />
         <Row icon={Shield} title="Politique de confidentialité" href="/confidentialite/" />
         <Row icon={Shield} title="Mentions légales" to="/mentions" />
-        {adsOn ? <Row icon={Cookie} title="Gérer mes cookies" text="Revoir ton choix pour les publicités." onClick={openCookieChoices} /> : null}
+        {adsReady ? <Row icon={Cookie} title="Gérer mes cookies" text="Revoir ton choix pour les publicités." onClick={openCookieChoices} /> : null}
       </Group>
       <button
         type="button"

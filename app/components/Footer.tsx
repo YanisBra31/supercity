@@ -5,7 +5,9 @@ export default function Footer() {
   return (
     <footer className="footer">
       <span>Créer ton équipe. Organiser tes matchs. Partout, sur tous les terrains.</span>
-      <nav className="footer__links" aria-label="Informations légales">
+      <nav className="footer__links" aria-label="Liens utiles">
+        <a href="/foot/">Où jouer</a>
+        <Link href="/guides/">Guides</Link>
         <Link href="/mentions-legales/">Mentions légales</Link>
         <Link href="/confidentialite/">Confidentialité</Link>
         <CookieLink />

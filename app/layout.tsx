@@ -66,12 +66,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" suppressHydrationWarning>
+      <head>
+        <AdScript />
+      </head>
       <body className={poppins.className}>
         {/* Active les animations seulement si le JS tourne : sans lui, tout reste visible. */}
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {children}
-        <AdScript />
       </body>
     </html>
   );

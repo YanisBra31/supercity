@@ -1,0 +1,5 @@
+# Pages publiques « Foot à <ville> », générées par index.php à partir des terrains et matchs de l'appli.
+RewriteEngine On
+RewriteBase /foot/
+RewriteRule ^sitemap\.xml$ index.php?sitemap=1 [L,QSA]
+RewriteRule ^([a-z0-9-]+)/?$ index.php?ville=$1 [L,QSA]

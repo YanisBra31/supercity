@@ -92,7 +92,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/decouvrir/" },
 };
 
-// Présentation de Supercity. L'adresse principale (supercity.fr) ouvre directement l'appli.
+// Présentation de Supercity, aussi servie sur supercity.fr (voir app/page.tsx).
 export default function Home() {
   return (
     <>
