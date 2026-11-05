@@ -9,7 +9,7 @@ import { useAuth } from '../lib/auth';
 import { useBadge } from '../lib/badge';
 import { formatLabel, whenLabel } from '../lib/format';
 import { PresenceDot } from './social';
-import { Ad, adsReady, openCookieChoices } from './Ad';
+import { adsReady, openCookieChoices } from './Ad';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Avatar, Icon, Loading } from './ui';
 
@@ -142,7 +142,6 @@ function Rail() {
           {friends?.length ? 'Tous mes amis' : 'Trouver des amis'}
         </Link>
       </section>
-      <Ad className="card" />
       <nav className="rail__links" aria-label="Informations">
         <Link to="/help">Aide</Link>
         <Link to="/cgu">Conditions</Link>
