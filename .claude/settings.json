@@ -1,0 +1,11 @@
+{
+  "extraKnownMarketplaces": {
+    "rea": {
+      "source": { "source": "github", "repo": "morluto/rea" }
+    }
+  },
+  "enabledPlugins": {
+    "rea@rea": true
+  },
+  "enabledMcpjsonServers": ["rea"]
+}
