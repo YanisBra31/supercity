@@ -1,0 +1,203 @@
+/* Habillage aligné sur la vitrine (supercity.fr) : verre dépoli, boutons dégradés, fond sombre à halos orange,
+   apparitions douces. Chargé en dernier : ne fait que surcharger les styles de base. */
+:root {
+  --glass-bg: rgba(255, 250, 245, 0.72);
+  --glass-line: rgba(31, 26, 23, 0.08);
+  --glass-shadow: 0 10px 30px rgba(120, 50, 10, 0.08);
+  --glow: 0 8px 24px rgba(255, 82, 35, 0.32);
+  --radius: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0a08;
+    --card: #17110e;
+    --line: rgba(255, 248, 241, 0.09);
+    --tint: rgba(255, 248, 241, 0.06);
+    --grey-bg: rgba(255, 248, 241, 0.08);
+    --glass-bg: rgba(22, 17, 14, 0.62);
+    --glass-line: rgba(255, 248, 241, 0.12);
+    --glass-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  }
+  body {
+    background:
+      radial-gradient(60vw 50vh at 85% -10%, rgba(255, 82, 35, 0.16), transparent 70%),
+      radial-gradient(50vw 40vh at -10% 110%, rgba(255, 148, 23, 0.1), transparent 70%),
+      var(--bg) fixed;
+    background-attachment: fixed;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255, 248, 241, 0.055), rgba(255, 248, 241, 0.02)), var(--card);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .btn--dark,
+  .icon-btn--dark {
+    background: rgba(255, 248, 241, 0.1);
+    border-color: rgba(255, 248, 241, 0.14);
+  }
+  .pill--dark {
+    background: rgba(255, 248, 241, 0.12);
+  }
+}
+@media (prefers-color-scheme: light) {
+  .card {
+    box-shadow: 0 1px 2px rgba(120, 50, 10, 0.04);
+  }
+}
+
+/* Verre : barre de titre, menu, barre d'onglets, barre d'action */
+.topbar {
+  background: var(--glass-bg);
+  color: var(--ink);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  border-bottom: 1px solid var(--glass-line);
+}
+.topbar__back {
+  background: var(--tint);
+}
+.topbar__back:hover {
+  background: var(--grey-bg);
+}
+.actionbar {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
+  border-top: 1px solid var(--glass-line);
+}
+.side__item {
+  transition: background 0.2s, color 0.2s;
+}
+.side__item.active {
+  background: var(--tint);
+  box-shadow: inset 0 0 0 1px var(--glass-line);
+}
+.side__item.active svg {
+  color: var(--orange-2);
+  filter: drop-shadow(0 2px 6px rgba(255, 82, 35, 0.35));
+}
+
+@media (max-width: 759px) {
+  .main {
+    padding-bottom: calc(var(--tabbar) + 24px + env(safe-area-inset-bottom));
+  }
+  .tabbar {
+    inset: auto 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+    height: var(--tabbar);
+    padding: 0 6px;
+    border-radius: 26px;
+    background: rgba(24, 19, 16, 0.72);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    backdrop-filter: blur(22px) saturate(180%);
+    border: 1px solid rgba(255, 248, 241, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 40px rgba(10, 6, 4, 0.35);
+  }
+  .tabbar a {
+    margin: 6px 2px;
+    border-radius: 20px;
+    transition: color 0.2s, background 0.25s;
+  }
+  .tabbar a.active {
+    color: var(--chalk);
+    background: linear-gradient(135deg, rgba(255, 148, 23, 0.9), rgba(255, 82, 35, 0.9));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 18px rgba(255, 82, 35, 0.4);
+  }
+  .tabbar .dot-badge {
+    border-color: #1c1613;
+  }
+  .actionbar {
+    bottom: calc(var(--tabbar) + 18px + env(safe-area-inset-bottom));
+    margin: 0 12px;
+    border: 1px solid var(--glass-line);
+    border-radius: 22px;
+    box-shadow: var(--glass-shadow);
+  }
+  .toast {
+    bottom: calc(var(--tabbar) + 28px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Boutons : dégradé lumineux, reflet au survol */
+.btn--primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--glow);
+}
+.btn--primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%) skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  pointer-events: none;
+}
+.btn--primary:hover:not(:disabled)::after {
+  transform: translateX(120%) skewX(-20deg);
+  transition: transform 0.8s ease;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.chip[aria-pressed='true'] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 14px rgba(255, 82, 35, 0.3);
+}
+
+/* Cartes : coins plus ronds, légère montée au survol */
+a.card:hover,
+button.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(255, 82, 35, 0.12);
+}
+
+/* Fenêtres : fond flouté */
+dialog.sheet::backdrop {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Apparition des blocs d'une page */
+.page > * {
+  animation: rise 0.6s var(--ease) both;
+}
+.page > :nth-child(2) { animation-delay: 0.04s; }
+.page > :nth-child(3) { animation-delay: 0.08s; }
+.page > :nth-child(4) { animation-delay: 0.12s; }
+.page > :nth-child(5) { animation-delay: 0.16s; }
+.page > :nth-child(n + 6) { animation-delay: 0.2s; }
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* Écran d'entrée : halos et grille comme la vitrine */
+.welcome {
+  background:
+    radial-gradient(50vw 50vh at 80% 10%, rgba(255, 82, 35, 0.22), transparent 70%),
+    radial-gradient(40vw 40vh at 0% 100%, rgba(255, 148, 23, 0.14), transparent 70%),
+    #0d0a08;
+}
+.welcome__title span {
+  background: linear-gradient(100deg, #ffb347, var(--orange-1) 35%, var(--orange-2) 70%, #ff3d6e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.welcome__input {
+  border-radius: 16px;
+  background: rgba(255, 248, 241, 0.04);
+}
+.welcome__card {
+  background: rgba(30, 24, 20, 0.6);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-color: rgba(255, 248, 241, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 40px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page > * {
+    animation: none;
+  }
+  .btn--primary::after {
+    display: none;
+  }
+}

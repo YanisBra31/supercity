@@ -8,6 +8,7 @@ import './styles.css';
 import './styles-matches.css';
 import './styles-social.css';
 import './styles-me.css';
+import './styles-vitrine.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
