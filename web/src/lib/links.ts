@@ -5,6 +5,16 @@ export function webUrl(path: string): string {
   return `${location.origin}/app/${path.replace(/^\//, '')}`;
 }
 
+/** Page publique d'un match, visible sans compte, avec son aperçu pour WhatsApp et Instagram : supercity.fr/m/12. */
+export function matchUrl(id: number): string {
+  return `${location.origin}/m/${id}`;
+}
+
+/** Adresse de retour sûre après connexion : un chemin de l'appli, jamais un autre site. */
+export function safeNext(next: string | null): string {
+  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+}
+
 /** Partage un message ; là où le partage n'existe pas (ordinateur), il est copié. */
 export async function shareMessage(message: string): Promise<'shared' | 'copied' | 'failed'> {
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {

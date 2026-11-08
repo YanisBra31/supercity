@@ -1,8 +1,9 @@
 // Confirmation de l'adresse e-mail avec le code reçu.
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError, Me, post } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
+import { safeNext } from '../../lib/links';
 import { Page } from '../../ui/Layout';
 import { CodeField } from '../../ui/forms';
 import { Button, ErrorText, Success } from '../../ui/ui';
@@ -10,6 +11,8 @@ import { Button, ErrorText, Success } from '../../ui/ui';
 export default function Verify() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
+  // Arrivé depuis un match partagé : on y retourne une fois l'e-mail confirmé.
+  const next = safeNext(useSearchParams()[0].get('next'));
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -21,7 +24,7 @@ export default function Verify() {
     try {
       setUser(await post<Me>('/auth/verify-email', { code: value }));
       setMsg('E-mail confirmé, bienvenue dans l’équipe !');
-      setTimeout(() => navigate('/', { replace: true }), 900);
+      setTimeout(() => navigate(next, { replace: true }), 900);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Vérification impossible.');
     } finally {
@@ -58,7 +61,7 @@ export default function Verify() {
       <button type="button" className="link" onClick={resend}>
         Renvoyer un code
       </button>
-      <button type="button" className="link" style={{ color: 'var(--dim)' }} onClick={() => navigate('/', { replace: true })}>
+      <button type="button" className="link" style={{ color: 'var(--dim)' }} onClick={() => navigate(next, { replace: true })}>
         Plus tard
       </button>
     </Page>

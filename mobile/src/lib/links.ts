@@ -10,6 +10,12 @@ export function webUrl(path: string): string {
   return `${origin ? `${origin}/app` : WEB_APP}/${path.replace(/^\//, '')}`;
 }
 
+/** Page publique d'un match, visible sans compte, avec son aperçu pour WhatsApp et Instagram : supercity.fr/m/12. */
+export function matchUrl(id: number): string {
+  const origin = Platform.OS === 'web' ? globalThis.location?.origin : undefined;
+  return `${origin ?? 'https://supercity.fr'}/m/${id}`;
+}
+
 /**
  * Partage un message. Sur ordinateur, où le partage n'existe pas toujours, le message est copié.
  * Renvoie 'copied' dans ce cas, pour pouvoir le dire au joueur.

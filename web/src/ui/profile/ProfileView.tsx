@@ -1,7 +1,7 @@
 // Profil public d'un joueur, tel que tout le monde le voit : bannière, carte joueur, grade, infos, équipes, publications.
 // La page Profil affiche le même, avec ses boutons à soi (`actions`, `children`).
 import { BarChart3, Footprints, Heart, MapPin, Shirt, Volleyball } from 'lucide-react';
-import { ReactNode, useEffect, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { get, Post, PublicProfile } from '../../lib/api';
 import { FEET, LEVELS, POSITIONS } from '../../lib/format';
@@ -28,9 +28,11 @@ type Props = {
   actions?: ReactNode;
   /** Ce que seul le joueur voit de son profil, juste sous les boutons. */
   children?: ReactNode;
+  /** Bouton sous la carte joueur (partager ma carte). */
+  cardAction?: ReactNode;
 };
 
-export function ProfileView({ p: given, user, posts: givenPosts, setPosts: givenSetPosts, onAvatarPress, actions, children }: Props) {
+export function ProfileView({ p: given, user, posts: givenPosts, setPosts: givenSetPosts, onAvatarPress, actions, children, cardAction }: Props) {
   const p = (given ?? user)!;
   const [ownPosts, setOwnPosts] = useState<Post[]>([]);
   const external = givenPosts !== undefined;
@@ -106,7 +108,19 @@ export function ProfileView({ p: given, user, posts: givenPosts, setPosts: given
       <ProfileCards
         pages={[
           ...(p.grade ? [{ title: 'Grade', render: () => <GradeCard grade={p.grade} /> }] : []),
-          ...(p.card ? [{ title: 'Carte joueur', render: (visit: number) => <PlayerCardView key={visit} card={p.card!} name={p.display_name} uri={p.avatar_url} position={p.position} /> }] : []),
+          ...(p.card
+            ? [
+                {
+                  title: 'Carte joueur',
+                  render: (visit: number) => (
+                    <Fragment key={visit}>
+                      <PlayerCardView card={p.card!} name={p.display_name} uri={p.avatar_url} position={p.position} />
+                      {cardAction}
+                    </Fragment>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
 
