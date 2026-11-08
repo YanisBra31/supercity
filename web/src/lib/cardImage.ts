@@ -22,9 +22,9 @@ function tier(overall: number) {
   return { stops: ['#f0c79c', '#a0643a'], ink: '#3a1f0c', line: 'rgba(58,31,12,.2)' };
 }
 
-const font = (weight: number, size: number) => `${weight} ${size}px Poppins, system-ui, sans-serif`;
+export const font = (weight: number, size: number) => `${weight} ${size}px Poppins, system-ui, sans-serif`;
 
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+export function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -64,7 +64,7 @@ function star(c: CanvasRenderingContext2D, cx: number, cy: number, r: number, fi
   else c.stroke();
 }
 
-function halo(c: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
+export function halo(c: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, color);
   g.addColorStop(1, 'rgba(13,10,8,0)');
@@ -73,7 +73,7 @@ function halo(c: CanvasRenderingContext2D, x: number, y: number, r: number, colo
 }
 
 /** Texte réduit jusqu'à tenir dans `max` pixels. */
-function fitFont(c: CanvasRenderingContext2D, text: string, weight: number, size: number, max: number) {
+export function fitFont(c: CanvasRenderingContext2D, text: string, weight: number, size: number, max: number) {
   let s = size;
   c.font = font(weight, s);
   while (s > 24 && c.measureText(text).width > max) {
