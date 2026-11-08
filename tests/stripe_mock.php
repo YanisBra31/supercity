@@ -2,7 +2,7 @@
 // Faux Stripe pour les tests (serveur PHP intégré) : comptes, sessions de paiement, remboursements, retours de virement.
 // Sert aussi de faux service push d'Expo (POST /--/api/v2/push/send ; un jeton qui contient « Gone » n'existe plus).
 // Usage : STRIPE_MOCK_STATE=/tmp/stripe.json php -S 127.0.0.1:8097 tests/stripe_mock.php
-// Routes de test : POST /test/accounts/{id}/ready, POST /test/sessions/{id}/pay, GET /test/state.
+// Routes de test : POST /test/accounts/{id}/ready, POST /test/sessions/{id}/pay (carte bloquée si capture manuelle), GET /test/state.
 declare(strict_types=1);
 
 $file = getenv('STRIPE_MOCK_STATE') ?: sys_get_temp_dir() . '/stripe-mock.json';
@@ -86,7 +86,14 @@ switch (true) {
         $state['sessions'][$m[1]]['status'] = 'expired';
         out(200, $state['sessions'][$m[1]]);
     case $method === 'GET' && preg_match('#^/v1/payment_intents/(\w+)$#', $path, $m) === 1:
-        out(200, ['id' => $m[1], 'object' => 'payment_intent', 'latest_charge' => ['id' => "ch_{$m[1]}", 'transfer' => "tr_{$m[1]}"]]);
+        out(200, ['id' => $m[1], 'object' => 'payment_intent', 'status' => $state['intents'][$m[1]] ?? 'succeeded', 'latest_charge' => ['id' => "ch_{$m[1]}", 'transfer' => "tr_{$m[1]}"]]);
+    case $method === 'POST' && preg_match('#^/v1/payment_intents/(\w+)/(capture|cancel)$#', $path, $m) === 1:
+        if (($state['intents'][$m[1]] ?? null) !== 'requires_capture') {
+            out(400, ['error' => ['type' => 'invalid_request_error', 'code' => 'payment_intent_unexpected_state', 'message' => "This PaymentIntent's status is " . ($state['intents'][$m[1]] ?? 'succeeded') . '.']]);
+        }
+        $state['intents'][$m[1]] = $m[2] === 'capture' ? 'succeeded' : 'canceled';
+        $state[$m[2] === 'capture' ? 'captures' : 'cancels'][] = $m[1];
+        out(200, ['id' => $m[1], 'object' => 'payment_intent', 'status' => $state['intents'][$m[1]]]);
     case $method === 'POST' && preg_match('#^/v1/transfers/(\w+)/reversals$#', $path, $m) === 1:
         $r = ['id' => $id('trr'), 'object' => 'transfer_reversal', 'transfer' => $m[1]] + $in;
         $state['reversals'][] = $r;
@@ -99,9 +106,13 @@ switch (true) {
         $state['accounts'][$m[1]]['capabilities']['transfers'] = 'active';
         out(200, $state['accounts'][$m[1]]);
     case $method === 'POST' && preg_match('#^/test/sessions/(\w+)/pay$#', $path, $m) === 1:
+        // Capture manuelle : la carte est bloquée, Stripe dit « unpaid » tant que rien n'est débité.
+        $manual = ($state['sessions'][$m[1]]['params']['payment_intent_data']['capture_method'] ?? '') === 'manual';
+        $pi = $id('pi');
+        $state['intents'][$pi] = $manual ? 'requires_capture' : 'succeeded';
         $state['sessions'][$m[1]]['status'] = 'complete';
-        $state['sessions'][$m[1]]['payment_status'] = 'paid';
-        $state['sessions'][$m[1]]['payment_intent'] = $id('pi');
+        $state['sessions'][$m[1]]['payment_status'] = $manual ? 'unpaid' : 'paid';
+        $state['sessions'][$m[1]]['payment_intent'] = $pi;
         out(200, $state['sessions'][$m[1]]);
     case $method === 'POST' && $path === '/--/api/v2/push/send':
         $tickets = [];

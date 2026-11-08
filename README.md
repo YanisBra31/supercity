@@ -21,7 +21,7 @@ En local, le formulaire affiche une erreur : le script PHP ne tourne que sur l'h
 
 ## Mise en ligne
 
-1. Dans phpMyAdmin, importer dans l'ordre `sql/001_waitlist.sql`, `sql/002_core.sql`, `sql/003_securite.sql`, `sql/004_personnalisation.sql`, `sql/005_defis.sql`, `sql/006_fil.sql`, `sql/007_roles.sql`, `sql/008_paiement.sql`, `sql/009_pro.sql`, `sql/010_series.sql`, `sql/011_notifications.sql` puis `sql/012_boutique.sql`. Pour devenir admin, lancer ensuite `UPDATE users SET site_role = 'admin' WHERE email = 'ton-adresse';`. Les photos envoyées vont dans `public_html/uploads/` (créé automatiquement).
+1. Dans phpMyAdmin, importer dans l'ordre `sql/001_waitlist.sql`, `sql/002_core.sql`, `sql/003_securite.sql`, `sql/004_personnalisation.sql`, `sql/005_defis.sql`, `sql/006_fil.sql`, `sql/007_roles.sql`, `sql/008_paiement.sql`, `sql/009_pro.sql`, `sql/010_series.sql`, `sql/011_notifications.sql`, `sql/012_boutique.sql`, `sql/013_cartes.sql`, `sql/014_grade_bonus.sql`, `sql/015_rgpd.sql`, `sql/016_notifs_amis.sql`, `sql/017_invitations_discussions.sql` puis `sql/018_paiement_au_coup_d_envoi.sql`. Pour devenir admin, lancer ensuite `UPDATE users SET site_role = 'admin' WHERE email = 'ton-adresse';`. Les photos envoyées vont dans `public_html/uploads/` (créé automatiquement).
 2. Copier `public/api/config.example.php` en `supercity-config.php` dans le dossier qui contient `public_html` (pas dedans), et le remplir avec les identifiants MySQL.
 3. Vérifier `app/legal.ts` (éditeur, adresse, contact) : il alimente les mentions légales et la politique de confidentialité.
 4. `npm run build`, puis déposer le contenu du dossier `out/` dans `public_html` (il remplace la page de maintenance).

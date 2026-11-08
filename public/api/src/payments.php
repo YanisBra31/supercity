@@ -1,11 +1,16 @@
 <?php
 // Paiement de la place (Stripe Connect) : l'organisation pro relie son compte Stripe, le joueur paie le prix
 // de la place plus les frais de service Supercity. L'organisation reçoit le prix moins la commission Supercity.
+// Le joueur n'est débité que si le match se joue complet : à l'inscription, le montant est seulement bloqué sur sa carte,
+// puis débité 2 h avant le coup d'envoi si le match est complet. Sinon le match est annulé et le blocage levé.
 declare(strict_types=1);
 
 const HOLD_MINUTES = 30;          // place réservée pendant le paiement (minimum imposé par Stripe Checkout)
 const PROMOTED_HOLD_HOURS = 6;    // place réservée pour qui sort de la liste d'attente
-const REFUND_HOURS_BEFORE = 24;   // désistement remboursé jusqu'à 24 h avant le coup d'envoi
+const REFUND_HOURS_BEFORE = 24;   // anciens paiements débités tout de suite : remboursés jusqu'à 24 h avant
+const AUTH_DAYS = 6;              // un blocage de carte dure 7 jours : on ne bloque qu'à partir de J-6
+const CARD_DEADLINE_DAYS = 4;     // inscrit plus tôt : carte à confirmer avant J-4, sinon la place est libérée
+const SETTLE_HOURS_BEFORE = 2;    // débit (match complet) ou annulation (pas complet) 2 h avant le coup d'envoi
 const PRICE_MAX_CENTS = 5000;
 
 function stripe_config(): ?array
@@ -141,6 +146,7 @@ function payout_view(array $org): array
         'fee_cents' => service_fee(),
         'commission_percent' => commission_percent($org),
         'refund_hours' => REFUND_HOURS_BEFORE,
+        'settle_hours' => SETTLE_HOURS_BEFORE,
     ];
 }
 
@@ -200,6 +206,9 @@ function create_checkout(array $m, array $user, string $returnUrl): string
     if (!$payee['stripe_ready'] || !$payee['stripe_account_id']) {
         throw new HttpError(409, 'organizer_not_ready', "L'organisateur ne peut pas encore encaisser. Réessaie plus tard.");
     }
+    if (!card_window_open($m)) {
+        throw new HttpError(409, 'card_too_early', 'Tu pourras confirmer ta carte à partir du ' . fr_when(card_window($m)['from']) . '.');
+    }
     $venue = one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']]);
     $price = (int)$m['price_cents'];
     $fee = service_fee();
@@ -220,6 +229,8 @@ function create_checkout(array $m, array $user, string $returnUrl): string
         // Managed Payments (activé par défaut sur les nouveaux comptes Stripe) refuse Connect : on le coupe ici.
         'managed_payments' => ['enabled' => false],
         'payment_intent_data' => [
+            // Montant seulement bloqué sur la carte : débité 2 h avant le match s'il est complet (settle_match).
+            'capture_method' => 'manual',
             // Supercity garde les frais de service et sa commission, le reste va à l'organisation.
             'application_fee_amount' => $fee + $commission,
             'transfer_data' => ['destination' => $payee['stripe_account_id']],
@@ -238,43 +249,84 @@ function create_checkout(array $m, array $user, string $returnUrl): string
 }
 
 /**
- * Valide une session Stripe payée (appelé par le webhook et au retour dans l'appli, sans risque d'être fait deux fois).
- * Place encore réservée ou place libre : inscrit. Sinon (délai dépassé et match complet) : remboursé en entier.
+ * Valide une session Stripe (appelé par le webhook et au retour dans l'appli, sans risque d'être fait deux fois).
+ * Carte bloquée (ou payée) : place réservée, place libre ou joueur déjà inscrit qui confirme sa carte -> inscrit.
+ * Sinon (délai dépassé et match complet) : le blocage est levé (ou le paiement remboursé en entier).
  */
 function finalize_session(array $session): void
 {
-    if (($session['payment_status'] ?? '') !== 'paid') {
+    $pi = is_array($session['payment_intent'] ?? null) ? $session['payment_intent']['id'] : ($session['payment_intent'] ?? null);
+    $charged = ($session['payment_status'] ?? '') === 'paid';
+    $held = false;
+    if (!$charged && ($session['status'] ?? '') === 'complete' && $pi) {
+        // Capture manuelle : Stripe dit « unpaid » tant que rien n'est débité ; on vérifie que la carte est bien bloquée.
+        $held = (stripe('GET', '/payment_intents/' . rawurlencode($pi))['status'] ?? '') === 'requires_capture';
+    }
+    if (!$charged && !$held) {
         if (($session['status'] ?? '') === 'expired') {
             query('UPDATE payments SET status = "expired" WHERE session_id = ? AND status = "open"', [$session['id']]);
         }
         return;
     }
-    $refund = transaction(function () use ($session) {
+    [$undo, $capture] = transaction(function () use ($session, $pi, $charged) {
         $p = one('SELECT * FROM payments WHERE session_id = ? FOR UPDATE', [$session['id']]);
-        if (!$p || $p['status'] === 'paid' || $p['status'] === 'refunded') {
-            return null;
+        if (!$p || $p['status'] !== 'open') {
+            return [null, null];
         }
-        $pi = is_array($session['payment_intent'] ?? null) ? $session['payment_intent']['id'] : ($session['payment_intent'] ?? null);
-        query('UPDATE payments SET status = "paid", payment_intent = ?, paid_at = UTC_TIMESTAMP() WHERE id = ?', [$pi, $p['id']]);
+        query(
+            'UPDATE payments SET status = ?, payment_intent = ?, ' . ($charged ? 'paid_at' : 'authorized_at') . ' = UTC_TIMESTAMP() WHERE id = ?',
+            [$charged ? 'paid' : 'authorized', $pi, $p['id']]
+        );
+        $p = ['status' => $charged ? 'paid' : 'authorized', 'payment_intent' => $pi] + $p;
         $m = load_match((int)$p['match_id'], true);
         $me = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [$m['id'], $p['user_id']]);
-        $held = $me && $me['status'] === 'pending';
-        $already = $me && $me['status'] === 'registered';
+        $pending = $me && $me['status'] === 'pending';
+        $registered = $me && $me['status'] === 'registered';
         $free = registered_count((int)$m['id']) < (int)$m['max_players'];
-        if ($m['status'] !== 'cancelled' && match_status($m) !== 'played' && !$already && ($held || $free)) {
-            query(
-                'INSERT INTO match_participants (match_id, user_id, status) VALUES (?, ?, "registered")
-                 ON DUPLICATE KEY UPDATE status = "registered", hold_until = NULL, updated_at = CURRENT_TIMESTAMP',
-                [$m['id'], $p['user_id']]
-            );
-            refresh_match((int)$m['id']);
-            return null;
+        if ($m['status'] !== 'cancelled' && match_status($m) !== 'played' && ($registered || $pending || $free)) {
+            if (!$registered) {
+                query(
+                    'INSERT INTO match_participants (match_id, user_id, status) VALUES (?, ?, "registered")
+                     ON DUPLICATE KEY UPDATE status = "registered", hold_until = NULL, updated_at = CURRENT_TIMESTAMP',
+                    [$m['id'], $p['user_id']]
+                );
+                refresh_match((int)$m['id']);
+            }
+            // Joueurs déjà débités (match complet) : celui qui arrive après est débité tout de suite.
+            return [null, $m['payment_settled_at'] !== null && $p['status'] === 'authorized' ? $p : null];
         }
-        return ['payment_intent' => $pi] + $p;
+        return [$p, null];
     });
-    if ($refund) {
-        refund_payment($refund, true);
+    if ($capture) {
+        capture_payment($capture);
     }
+    if ($undo) {
+        $undo['status'] === 'authorized' ? release_payment($undo) : refund_payment($undo, true);
+    }
+}
+
+/** Débite une carte bloquée. */
+function capture_payment(array $p): bool
+{
+    try {
+        stripe('POST', '/payment_intents/' . rawurlencode($p['payment_intent']) . '/capture', [], "capture-{$p['id']}");
+    } catch (HttpError) {
+        error_log("supercity: débit du paiement {$p['id']} refusé par Stripe");
+        return false;
+    }
+    query('UPDATE payments SET status = "paid", paid_at = UTC_TIMESTAMP() WHERE id = ? AND status = "authorized"', [$p['id']]);
+    return true;
+}
+
+/** Lève le blocage d'une carte : rien n'est débité. */
+function release_payment(array $p): void
+{
+    try {
+        stripe('POST', '/payment_intents/' . rawurlencode($p['payment_intent']) . '/cancel', [], "cancel-{$p['id']}");
+    } catch (HttpError) {
+        // Déjà levé chez Stripe (blocage expiré ou annulé) : rien n'est débité de toute façon.
+    }
+    query('UPDATE payments SET status = "canceled", canceled_at = UTC_TIMESTAMP() WHERE id = ? AND status = "authorized"', [$p['id']]);
 }
 
 /**
@@ -313,13 +365,41 @@ function refund_payment(array $p, bool $withFee): void
     }
 }
 
-/** Paiement validé de ce joueur pour ce match, s'il y en a un. */
+/** Paiement débité de ce joueur pour ce match, s'il y en a un. */
 function paid_payment(int $matchId, int $userId): ?array
 {
     return one('SELECT * FROM payments WHERE match_id = ? AND user_id = ? AND status = "paid" ORDER BY id DESC LIMIT 1', [$matchId, $userId]);
 }
 
-/** Désistement d'un match payant : remboursé (hors frais) jusqu'à 24 h avant, et la session en cours est fermée. */
+/** Carte bloquée ou paiement débité : le joueur a réglé sa place. */
+function held_payment(int $matchId, int $userId): ?array
+{
+    return one('SELECT * FROM payments WHERE match_id = ? AND user_id = ? AND status IN ("authorized", "paid") ORDER BY id DESC LIMIT 1', [$matchId, $userId]);
+}
+
+/** Période où le joueur peut faire bloquer sa carte : de J-6 à J-4 (jusqu'au coup d'envoi pour une place réservée). */
+function card_window(array $m): array
+{
+    $start = strtotime($m['starts_at'] . ' UTC');
+    return ['from' => gmdate('Y-m-d H:i:s', $start - AUTH_DAYS * 86400), 'until' => gmdate('Y-m-d H:i:s', $start - CARD_DEADLINE_DAYS * 86400)];
+}
+
+function card_window_open(array $m): bool
+{
+    return strtotime($m['starts_at'] . ' UTC') - time() <= AUTH_DAYS * 86400;
+}
+
+/** Inscrit à un match payant sans carte bloquée (inscrit plus de 6 jours avant) : il doit encore confirmer sa carte. */
+function needs_card(array $m, int $userId, ?string $status): bool
+{
+    return (int)$m['price_cents'] > 0 && $status === 'registered' && (int)$m['organizer_id'] !== $userId
+        && $m['status'] !== 'cancelled' && $m['payment_settled_at'] === null && !held_payment((int)$m['id'], $userId);
+}
+
+/**
+ * Désistement d'un match payant : la carte bloquée est libérée (rien n'est débité) et la session en cours est fermée.
+ * Place déjà débitée (match complet, ou ancien paiement) : remboursée hors frais jusqu'à 24 h avant.
+ */
 function settle_withdrawal(array $m, int $userId): ?int
 {
     foreach (query('SELECT session_id FROM payments WHERE match_id = ? AND user_id = ? AND status = "open"', [$m['id'], $userId])->fetchAll() as $s) {
@@ -329,6 +409,9 @@ function settle_withdrawal(array $m, int $userId): ?int
             // déjà fermée chez Stripe
         }
         query('UPDATE payments SET status = "expired" WHERE session_id = ? AND status = "open"', [$s['session_id']]);
+    }
+    foreach (query('SELECT * FROM payments WHERE match_id = ? AND user_id = ? AND status = "authorized"', [$m['id'], $userId])->fetchAll() as $a) {
+        release_payment($a);
     }
     $p = paid_payment((int)$m['id'], $userId);
     if (!$p || strtotime($m['starts_at'] . ' UTC') - time() < REFUND_HOURS_BEFORE * 3600) {
@@ -344,15 +427,111 @@ function settle_withdrawal(array $m, int $userId): ?int
     return (int)$p['amount_cents'] - (int)$p['fee_cents'];
 }
 
-/** Match annulé : tout le monde est remboursé, frais compris. Un échec chez Stripe n'empêche pas les autres. */
+/** Match annulé : les cartes bloquées sont libérées, les places débitées remboursées en entier. Un échec chez Stripe n'empêche pas les autres. */
 function refund_all(int $matchId): void
 {
+    foreach (query('SELECT * FROM payments WHERE match_id = ? AND status = "authorized"', [$matchId])->fetchAll() as $a) {
+        release_payment($a);
+    }
+    foreach (query('SELECT session_id FROM payments WHERE match_id = ? AND status = "open"', [$matchId])->fetchAll() as $o) {
+        try {
+            stripe('POST', '/checkout/sessions/' . rawurlencode($o['session_id']) . '/expire');
+        } catch (HttpError) {
+            // déjà fermée chez Stripe
+        }
+        query('UPDATE payments SET status = "expired" WHERE session_id = ? AND status = "open"', [$o['session_id']]);
+    }
     foreach (query('SELECT * FROM payments WHERE match_id = ? AND status = "paid"', [$matchId])->fetchAll() as $p) {
         try {
             refund_payment($p, true);
         } catch (HttpError) {
             error_log("supercity: remboursement {$p['id']} à refaire depuis le tableau de bord Stripe");
         }
+    }
+}
+
+// ───── Au coup d'envoi ─────
+
+/**
+ * 2 h avant le match : complet, tout le monde est débité ; pas complet, le match est annulé et personne n'est débité.
+ * Un tournoi se joue même s'il n'est pas plein : les inscrits sont débités.
+ */
+function settle_match(int $matchId): void
+{
+    $m = transaction(function () use ($matchId) {
+        $m = load_match($matchId, true);
+        if ($m['payment_settled_at'] !== null || $m['status'] === 'cancelled') {
+            return null;
+        }
+        expire_holds($matchId);
+        $full = registered_count($matchId) >= (int)$m['max_players'];
+        $play = $full || $m['kind'] === 'tournament';
+        query('UPDATE matches SET payment_settled_at = UTC_TIMESTAMP()' . ($play ? '' : ', status = "cancelled"') . ' WHERE id = ?', [$matchId]);
+        return ['play' => $play] + $m;
+    });
+    if (!$m) {
+        return;
+    }
+    $where = 'à ' . (one('SELECT name FROM venues WHERE id = ?', [$m['venue_id']])['name'] ?? 'ton terrain') . ', ' . fr_when($m['starts_at']);
+    if ($m['play']) {
+        $failed = [];
+        foreach (query(
+            'SELECT p.* FROM payments p JOIN match_participants mp ON mp.match_id = p.match_id AND mp.user_id = p.user_id AND mp.status = "registered"
+             WHERE p.match_id = ? AND p.status = "authorized"',
+            [$matchId]
+        )->fetchAll() as $p) {
+            if (!capture_payment($p)) {
+                $failed[] = (int)$p['user_id'];
+            }
+        }
+        if ($failed) {
+            notify($failed, 'payment', 'Paiement refusé', "Ta banque a refusé le débit de ta place $where. Préviens l'organisateur.", "/match/$matchId");
+        }
+        return;
+    }
+    $players = array_column(query(
+        'SELECT user_id FROM match_participants WHERE match_id = ? AND status <> "withdrawn" AND user_id <> ?',
+        [$matchId, $m['organizer_id']]
+    )->fetchAll(), 'user_id');
+    refund_all($matchId);
+    notify($players, 'cancelled', 'Match annulé', "Le match $where n'était pas complet : il est annulé et tu n'es pas débité.", "/match/$matchId");
+    notify([(int)$m['organizer_id']], 'cancelled', 'Match annulé', "Le match $where n'était pas complet : il est annulé et personne n'est débité.", "/match/$matchId");
+}
+
+/** Tâches liées au paiement, lancées avec les rappels (toutes les 15 minutes au plus). */
+function run_payment_jobs(): void
+{
+    if (!stripe_config()) {
+        return;
+    }
+    // Débit ou annulation 2 h avant le coup d'envoi.
+    foreach (query(
+        'SELECT id FROM matches WHERE price_cents > 0 AND status <> "cancelled" AND payment_settled_at IS NULL
+         AND starts_at <= UTC_TIMESTAMP() + INTERVAL ' . SETTLE_HOURS_BEFORE . ' HOUR AND starts_at > UTC_TIMESTAMP() - INTERVAL 1 DAY'
+    )->fetchAll() as $row) {
+        settle_match((int)$row['id']);
+    }
+    $unheld = 'FROM match_participants mp JOIN matches m ON m.id = mp.match_id
+        WHERE m.price_cents > 0 AND m.status <> "cancelled" AND m.payment_settled_at IS NULL AND mp.status = "registered" AND mp.user_id <> m.organizer_id
+        AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.match_id = mp.match_id AND p.user_id = mp.user_id AND p.status IN ("authorized", "paid"))';
+    // J-6 : les inscrits de la première heure sont invités à confirmer leur carte.
+    foreach (query(
+        "SELECT mp.match_id, mp.user_id, m.starts_at $unheld AND mp.card_reminded_at IS NULL
+         AND m.starts_at <= UTC_TIMESTAMP() + INTERVAL " . AUTH_DAYS . ' DAY AND m.starts_at > UTC_TIMESTAMP() + INTERVAL ' . CARD_DEADLINE_DAYS . ' DAY'
+    )->fetchAll() as $row) {
+        query('UPDATE match_participants SET card_reminded_at = UTC_TIMESTAMP() WHERE match_id = ? AND user_id = ?', [$row['match_id'], $row['user_id']]);
+        notify([(int)$row['user_id']], 'payment', 'Confirme ta carte', 'Pour garder ta place du ' . fr_when($row['starts_at']) . ', confirme ta carte avant le '
+            . fr_when(gmdate('Y-m-d H:i:s', strtotime($row['starts_at'] . ' UTC') - CARD_DEADLINE_DAYS * 86400)) . ". Tu ne seras débité que si le match est complet.", "/match/{$row['match_id']}");
+    }
+    // J-4 : carte toujours pas confirmée, la place passe au suivant.
+    foreach (query(
+        "SELECT mp.match_id, mp.user_id, m.starts_at $unheld AND m.starts_at <= UTC_TIMESTAMP() + INTERVAL " . CARD_DEADLINE_DAYS . ' DAY'
+    )->fetchAll() as $row) {
+        transaction(function () use ($row) {
+            query('UPDATE match_participants SET status = "withdrawn", hold_until = NULL WHERE match_id = ? AND user_id = ? AND status = "registered"', [$row['match_id'], $row['user_id']]);
+            refresh_match((int)$row['match_id']);
+        });
+        notify([(int)$row['user_id']], 'payment', 'Place libérée', 'Ta carte n\'a pas été confirmée à temps : ta place du ' . fr_when($row['starts_at']) . ' est passée à un autre joueur.', "/match/{$row['match_id']}");
     }
 }
 
@@ -387,7 +566,7 @@ function register_payment_routes(Router $r): void
         $m = load_match((int)$id);
         expire_holds((int)$m['id']);
         $me = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [$m['id'], $user['id']]);
-        if (($me['status'] ?? null) !== 'pending') {
+        if (($me['status'] ?? null) !== 'pending' && !needs_card($m, (int)$user['id'], $me['status'] ?? null)) {
             throw new HttpError(409, 'nothing_to_pay', "Tu n'as pas de place à payer pour ce match.");
         }
         respond(200, ['checkout_url' => create_checkout($m, $user, app_return($in['return_url'] ?? null))]);
@@ -435,6 +614,10 @@ function register_payment_routes(Router $r): void
             case 'checkout.session.async_payment_succeeded':
             case 'checkout.session.expired':
                 finalize_session($obj);
+                break;
+            case 'payment_intent.canceled':
+                // Blocage levé chez Stripe (expiré au bout de 7 jours, ou annulé) : le joueur devra reconfirmer sa carte.
+                query('UPDATE payments SET status = "canceled", canceled_at = UTC_TIMESTAMP() WHERE payment_intent = ? AND status = "authorized"', [$obj['id'] ?? '']);
                 break;
             case 'account.updated':
                 $ready = account_ready($obj) ? 1 : 0;

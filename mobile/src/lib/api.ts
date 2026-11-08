@@ -215,6 +215,12 @@ export type Match = {
   /** Place réservée en attendant le paiement, jusqu'à cette date. */
   my_hold_until: string | null;
   my_paid: boolean;
+  /** Carte bloquée (débitée 2 h avant si le match est complet) ou déjà débitée. */
+  my_payment: 'authorized' | 'paid' | null;
+  /** Inscrit plus de 6 jours avant : carte à confirmer entre ces deux dates (open : c'est le moment). */
+  my_card_window: { from: string; until: string; open: boolean } | null;
+  /** Débit (match complet) ou annulation (pas complet) à ce moment-là. */
+  settle_at: string | null;
   /** Prix de la place en centimes (0 : gratuit), hors frais de service. */
   price_cents: number;
   fee_cents: number;
@@ -238,7 +244,7 @@ export type LegalForm = 'company' | 'non_profit' | 'individual';
 export type OrgSummary = { id: number; name: string; kind: OrgKind; city: string | null; description: string | null };
 
 /** Paiements d'un espace pro (compte Stripe relié). */
-export type Payouts = { enabled: boolean; connected: boolean; ready: boolean; fee_cents: number; commission_percent: number; refund_hours: number };
+export type Payouts = { enabled: boolean; connected: boolean; ready: boolean; fee_cents: number; commission_percent: number; refund_hours: number; settle_hours: number };
 
 /** Mon espace pro : paiements et chiffres. */
 export type MyOrganization = OrgSummary & {
