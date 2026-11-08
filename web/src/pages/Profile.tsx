@@ -1,10 +1,11 @@
 // Profil du joueur : son profil public tel que les autres le voient, avec ses boutons à soi (modifier, boutique, amis, réglages).
-import { Briefcase, ChevronDown, ChevronUp, LogOut, MailWarning, Package, Pencil, Settings, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
+import { Briefcase, ChevronDown, ChevronUp, ImageDown, LogOut, MailWarning, Package, Pencil, Settings, ShieldCheck, ShoppingBag, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { get, Match, Post, PublicProfile } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBadge } from '../lib/badge';
+import { cardImage, shareImage } from '../lib/cardImage';
 import { loadItem, saveItem } from '../lib/storage';
 import { TabPage } from '../ui/Layout';
 import { MatchCard } from '../ui/MatchCard';
@@ -20,6 +21,20 @@ export default function Profile() {
   const [pub, setPub] = useState<PublicProfile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [allMatches, setAllMatches] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+
+  const shareCard = async () => {
+    if (!pub?.card) return;
+    setDrawing(true);
+    try {
+      const blob = await cardImage(pub.card, pub.display_name, pub.avatar_url, pub.position);
+      if ((await shareImage(blob, 'ma-carte-supercity.png')) === 'saved') show('Image enregistrée : poste-la en story !');
+    } catch {
+      show("L'image n'a pas pu être créée. Réessaie.");
+    } finally {
+      setDrawing(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -60,6 +75,11 @@ export default function Profile() {
           posts={posts}
           setPosts={setPosts}
           onAvatarPress={() => navigate('/me/edit')}
+          cardAction={
+            <Button variant="dark" icon={ImageDown} onClick={shareCard} loading={drawing}>
+              Partager ma carte en story
+            </Button>
+          }
           actions={
             <div className="row" style={{ gap: 8 }}>
               <ButtonLink to="/me/edit" icon={Pencil} variant="dark" className="grow">

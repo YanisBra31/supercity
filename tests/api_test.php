@@ -280,6 +280,28 @@ check('places par défaut selon le format (8 vs 8 = 16)', $s === 201 && $m2['max
 $ids = array_column($r['items'] ?? [], 'id');
 check('recherche autour de soi : Toulouse oui, Bordeaux et privé non', $s === 200 && in_array($matchId, $ids) && in_array($m2['id'], $ids) && !in_array($m3['id'], $ids) && !in_array($mp['id'], $ids), $ids);
 check('la distance est renvoyée', isset($r['items'][0]['venue']['distance_km']), $r['items'][0] ?? null);
+
+// Page publique d'un match à partager (/m/<id>) : visible sans compte, sans le nom des joueurs.
+$site = preg_replace('#/api/v1$#', '', $base);
+$page = function (string $path) use ($site): array {
+    $ch = curl_init($site . $path);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => false]);
+    $body = (string)curl_exec($ch);
+    $out = [curl_getinfo($ch, CURLINFO_HTTP_CODE), $body, (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE)];
+    curl_close($ch);
+    return $out;
+};
+[$s, $html] = $page("/m/$matchId");
+check('page publique du match sans compte', $s === 200 && str_contains($html, 'places restantes') && str_contains($html, 'Je rejoins le match'), $s);
+check('page publique : aperçu de partage propre au match', str_contains($html, "og:image\" content=\"https://supercity.fr/m/$matchId.jpg") && str_contains($html, 'og:title'), null);
+check('page publique : inscription puis retour sur le match', str_contains($html, '/app/register?next=' . rawurlencode("/match/$matchId")), null);
+check('page publique : aucun nom de joueur', !str_contains($html, 'Yassin'), null);
+[$s, $img, $type] = $page("/m/$matchId.jpg");
+check('aperçu du match en image', $s === 200 && $type === 'image/jpeg' && str_starts_with($img, "\xFF\xD8"), [$s, $type]);
+[$s, $html] = $page('/m/' . $mp['id']);
+check('match privé : ni terrain ni heure, pas indexé', $s === 200 && str_contains($html, 'Match <span>privé') && str_contains($html, 'noindex') && !str_contains($html, $v1['name']), $s);
+[$s] = $page('/m/999999');
+check('match inconnu : 404', $s === 404, $s);
 [$s, $r] = api('GET', '/matches?format=foot8', null, $karim);
 check('filtre par format', $s === 200 && array_column($r['items'], 'id') === [$m2['id']], $r);
 [$s, $r] = api('GET', '/matches?level=4', null, $karim);

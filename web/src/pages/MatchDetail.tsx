@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dayLabel, distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../lib/format';
-import { shareMessage, webUrl } from '../lib/links';
+import { matchUrl, shareMessage, webUrl } from '../lib/links';
 import { euros, openStripe, returnUrl } from '../lib/pay';
 import { celebrate } from '../ui/celebrate';
 import { Page } from '../ui/Layout';
@@ -150,9 +150,9 @@ export default function MatchDetail() {
   const start = new Date(m.starts_at);
 
   const share = async () => {
-    const r = await shareMessage(`${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : ${webUrl(`match/${m.id}`)}`);
+    const r = await shareMessage(`${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : ${matchUrl(m.id)}`);
     if (r === 'copied') show('Lien du match copié, colle-le à tes potes.');
-    if (r === 'failed') show('Copie impossible : ' + webUrl(`match/${m.id}`));
+    if (r === 'failed') show('Copie impossible : ' + matchUrl(m.id));
   };
   // Paiement de la place : on part sur Stripe, qui ramène sur cette fiche (vérifiée au chargement).
   const pay = async (checkoutUrl: string | null | undefined, current: Match): Promise<Match> => {

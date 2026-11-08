@@ -1,0 +1,6 @@
+# Lien court d'un match à partager : /m/12 (la page), /m/12.jpg (son aperçu pour WhatsApp, Instagram…).
+# Les deux sont générés par /foot/index.php depuis la base de l'appli.
+RewriteEngine On
+RewriteBase /m/
+RewriteRule ^([0-9]+)\.jpg$ /foot/index.php?match=$1&img=1 [L]
+RewriteRule ^([0-9]+)/?$ /foot/index.php?match=$1 [L,QSA]

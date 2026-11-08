@@ -1,8 +1,9 @@
 // Routes de l'appli web. Adresses identiques à l'appli mobile (/match/12, /user/3…) : les liens des notifications marchent partout.
-import { lazy, ReactNode, Suspense } from 'react';
+import { lazy, ReactNode, Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, useAuth } from './lib/auth';
 import { useBadgePolling } from './lib/badge';
+import { safeNext } from './lib/links';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { AppShell } from './ui/Layout';
 import { Loading } from './ui/ui';
@@ -46,6 +47,12 @@ const Mentions = lazy(() => import('./pages/Mentions'));
 function Private() {
   const { user } = useAuth();
   const loc = useLocation();
+  // Lien de match partagé, ouvert sans compte : la page publique du match (terrain, heure, places), pas la connexion.
+  const shared = user ? null : (/^\/match\/(\d+)\/?$/.exec(loc.pathname)?.[1] ?? null);
+  useEffect(() => {
+    if (shared) window.location.replace(`/m/${shared}`);
+  }, [shared]);
+  if (shared) return null;
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   return <Outlet />;
 }
@@ -55,8 +62,8 @@ function Guest() {
   const { user } = useAuth();
   const loc = useLocation();
   // Tout juste inscrit : on confirme l'e-mail avant tout.
-  if (user && !user.email_verified && loc.pathname === '/register') return <Navigate to="/verify" replace />;
-  if (user) return <Navigate to={new URLSearchParams(loc.search).get('next') || '/'} replace />;
+  if (user && !user.email_verified && loc.pathname === '/register') return <Navigate to={`/verify${loc.search}`} replace />;
+  if (user) return <Navigate to={safeNext(new URLSearchParams(loc.search).get('next'))} replace />;
   return <Outlet />;
 }
 
