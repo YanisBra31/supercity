@@ -587,19 +587,21 @@ check('Stripe : 5 € de place + 0,50 € de frais ; Supercity garde frais et co
     $sess['params']['line_items'][0]['price_data']['unit_amount'] === '500' && $sess['params']['line_items'][1]['price_data']['unit_amount'] === '50'
     && $pi['application_fee_amount'] === '100' && $pi['transfer_data']['destination'] === $acct, $sess['params'] ?? null);
 check('Stripe : Managed Payments coupé pour que la commission passe', ($sess['params']['managed_payments']['enabled'] ?? null) === 'false', $sess['params']);
+check('Stripe : le montant est seulement bloqué sur la carte (capture manuelle)', ($pi['capture_method'] ?? null) === 'manual', $pi);
 [$s, $r] = api('GET', "/matches/$pid", null, $lea);
-check('un joueur ne voit pas ce que touche le five', $r['payout_cents'] === null, $r);
+check('un joueur ne voit pas ce que touche le five ; débit prévu 2 h avant', $r['payout_cents'] === null
+    && abs(strtotime($r['settle_at']) - (strtotime($in3days) - 7200)) < 2, $r);
 [$s, $r] = api('POST', "/matches/$pid/pay/confirm", null, $lea);
-check('pas encore payé : la place reste réservée', $s === 200 && $r['my_status'] === 'pending', $r);
+check('carte pas encore bloquée : la place reste réservée', $s === 200 && $r['my_status'] === 'pending', $r);
 check('webhook mal signé refusé', webhook('checkout.session.completed', $sess, 'whsec_faux') === 400);
 $paidSess = mock('POST', "/test/sessions/{$sess['id']}/pay");
 check('webhook signé accepté', webhook('checkout.session.completed', $paidSess) === 200);
 [$s, $r] = api('GET', "/matches/$pid", null, $lea);
-check('paiement validé : inscrite', $r['my_status'] === 'registered' && $r['my_paid'] === true && $r['players_count'] === 1, $r);
+check('carte bloquée : inscrite, rien de débité pour l\'instant', $r['my_status'] === 'registered' && $r['my_paid'] === true && $r['my_payment'] === 'authorized' && $r['players_count'] === 1, $r);
 webhook('checkout.session.completed', $paidSess);
 api('POST', "/matches/$pid/pay/confirm", null, $lea);
-$n = $pdo->query("SELECT COUNT(*) FROM payments WHERE match_id = $pid AND status = 'paid'")->fetchColumn();
-check('événement reçu deux fois : un seul paiement compté', (int)$n === 1);
+$n = $pdo->query("SELECT COUNT(*) FROM payments WHERE match_id = $pid AND status = 'authorized'")->fetchColumn();
+check('événement reçu deux fois : un seul blocage compté', (int)$n === 1);
 
 [$s, $r] = api('POST', "/matches/$pid/join", ['return_url' => $back], $sam);
 $samSess = $lastSession();
@@ -611,36 +613,111 @@ check('place non payée à temps : elle passe au premier de la liste d\'attente'
 $paidLate = mock('POST', "/test/sessions/{$samSess['id']}/pay");
 webhook('checkout.session.completed', $paidLate);
 $st = mock('GET', '/test/state');
-$ref = end($st['refunds']);
 [$s, $r] = api('GET', "/matches/$pid", null, $sam);
-check('paiement arrivé trop tard, match complet : remboursé en entier', $r['my_status'] === 'withdrawn' && $ref['amount'] === '550' && $ref['refund_application_fee'] === 'true', [$r, $ref]);
+check('carte bloquée trop tard, match complet : blocage levé, rien de débité', $r['my_status'] === 'withdrawn' && in_array($paidLate['payment_intent'], $st['cancels'] ?? [], true)
+    && empty($st['refunds']), [$r, $st['cancels'] ?? null]);
 [$s, $r] = api('POST', "/matches/$pid/pay", ['return_url' => $back], $nina2);
 check('sortie de liste d\'attente : page de paiement à la demande', $s === 200 && str_starts_with($r['checkout_url'], 'https://checkout.stripe.test/'), $r);
 [$s, $r] = api('POST', "/matches/$pid/pay", ['return_url' => $back], $sam);
 check('rien à payer sans place réservée', $s === 409, $r);
 [$s, $r] = api('PATCH', "/matches/$pid", ['price_cents' => 800], $karim);
-check('prix bloqué une fois que des joueurs ont payé', $s === 409 && $r['error'] === 'price_locked', $r);
+check('prix bloqué une fois que des cartes sont bloquées', $s === 409 && $r['error'] === 'price_locked', $r);
 
+[$s, $r] = api('DELETE', "/matches/$pid/join", null, $lea);
+$st = mock('GET', '/test/state');
+check('désistement : la carte est libérée, rien de débité ni à rembourser', $s === 200 && $r['refunded_cents'] === null && in_array($paidSess['payment_intent'], $st['cancels'], true)
+    && empty($st['refunds']), [$r, $st['cancels']]);
+
+// Ancien paiement débité tout de suite (avant le blocage de carte) : toujours remboursé jusqu'à 24 h avant.
+api('POST', "/matches/$pid/join", ['return_url' => $back], $lea);
+$pdo->exec("UPDATE match_participants SET status = 'registered', hold_until = NULL WHERE match_id = $pid AND user_id = $leaId");
+$pdo->exec("UPDATE payments SET status = 'expired' WHERE match_id = $pid AND user_id = $leaId AND status = 'open'");
+$pdo->exec("INSERT INTO payments (match_id, user_id, session_id, payment_intent, amount_cents, fee_cents, commission_cents, status, paid_at)
+    VALUES ($pid, $leaId, 'cs_ancien', 'pi_ancien', 550, 50, 50, 'paid', UTC_TIMESTAMP())");
 [$s, $r] = api('DELETE', "/matches/$pid/join", null, $lea);
 $st = mock('GET', '/test/state');
 $ref = end($st['refunds']);
 $rev = end($st['reversals']);
-check('désistement plus de 24 h avant : place remboursée, frais gardés', $s === 200 && $r['refunded_cents'] === 500 && $ref['amount'] === '500'
+check('ancien paiement, désistement plus de 24 h avant : place remboursée, frais gardés', $s === 200 && $r['refunded_cents'] === 500 && $ref['amount'] === '500'
     && $ref['refund_application_fee'] === 'false' && $ref['reverse_transfer'] === 'false', [$r, $ref]);
-check('le five rend ce qu\'il a reçu (4,50 €), Supercity rend sa commission', $rev['amount'] === '450' && str_starts_with($rev['transfer'], 'tr_pi'), $rev);
+check('le five rend ce qu\'il a reçu (4,50 €), Supercity rend sa commission', $rev['amount'] === '450' && $rev['transfer'] === 'tr_pi_ancien', $rev);
 
-$in10h = gmdate('Y-m-d\TH:i:s\Z', time() + 10 * 3600);
-[$s, $late] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in10h, 'price_cents' => 400, 'organization_id' => $org['id']], $karim);
-api('POST', "/matches/{$late['id']}/join", ['return_url' => $back], $lea);
-webhook('checkout.session.completed', mock('POST', '/test/sessions/' . $lastSession()['id'] . '/pay'));
-[$s, $r] = api('DELETE', "/matches/{$late['id']}/join", null, $lea);
-check('désistement moins de 24 h avant : pas de remboursement', $s === 200 && $r['refunded_cents'] === null, $r);
-[$s, $r] = api('POST', "/matches/{$late['id']}/join", ['return_url' => $back], $lea);
-check('revenir après un désistement non remboursé : pas de second paiement', $r['my_status'] === 'registered' && $r['checkout_url'] === null, $r);
+/** Joue les tâches planifiées (débits, rappels de carte). */
+$cron = fn() => api('GET', '/cron/notifications?key=cron-test', null, null);
+/** Inscrit un joueur et bloque sa carte. */
+$joinPay = function (int $matchId, string $token) use ($back, $lastSession) {
+    api('POST', "/matches/$matchId/join", ['return_url' => $back], $token);
+    $paid = mock('POST', '/test/sessions/' . $lastSession()['id'] . '/pay');
+    webhook('checkout.session.completed', $paid);
+    return $paid['payment_intent'];
+};
+$in5h = gmdate('Y-m-d\TH:i:s\Z', time() + 5 * 3600);
+
+[$s, $full] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in5h, 'price_cents' => 400, 'max_players' => 2, 'organization_id' => $org['id']], $karim);
+$fid = $full['id'];
+$piLea = $joinPay($fid, $lea);
+$piSam = $joinPay($fid, $sam);
+$cron();
+$st = mock('GET', '/test/state');
+check('plus de 2 h avant le match : personne n\'est encore débité', !in_array($piLea, $st['captures'] ?? [], true), $st['captures'] ?? null);
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 90 MINUTE WHERE id = $fid");
+$cron();
+$cron();
+$st = mock('GET', '/test/state');
+[$s, $r] = api('GET', "/matches/$fid", null, $lea);
+$n = $pdo->query("SELECT COUNT(*) FROM payments WHERE match_id = $fid AND status = 'paid'")->fetchColumn();
+check('2 h avant, match complet : les deux joueurs sont débités une seule fois', in_array($piLea, $st['captures'], true) && in_array($piSam, $st['captures'], true)
+    && count(array_keys($st['captures'], $piLea, true)) === 1 && (int)$n === 2 && $r['my_payment'] === 'paid' && $r['status'] === 'full', [$st['captures'], $r]);
+api('DELETE', "/matches/$fid/join", null, $sam);
+$piNina = $joinPay($fid, $nina2);
+$st = mock('GET', '/test/state');
+[$s, $r] = api('GET', "/matches/$fid", null, $nina2);
+check('place reprise après le débit : la nouvelle carte est débitée tout de suite', in_array($piNina, $st['captures'], true) && $r['my_payment'] === 'paid', $r);
+
+[$s, $half] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in5h, 'price_cents' => 400, 'max_players' => 2, 'organization_id' => $org['id']], $karim);
+$piHalf = $joinPay($half['id'], $lea);
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 90 MINUTE WHERE id = {$half['id']}");
+$cron();
+$st = mock('GET', '/test/state');
+[$s, $r] = api('GET', "/matches/{$half['id']}", null, $lea);
+$note = $pdo->query("SELECT body FROM notifications WHERE user_id = $leaId ORDER BY id DESC LIMIT 1")->fetchColumn();
+check('2 h avant, match pas complet : annulé, carte libérée, joueur prévenu', $r['status'] === 'cancelled' && in_array($piHalf, $st['cancels'], true)
+    && !in_array($piHalf, $st['captures'], true) && str_contains((string)$note, "pas débité"), [$r['status'], $note]);
+
+$in10d = gmdate('Y-m-d\TH:i:s\Z', time() + 10 * 86400);
+[$s, $far] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in10d, 'price_cents' => 400, 'max_players' => 2, 'organization_id' => $org['id']], $karim);
+$farId = $far['id'];
+[$s, $r] = api('POST', "/matches/$farId/join", ['return_url' => $back], $lea);
+check('inscription plus de 6 jours avant : inscrite tout de suite, carte à confirmer de J-6 à J-4', $s === 200 && $r['my_status'] === 'registered' && $r['checkout_url'] === null
+    && $r['my_paid'] === false && $r['my_card_window']['open'] === false
+    && abs(strtotime($r['my_card_window']['until']) - (strtotime($in10d) - 4 * 86400)) < 2, $r);
+[$s, $r] = api('POST', "/matches/$farId/pay", ['return_url' => $back], $lea);
+check('trop tôt pour bloquer la carte (un blocage dure 7 jours)', $s === 409 && $r['error'] === 'card_too_early', $r);
+api('POST', "/matches/$farId/join", ['return_url' => $back], $sam);
+[$s, $r] = api('POST', "/matches/$farId/join", ['return_url' => $back], $nina2);
+check('match lointain complet : liste d\'attente', $r['my_status'] === 'waitlist', $r);
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 5 DAY WHERE id = $farId");
+$cron();
+$reminded = $pdo->query("SELECT COUNT(*) FROM notifications WHERE kind = 'payment' AND title = 'Confirme ta carte' AND url = '/match/$farId'")->fetchColumn();
+$cron();
+$again = $pdo->query("SELECT COUNT(*) FROM notifications WHERE kind = 'payment' AND title = 'Confirme ta carte' AND url = '/match/$farId'")->fetchColumn();
+check('J-6 : les inscrits sont invités à confirmer leur carte, une seule fois', (int)$reminded === 2 && (int)$again === 2, [$reminded, $again]);
+[$s, $r] = api('POST', "/matches/$farId/pay", ['return_url' => $back], $lea);
+$paid = mock('POST', '/test/sessions/' . $lastSession()['id'] . '/pay');
+webhook('checkout.session.completed', $paid);
+[$s, $r] = api('GET', "/matches/$farId", null, $lea);
+check('carte confirmée : toujours inscrite, carte bloquée', $r['my_status'] === 'registered' && $r['my_payment'] === 'authorized' && $r['my_card_window'] === null, $r);
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 3 DAY WHERE id = $farId");
+$cron();
+[$s, $r] = api('GET', "/matches/$farId", null, $sam);
+[$s, $r2] = api('GET', "/matches/$farId", null, $nina2);
+check('J-4 sans carte : la place passe au premier de la liste d\'attente', $r['my_status'] === 'withdrawn' && $r2['my_status'] === 'pending', [$r['my_status'], $r2['my_status']]);
+
+[$s, $late] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'city5', 'starts_at' => $in5h, 'price_cents' => 400, 'organization_id' => $org['id']], $karim);
+$piLate = $joinPay($late['id'], $lea);
 [$s, $r] = api('POST', "/matches/{$late['id']}/cancel", null, $karim);
 $st = mock('GET', '/test/state');
-$ref = end($st['refunds']);
-check('match annulé : remboursé en entier, frais compris', $s === 200 && $ref['amount'] === '450' && $ref['refund_application_fee'] === 'true' && $ref['reverse_transfer'] === 'true', $ref);
+check('match annulé par l\'organisateur : carte libérée, rien de débité', $s === 200 && in_array($piLate, $st['cancels'], true) && !in_array($piLate, $st['captures'], true), $st['cancels']);
 
 echo "Espace pro\n";
 [$s, $r] = api('POST', '/matches', ['venue_id' => $v1['id'], 'format' => 'foot8', 'starts_at' => $in3days, 'organization_id' => $org['id'], 'kind' => 'tournament', 'max_players' => 64], $karim);
@@ -650,15 +727,24 @@ check('tournoi sans nom : refusé', $s === 422 && isset($r['fields']['title']), 
 check('tournoi pro : 64 joueurs, 8 h, 10 €', $s === 201 && $t['kind'] === 'tournament' && $t['title'] === 'Tournoi de la Toussaint' && $t['max_players'] === 64 && $t['duration_min'] === 480 && $t['payout_cents'] === 900, $t);
 [$s, $r] = api('PATCH', "/matches/{$t['id']}", ['title' => null], $karim);
 check('un tournoi garde son nom', $s === 422 && isset($r['fields']['title']), $r);
+$statsBefore = api('GET', '/me/organization', null, $karim)[1]['organization']['stats'] ?? [];
 api('POST', "/matches/{$t['id']}/join", ['return_url' => $back], $lea);
 $sess = $lastSession();
 check('inscription au tournoi : libellé du tournoi sur la page de paiement, commission de 1 €', str_starts_with($sess['params']['line_items'][0]['price_data']['product_data']['name'], 'Inscription · Tournoi de la Toussaint')
     && $sess['params']['payment_intent_data']['application_fee_amount'] === '150', $sess['params']);
 webhook('checkout.session.completed', mock('POST', "/test/sessions/{$sess['id']}/pay"));
 [$s, $r] = api('GET', '/me/organization', null, $karim);
+check('carte bloquée pour le tournoi : pas encore une place vendue', ($r['organization']['stats']['places_sold'] ?? null) === $statsBefore['places_sold'], [$statsBefore, $r['organization']['stats'] ?? $r]);
+// Un tournoi se joue même s'il n'est pas plein : les inscrits sont débités 2 h avant.
+$pdo->exec("UPDATE matches SET starts_at = UTC_TIMESTAMP() + INTERVAL 90 MINUTE WHERE id = {$t['id']}");
+$cron();
+[$s, $r] = api('GET', "/matches/{$t['id']}", null, $lea);
+check('tournoi pas plein : maintenu, inscrits débités', $r['status'] !== 'cancelled' && $r['my_payment'] === 'paid', $r);
+[$s, $r] = api('GET', '/me/organization', null, $karim);
 $stats = $r['organization']['stats'] ?? [];
-check('chiffres du five : places vendues, commission déduite, remboursements exclus', $stats['places_sold'] === 1 && $stats['gross_cents'] === 1000
-    && $stats['commission_cents'] === 100 && $stats['net_cents'] === 900 && $stats['upcoming'] === 2, $stats);
+check('chiffres du five : places vendues, commission déduite, remboursements et matchs annulés exclus', $stats['places_sold'] - $statsBefore['places_sold'] === 1
+    && $stats['gross_cents'] - $statsBefore['gross_cents'] === 1000 && $stats['commission_cents'] - $statsBefore['commission_cents'] === 100
+    && $stats['net_cents'] - $statsBefore['net_cents'] === 900 && $statsBefore['places_sold'] === 3 && $statsBefore['gross_cents'] === 1200, [$statsBefore, $stats]);
 [$s, $r] = api('GET', '/matches?kind=tournament', null, $lea);
 check('recherche des tournois seulement', $s === 200 && array_column($r['items'], 'id') === [$t['id']], $r);
 [$s, $r] = api('GET', "/organizations/{$org['id']}", null, $lea);

@@ -106,7 +106,7 @@ export default function ProScreen() {
         </View>
         <Step icon="phone-portrait-outline" text={`Chaque joueur paie le prix de la place, plus ${euros(p.fee_cents)} de frais de service.`} />
         <Step icon="cash-outline" text={`Tu reçois le prix moins ${String(p.commission_percent).replace('.', ',')} % de commission Supercity, par virement Stripe.`} />
-        <Step icon="refresh-outline" text={`Un joueur qui se désiste plus de ${p.refund_hours} h avant est remboursé. Si tu annules, tout le monde est remboursé.`} />
+        <Step icon="refresh-outline" text={`Les joueurs sont débités ${p.settle_hours} h avant le coup d'envoi, seulement si le match est complet (un tournoi est toujours maintenu). Sinon il est annulé et personne ne paie.`} />
         {!p.enabled ? (
           <Text style={s.sub}>Le paiement en ligne n'est pas encore activé sur Supercity.</Text>
         ) : p.ready ? (

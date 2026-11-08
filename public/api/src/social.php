@@ -234,6 +234,7 @@ function run_background_jobs(bool $force = false): void
             return;
         }
         send_match_reminders();
+        run_payment_jobs();
         run_notifications();
         prune_chats();
     } catch (Throwable $e) {

@@ -23,7 +23,7 @@ const SECTIONS: [string, string][] = [
   ],
   [
     'Paiements et boutique',
-    "Les places payantes sont réglées par Stripe ; Supercity ne voit pas tes coordonnées bancaires. Les pièces de la boutique se gagnent en jouant, n'ont aucune valeur en argent et ne sont ni remboursables ni échangeables.",
+    "Les places payantes sont réglées par Stripe ; Supercity ne voit pas tes coordonnées bancaires. À l'inscription, le montant est bloqué sur ta carte (au plus tôt 6 jours avant le match) ; il est débité 2 h avant le coup d'envoi si le match est complet, sinon le match est annulé et rien n'est débité. Les pièces de la boutique se gagnent en jouant, n'ont aucune valeur en argent et ne sont ni remboursables ni échangeables.",
   ],
   ['Évolutions', "Ces conditions peuvent évoluer ; tu seras prévenu dans l'appli en cas de changement important."],
 ];
@@ -32,7 +32,7 @@ export default function Cgu() {
   return (
     <Page title="Conditions d'utilisation">
       <div className="prose">
-        <p className="kicker">Version du 18 octobre 2026</p>
+        <p className="kicker">Version du 8 novembre 2026</p>
         <p className="sub">Le résumé de nos règles du jeu, en clair.</p>
         {SECTIONS.map(([title, text], i) => (
           <section key={title}>
