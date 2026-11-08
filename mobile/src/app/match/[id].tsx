@@ -101,10 +101,15 @@ export default function MatchDetail() {
   const paid = m.price_cents > 0 && !m.is_organizer;
   const total = m.price_cents + m.fee_cents;
   const refundable = new Date(m.starts_at).getTime() - Date.now() > 24 * 3600 * 1000;
+  // Plus de 6 jours avant : inscription sans carte, à confirmer à partir de J-6 (un blocage ne dure que 7 jours).
+  const cardLater = new Date(m.starts_at).getTime() - Date.now() > 6 * 86400 * 1000;
+  const askCard = paid && !m.my_paid && m.spots_left > 0 && !cardLater;
   const leaveText =
     m.my_status === 'pending'
       ? 'Ta place réservée sera libérée.'
-      : m.my_paid
+      : m.my_payment === 'authorized'
+        ? "Ta place ira au premier joueur en liste d'attente. Ta carte est libérée : tu ne seras pas débité."
+      : m.my_payment === 'paid'
         ? refundable
           ? `Ta place ira au premier joueur en liste d'attente et tu seras remboursé de ${euros(m.price_cents)} (les frais de service restent dus).`
           : "À moins de 24 h du match, ta place n'est pas remboursée."
@@ -140,9 +145,9 @@ export default function MatchDetail() {
     <View style={[st.state, { flex: 1 }]}>
       <Text style={st.stateText}>{cancelled ? 'Ce match a été annulé.' : 'Match terminé.'}</Text>
     </View>
-  ) : m.my_status === 'pending' ? (
+  ) : m.my_status === 'pending' || m.my_card_window?.open ? (
     <Button
-      title={`Payer ma place · ${euros(total)}`}
+      title={`Confirmer ma carte · ${euros(total)}`}
       icon="card-outline"
       loading={busy}
       style={{ flex: 1 }}
@@ -155,11 +160,11 @@ export default function MatchDetail() {
     </View>
   ) : (
     <Button
-      title={m.spots_left > 0 ? (paid && !m.my_paid ? `Je joue · ${euros(total)}` : 'Je joue') : "Liste d'attente"}
+      title={m.spots_left > 0 ? (askCard ? `Je joue · ${euros(total)}` : 'Je joue') : "Liste d'attente"}
       icon="football"
       loading={busy}
       style={{ flex: 1 }}
-      onPress={() => (paid && !m.my_paid && m.spots_left > 0 ? setOrder('join') : join())}
+      onPress={() => (askCard ? setOrder('join') : join())}
     />
   );
   const footer = (
@@ -182,9 +187,9 @@ export default function MatchDetail() {
           { label: 'Frais de service', value: euros(m.fee_cents) },
         ]}
         total={{ label: 'Total TTC', value: euros(total) }}
-        notes={["Remboursé si tu annules plus de 24 h avant le match, hors frais de service. Paiement sécurisé par Stripe."]}
+        notes={["Le montant est bloqué sur ta carte et débité 2 h avant le match, seulement s'il est complet. Sinon le match est annulé et rien n'est débité. Paiement sécurisé par Stripe."]}
         help="annuler"
-        confirm={`Confirmer et payer · ${euros(total)}`}
+        confirm={`Confirmer ma carte · ${euros(total)}`}
         busy={busy}
         onClose={() => setOrder(null)}
         onConfirm={() => {
@@ -353,17 +358,30 @@ export default function MatchDetail() {
             <Text style={s.sub}>
               {m.is_organizer
                 ? `Chaque joueur paie ${euros(total)}, frais de service compris. Tu reçois ${euros(m.payout_cents ?? m.price_cents)} par joueur, commission Supercity déduite.`
-                : `+ ${euros(m.fee_cents)} de frais de service. Remboursé si tu te désistes plus de 24 h avant.`}
+                : `+ ${euros(m.fee_cents)} de frais de service. Tu n'es débité que si le match est complet, 2 h avant le coup d'envoi. Sinon il est annulé et tu ne paies rien.`}
             </Text>
           </View>
-          {m.my_paid ? <Pill text="Payé" tone="green" /> : null}
+          {m.my_payment === 'paid' ? <Pill text="Payé" tone="green" /> : m.my_payment === 'authorized' ? <Pill text="Carte confirmée" tone="green" /> : null}
         </Card>
       ) : null}
 
       {m.my_status === 'pending' && !closed ? (
         <Card style={{ gap: 10, borderColor: colors.orange2, borderWidth: 2 }}>
           <Text style={{ ...font.bold, fontSize: 15, color: colors.ink }}>Ta place est réservée jusqu'à {m.my_hold_until ? timeLabel(new Date(m.my_hold_until)) : 'bientôt'}</Text>
-          <Text style={s.sub}>Paie-la pour confirmer ton inscription, sinon elle passera au joueur suivant.</Text>
+          <Text style={s.sub}>Confirme ta carte pour garder ta place, sinon elle passera au joueur suivant. Tu ne seras débité que si le match est complet.</Text>
+        </Card>
+      ) : null}
+
+      {m.my_card_window && !closed ? (
+        <Card style={{ gap: 10, borderColor: colors.orange2, borderWidth: 2 }}>
+          <Text style={{ ...font.bold, fontSize: 15, color: colors.ink }}>
+            {m.my_card_window.open
+              ? `Confirme ta carte avant ${whenLabel(m.my_card_window.until)}`
+              : `Tu es inscrit · carte à confirmer à partir de ${whenLabel(m.my_card_window.from)}`}
+          </Text>
+          <Text style={s.sub}>
+            Le montant n'est bloqué que quelques jours avant le match, et débité seulement s'il est complet. Sans carte confirmée à temps, ta place passe au joueur suivant.
+          </Text>
         </Card>
       ) : null}
 
@@ -415,7 +433,7 @@ export default function MatchDetail() {
           title="Annuler le match"
           variant="danger"
           onPress={async () => {
-            if (await confirm('Annuler le match ?', m.price_cents > 0 ? 'Les joueurs inscrits seront prévenus et remboursés en entier.' : 'Les joueurs inscrits verront le match comme annulé.')) act(() => post<Match>(`/matches/${m.id}/cancel`));
+            if (await confirm('Annuler le match ?', m.price_cents > 0 ? "Les joueurs inscrits seront prévenus et ne seront pas débités (ou remboursés en entier s'ils l'étaient déjà)." : 'Les joueurs inscrits verront le match comme annulé.')) act(() => post<Match>(`/matches/${m.id}/cancel`));
           }}
         />
       ) : null}

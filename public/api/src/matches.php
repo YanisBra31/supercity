@@ -47,8 +47,10 @@ function refresh_match(int $matchId): void
     expire_holds($matchId);
     $free = (int)$m['max_players'] - registered_count($matchId);
     if ($free > 0) {
-        // Match payant : la place est réservée, le joueur a quelques heures pour la payer.
-        $paid = (int)$m['price_cents'] > 0;
+        // Match payant à moins de 6 jours : la place est réservée, le joueur a quelques heures pour faire bloquer sa carte.
+        // Plus loin : il est inscrit et confirmera sa carte à partir de J-6 (run_payment_jobs).
+        $paid = (int)$m['price_cents'] > 0 && card_window_open($m);
+        $later = (int)$m['price_cents'] > 0 && !$paid;
         $promoted = array_column(query(
             'SELECT user_id FROM match_participants WHERE match_id = ? AND status = "waitlist" ORDER BY updated_at, created_at LIMIT ' . $free,
             [$matchId]
@@ -63,7 +65,7 @@ function refresh_match(int $matchId): void
             $promoted,
             'waitlist',
             'Une place s\'est libérée',
-            $paid ? "Tu sors de la liste d'attente $where. Paie ta place vite pour la garder." : "Tu sors de la liste d'attente : tu joues $where.",
+            $paid ? "Tu sors de la liste d'attente $where. Confirme ta carte vite pour garder ta place." : "Tu sors de la liste d'attente : tu joues $where." . ($later ? ' Tu confirmeras ta carte quelques jours avant.' : ''),
             "/match/$matchId"
         );
     }
@@ -122,7 +124,15 @@ function match_view(array $m, ?int $viewerId, bool $withPlayers = false): array
         'away_team' => $team($m['away_team_id']),
         'my_status' => $mine['status'] ?? null,
         'my_hold_until' => ($mine['status'] ?? null) === 'pending' ? iso($mine['hold_until']) : null,
-        'my_paid' => $price > 0 && $viewerId !== null && paid_payment($id, $viewerId) !== null,
+        // Place réglée : carte bloquée (débitée 2 h avant si le match est complet) ou déjà débitée.
+        'my_paid' => $price > 0 && $viewerId !== null && held_payment($id, $viewerId) !== null,
+        'my_payment' => $price > 0 && $viewerId !== null ? (held_payment($id, $viewerId)['status'] ?? null) : null,
+        // Inscrit plus de 6 jours avant : carte à confirmer entre ces deux dates.
+        'my_card_window' => $viewerId !== null && needs_card($m, $viewerId, $mine['status'] ?? null)
+            ? ['from' => iso(card_window($m)['from']), 'until' => iso(card_window($m)['until']), 'open' => card_window_open($m)]
+            : null,
+        // Moment du débit (match complet) ou de l'annulation (pas complet).
+        'settle_at' => $price > 0 ? iso(gmdate('Y-m-d H:i:s', strtotime($m['starts_at'] . ' UTC') - SETTLE_HOURS_BEFORE * 3600)) : null,
         'is_organizer' => $isOrganizer,
         // Ce que l'organisation touche par place, commission Supercity déduite (vu par l'organisateur seulement).
         'payout_cents' => $isOrganizer && $price > 0 ? $price - commission_cents($price, $org) : null,
@@ -384,7 +394,7 @@ function register_match_routes(Router $r): void
         if (array_key_exists('price_cents', $in)) {
             $in['price_cents'] ??= 0;
             if ($in['price_cents'] !== (int)$m['price_cents']) {
-                if (one('SELECT id FROM payments WHERE match_id = ? AND status IN ("open", "paid") LIMIT 1', [$m['id']])) {
+                if (one('SELECT id FROM payments WHERE match_id = ? AND status IN ("open", "authorized", "paid") LIMIT 1', [$m['id']])) {
                     throw new HttpError(409, 'price_locked', 'Des joueurs ont déjà payé : le prix ne peut plus changer.', ['price_cents' => 'Déjà payé par des joueurs.']);
                 }
                 check_price($in, $org);
@@ -441,14 +451,15 @@ function register_match_routes(Router $r): void
                 'SELECT user_id FROM match_participants WHERE match_id = ? AND status <> "withdrawn" AND user_id <> ?',
                 [$m['id'], $user['id']]
             )->fetchAll(), 'user_id');
-            $paid = (int)$m['price_cents'] > 0 ? ' Tu es remboursé en entier.' : '';
+            $paid = (int)$m['price_cents'] > 0 ? ' Tu n\'es pas débité (ou remboursé en entier si tu l\'étais déjà).' : '';
             notify($players, 'cancelled', 'Match annulé', "{$user['display_name']} a annulé le match du " . fr_when($m['starts_at']) . ".$paid", "/match/{$m['id']}", (int)$user['id']);
         }
         respond(200, match_view(load_match((int)$id), (int)$user['id']));
     });
 
     // S'inscrire : place libre -> inscrit, sinon liste d'attente. Corps facultatif : {"team_id": 3}
-    // Match payant : la place est réservée 30 min et la réponse contient checkout_url, la page de paiement.
+    // Match payant : la place est réservée 30 min et la réponse contient checkout_url, la page où la carte est bloquée
+    // (débitée 2 h avant le match s'il est complet). Plus de 6 jours avant : inscrit, carte à confirmer à partir de J-6.
     $r->post('/matches/(\d+)/join', function (string $id) {
         $user = require_user();
         $uid = (int)$user['id'];
@@ -460,8 +471,10 @@ function register_match_routes(Router $r): void
                 throw new HttpError(409, 'match_closed', 'Ce match est terminé ou annulé.');
             }
             expire_holds((int)$m['id']);
-            // Déjà payé (désistement tardif non remboursé, puis retour) : pas de second paiement.
-            $paid = (int)$m['price_cents'] > 0 && (int)$m['organizer_id'] !== $uid && !paid_payment((int)$m['id'], $uid);
+            // Déjà réglé (place débitée non remboursée, puis retour) : pas de second paiement.
+            $paid = (int)$m['price_cents'] > 0 && (int)$m['organizer_id'] !== $uid && !held_payment((int)$m['id'], $uid);
+            // Plus de 6 jours avant : inscrit tout de suite, carte à confirmer plus tard (un blocage ne dure que 7 jours).
+            $later = $paid && !card_window_open($m);
             $current = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [$m['id'], $uid]);
             if ($current && $current['status'] !== 'withdrawn') {
                 if (array_key_exists('team_id', $in)) {
@@ -473,7 +486,7 @@ function register_match_routes(Router $r): void
                 throw new HttpError(409, 'organizer_not_ready', "L'organisateur ne peut pas encore encaisser. Réessaie plus tard.");
             }
             $free = registered_count((int)$m['id']) < (int)$m['max_players'];
-            $status = !$free ? 'waitlist' : ($paid ? 'pending' : 'registered');
+            $status = !$free ? 'waitlist' : ($paid && !$later ? 'pending' : 'registered');
             query(
                 'INSERT INTO match_participants (match_id, user_id, team_id, status, hold_until) VALUES (?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE status = VALUES(status), team_id = VALUES(team_id), hold_until = VALUES(hold_until), updated_at = CURRENT_TIMESTAMP',
@@ -502,7 +515,7 @@ function register_match_routes(Router $r): void
     });
 
     // Se désister : la première personne en liste d'attente prend la place.
-    // Match payant : remboursé (hors frais de service) jusqu'à 24 h avant le coup d'envoi.
+    // Match payant : la carte bloquée est libérée ; une place déjà débitée est remboursée (hors frais) jusqu'à 24 h avant.
     $r->delete('/matches/(\d+)/join', function (string $id) {
         $user = require_user();
         $uid = (int)$user['id'];

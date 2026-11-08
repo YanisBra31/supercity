@@ -11,17 +11,22 @@ export const HELP: HelpTopic[] = [
       {
         id: 'rejoindre',
         q: 'Comment rejoindre un match ?',
-        a: "Ouvre le match et touche « Je joue ». Si le match est payant, un récapitulatif s'affiche avec le prix total : tu confirmes, puis tu paies sur la page sécurisée de Stripe.",
+        a: "Ouvre le match et touche « Je joue ». Si le match est payant, un récapitulatif s'affiche avec le prix total : tu confirmes, puis tu confirmes ta carte sur la page sécurisée de Stripe. Le montant est seulement bloqué : tu n'es débité que si le match est complet.",
+      },
+      {
+        id: 'debit',
+        q: 'Quand suis-je débité pour un match payant ?',
+        a: "À l'inscription, le montant est seulement bloqué sur ta carte. Il est débité 2 h avant le coup d'envoi si le match est complet. S'il ne l'est pas, le match est annulé et rien n'est débité. Un blocage de carte ne dure que 7 jours : si tu t'inscris plus de 6 jours avant, tu es inscrit tout de suite et tu confirmes ta carte entre 6 et 4 jours avant le match (on te prévient). Sans carte confirmée à temps, ta place passe au joueur suivant.",
       },
       {
         id: 'attente',
         q: "Comment marche la liste d'attente ?",
-        a: "Quand un match est complet, tu peux t'inscrire en liste d'attente. Si une place se libère, elle va au premier de la liste. Pour un match payant, tu as alors 6 heures pour payer ta place, sinon elle passe au suivant.",
+        a: "Quand un match est complet, tu peux t'inscrire en liste d'attente. Si une place se libère, elle va au premier de la liste. Pour un match payant, tu as alors jusqu'à 6 heures pour confirmer ta carte, sinon la place passe au suivant.",
       },
       {
         id: 'annuler',
         q: 'Je ne peux plus venir, comment annuler ?',
-        a: "Ouvre le match et désinscris-toi. Ta place va au premier joueur en liste d'attente. Sur un match payant, tu es remboursé du prix de la place si tu annules plus de 24 h avant le coup d'envoi ; les frais de service restent dus. Après, la place n'est plus remboursée.",
+        a: "Ouvre le match et désinscris-toi. Ta place va au premier joueur en liste d'attente. Sur un match payant, ta carte est libérée et rien n'est débité tant que le match n'a pas été validé, 2 h avant le coup d'envoi. Une place déjà débitée est remboursée, hors frais de service, si tu annules plus de 24 h avant.",
       },
       {
         id: 'frais',
@@ -31,7 +36,7 @@ export const HELP: HelpTopic[] = [
       {
         id: 'annule',
         q: "Et si l'organisateur annule le match ?",
-        a: "Le match passe en « Annulé » sur sa page. Sur un match payant, tu es remboursé en entier, frais de service compris.",
+        a: "Le match passe en « Annulé » sur sa page. Sur un match payant, ta carte est libérée et rien n'est débité ; si tu l'étais déjà, tu es remboursé en entier, frais de service compris.",
       },
       {
         id: 'organiser',
