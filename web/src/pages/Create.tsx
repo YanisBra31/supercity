@@ -136,7 +136,8 @@ export default function Create() {
       });
       saved = null;
       celebrate({ title: 'Match publié !', text: "Les joueurs du coin peuvent s'inscrire." });
-      navigate(`/match/${m.id}`);
+      // La fiche du match s'ouvre avec le partage proposé (story ou lien).
+      navigate(`/match/${m.id}`, { state: { share: true } });
     } catch (err) {
       setError(err instanceof ApiError ? (Object.values(err.fields)[0] ?? err.message) : 'Création impossible.');
       setLoading(false);

@@ -1,11 +1,13 @@
 // Fiche d'un match : infos, équipes et score, joueurs, inscription et paiement.
-import { Briefcase, CalendarPlus, CheckCircle2, ChevronRight, Clock, CreditCard, MapPin, MessagesSquare, Navigation, Search, Share2, Star, UserPlus, Volleyball, XCircle, Zap } from 'lucide-react';
+import { Briefcase, CalendarPlus, CheckCircle2, ChevronRight, Clock, CreditCard, MapPin, MessagesSquare, Navigation, Search, Send, Share2, Sparkles, Star, UserPlus, Volleyball, XCircle, Zap } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ApiError, del, get, JoinResult, Match, post, Rival, Team } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dayLabel, distanceLabel, formatLabel, formatShort, levelLabel, orgKindLabel, POSITIONS, surfaceLabel, timeLabel, whenLabel } from '../lib/format';
+import { shareImage } from '../lib/cardImage';
 import { matchUrl, shareMessage, webUrl } from '../lib/links';
+import { matchStoryImage } from '../lib/matchStory';
 import { euros, openStripe, returnUrl } from '../lib/pay';
 import { celebrate } from '../ui/celebrate';
 import { Page } from '../ui/Layout';
@@ -15,7 +17,7 @@ import { InviteSheet } from '../ui/match/InviteSheet';
 import { ScoreCard } from '../ui/match/ScoreCard';
 import { OrderSheet } from '../ui/OrderSheet';
 import { BonusBanner, KingCard, StreakBadge } from '../ui/streak';
-import { Avatar, Button, ButtonLink, Card, ErrorText, IconButton, Label, Loading, Pill, Success, TeamCrest, useConfirm, useToast } from '../ui/ui';
+import { Avatar, Button, ButtonLink, Card, ErrorText, IconButton, Label, Loading, Pill, Success, Sheet, TeamCrest, useConfirm, useToast } from '../ui/ui';
 
 /** 90 min, 4 h, 2 h 30 */
 function durationLabel(min: number): string {
@@ -108,6 +110,28 @@ export default function MatchDetail() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [load]);
 
+  // Image story du match, préparée à l'avance : sur téléphone, le partage doit suivre le geste sans attendre.
+  const story = useRef<{ key: string; blob: Promise<Blob> } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  // Match tout juste créé : on propose de le partager.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const askShare = !!(location.state as { share?: boolean } | null)?.share;
+  useEffect(() => {
+    if (!askShare || !m) return;
+    setSharing(true);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askShare, !!m]);
+  const storyKey = m ? `${m.id}-${m.spots_left}-${m.status}` : '';
+  useEffect(() => {
+    if (!m || story.current?.key === storyKey) return;
+    const blob = matchStoryImage(m, matchUrl(m.id));
+    blob.catch(() => undefined);
+    story.current = { key: storyKey, blob };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyKey]);
+
   const act = async (fn: () => Promise<Match>) => {
     setBusy(true);
     setError('');
@@ -158,6 +182,22 @@ export default function MatchDetail() {
     const r = await shareMessage(`${m.title ?? formatLabel(m.format)} ${whenLabel(m.starts_at)} à ${m.venue.name}. Viens jouer sur Supercity : ${matchUrl(m.id)}`);
     if (r === 'copied') show('Lien du match copié, colle-le à tes potes.');
     if (r === 'failed') show('Copie impossible : ' + matchUrl(m.id));
+  };
+  // Story Instagram, Snapchat, WhatsApp ou TikTok : l'image du match, et son lien copié pour le sticker Lien.
+  const shareStory = async () => {
+    const link = matchUrl(m.id);
+    const copied = await navigator.clipboard?.writeText(link).then(
+      () => true,
+      () => false,
+    );
+    try {
+      const blob = await (story.current?.key === storyKey ? story.current.blob : matchStoryImage(m, link));
+      const r = await shareImage(blob, `match-${m.id}-supercity.png`);
+      if (copied) show(r === 'saved' ? 'Image enregistrée et lien copié : ajoute le sticker Lien dans ta story.' : 'Lien copié : ajoute le sticker Lien et colle-le sur ta story.');
+      else if (r === 'saved') show('Image enregistrée : poste-la en story avec le lien ' + link);
+    } catch {
+      show("L'image n'a pas pu être créée. Réessaie.");
+    }
   };
   // Paiement de la place : on part sur Stripe, qui ramène sur cette fiche (vérifiée au chargement).
   const pay = async (checkoutUrl: string | null | undefined, current: Match): Promise<Match> => {
@@ -220,7 +260,7 @@ export default function MatchDetail() {
       ) : null}
       <div className="row">
         {primary}
-        <IconButton icon={Share2} label="Partager le match" onClick={share} />
+        <IconButton icon={Share2} label="Partager le match" onClick={() => setSharing(true)} />
       </div>
     </>
   );
@@ -480,6 +520,37 @@ export default function MatchDetail() {
           next();
         }}
       />
+      <Sheet open={sharing} onClose={() => setSharing(false)} title="Partager le match">
+        <p className="sub" style={{ marginTop: 0 }}>
+          {m.spots_left > 0 ? `Il manque ${m.spots_left} joueur${m.spots_left > 1 ? 's' : ''} : fais tourner !` : 'Le match est complet, la liste d’attente reste ouverte.'}
+        </p>
+        <div className="stack" style={{ gap: 10 }}>
+          <Button
+            block
+            icon={Sparkles}
+            onClick={() => {
+              shareStory();
+              setSharing(false);
+            }}
+          >
+            En story
+          </Button>
+          <p className="sub" style={{ fontSize: 12, margin: '-2px 0 4px', textAlign: 'center' }}>
+            Instagram, Snapchat, WhatsApp, TikTok : l'image du match, et le lien copié pour le sticker Lien.
+          </p>
+          <Button
+            block
+            variant="dark"
+            icon={Send}
+            onClick={() => {
+              share();
+              setSharing(false);
+            }}
+          >
+            Envoyer le lien
+          </Button>
+        </div>
+      </Sheet>
       {dialog}
       {toast}
     </Page>
