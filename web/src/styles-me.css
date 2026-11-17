@@ -112,3 +112,12 @@
 .mod-image { width: 100%; max-height: 320px; object-fit: cover; border-radius: 14px; background: var(--tint); }
 .card.mod-item { display: flex; flex-direction: row; align-items: center; gap: 12px; }
 .card.shop-wallet { display: flex; flex-direction: row; align-items: center; gap: 14px; }
+
+/* Administration : statistiques des pages de match */
+.stats-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; text-align: center; }
+.stats-kpis dd { margin: 0; font-size: 28px; font-weight: 800; color: var(--orange-2); }
+.stats-kpis dt { font-size: 12px; color: var(--dim); }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.stats-table th { font-size: 12px; font-weight: 600; color: var(--dim); padding: 0 4px 8px; white-space: nowrap; }
+.stats-table td { padding: 8px 4px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.stats-table td:first-child { min-width: 120px; }

@@ -463,8 +463,9 @@ function register_match_routes(Router $r): void
     $r->post('/matches/(\d+)/join', function (string $id) {
         $user = require_user();
         $uid = (int)$user['id'];
-        $in = validate(body())->int('team_id', 1, PHP_INT_MAX, false)->string('return_url', 1, 500, false)->check();
+        $in = validate(body())->int('team_id', 1, PHP_INT_MAX, false)->string('return_url', 1, 500, false)->string('src', 1, 40, false)->check();
         check_team_member($in['team_id'] ?? null, $uid, 'team_id');
+        $before = one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [(int)$id, $uid]);
         $pay = transaction(function () use ($id, $uid, $in) {
             $m = load_match((int)$id, true);
             if ($m['status'] === 'cancelled' || match_status($m) === 'played') {
@@ -510,6 +511,10 @@ function register_match_routes(Router $r): void
         }
         if (!$pay && (one('SELECT status FROM match_participants WHERE match_id = ? AND user_id = ?', [(int)$id, $uid])['status'] ?? null) === 'registered') {
             notify_friends_of_match((int)$id, $user, false);
+        }
+        // Arrivé par la page publique du match (lien partagé) : une inscription de plus pour sa source.
+        if (array_key_exists('src', $in) && (!$before || $before['status'] === 'withdrawn')) {
+            bump_page_stat((int)$id, $in['src'], 'joins');
         }
         respond(200, match_view(load_match((int)$id), $uid, true) + ['checkout_url' => $checkout]);
     });

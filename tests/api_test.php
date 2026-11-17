@@ -7,7 +7,7 @@ $base = rtrim($argv[1] ?? 'http://127.0.0.1:8093/api/v1', '/');
 $config = require getenv('SUPERCITY_CONFIG');
 $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4", $config['user'], $config['password']);
 $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-foreach (['job_runs', 'chat_reads', 'chat_messages', 'match_invites', 'notifications', 'friendships', 'grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
+foreach (['match_page_stats', 'job_runs', 'chat_reads', 'chat_messages', 'match_invites', 'notifications', 'friendships', 'grade_bonus', 'player_ratings', 'coin_ledger', 'user_cosmetics', 'streak_alerts', 'push_tokens', 'bonus_events', 'payments', 'organizations', 'post_reports', 'post_comments', 'post_likes', 'posts', 'challenges', 'email_codes', 'auth_attempts', 'match_participants', 'matches', 'venues', 'team_members', 'teams', 'auth_tokens', 'users'] as $t) {
     $pdo->exec("TRUNCATE $t");
 }
 $pdo->exec('DELETE FROM cosmetics WHERE created_by IS NOT NULL');
@@ -302,6 +302,38 @@ check('aperçu du match en image', $s === 200 && $type === 'image/jpeg' && str_s
 check('match privé : ni terrain ni heure, pas indexé', $s === 200 && str_contains($html, 'Match <span>privé') && str_contains($html, 'noindex') && !str_contains($html, $v1['name']), $s);
 [$s] = $page('/m/999999');
 check('match inconnu : 404', $s === 404, $s);
+
+// Statistiques des pages de match : vues (sans les robots), comptes créés et inscriptions, par source. Rien de personnel.
+$view = function (int $id, ?string $src, string $ua) use ($base): int {
+    $ch = curl_init("$base/public/matches/$id/view");
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($src === null ? [] : ['src' => $src]), CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: text/plain', "User-Agent: $ua"]]);
+    curl_exec($ch);
+    return curl_getinfo($ch, CURLINFO_HTTP_CODE);
+};
+$phone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148';
+$m2id = $m2['id'];
+$s = $view($m2id, 'TikTok', $phone);
+$view($m2id, 'tiktok', $phone);
+$view($m2id, null, $phone);
+$view($m2id, '<script>', $phone);
+$view($m2id, 'tiktok', 'WhatsApp/2.24.1 A');
+$view($m2id, 'tiktok', 'facebookexternalhit/1.1');
+$view($mp['id'], 'tiktok', $phone);
+$stat = fn(int $id, string $src) => $pdo->query("SELECT COALESCE(SUM(views),0) v, COALESCE(SUM(accounts),0) a, COALESCE(SUM(joins),0) j FROM match_page_stats WHERE match_id = $id AND src = " . $pdo->quote($src))->fetch(PDO::FETCH_ASSOC);
+check('vue comptée par source (tiktok ×2), sans les aperçus WhatsApp ni Facebook', $s === 204 && (int)$stat($m2id, 'tiktok')['v'] === 2, $stat($m2id, 'tiktok'));
+check('sans source : « direct » ; source bizarre : « autre »', (int)$stat($m2id, 'direct')['v'] === 1 && (int)$stat($m2id, 'autre')['v'] === 1, null);
+check('match privé : aucune vue comptée', (int)$pdo->query("SELECT COUNT(*) FROM match_page_stats WHERE match_id = {$mp['id']}")->fetchColumn() === 0, null);
+check('aucune donnée personnelle gardée', array_keys($pdo->query('SELECT * FROM match_page_stats LIMIT 1')->fetch(PDO::FETCH_ASSOC)) === ['day', 'match_id', 'src', 'views', 'accounts', 'joins'], null);
+[$s, $r] = api('POST', '/auth/register', ['email' => 'ines@example.fr', 'password' => PASS, 'display_name' => 'Ines', 'birth_date' => '1999-02-03', 'accept_terms' => true, 'from_match' => $m2id, 'src' => 'tiktok']);
+$ines = $r['token'] ?? '';
+check('compte créé depuis la page du match : compté pour tiktok', $s === 201 && (int)$stat($m2id, 'tiktok')['a'] === 1, $r);
+[$s, $r] = api('POST', "/matches/$m2id/join", ['src' => 'tiktok'], $ines);
+[$s2] = api('POST', "/matches/$m2id/join", ['src' => 'tiktok'], $ines);
+check('inscription au match depuis la page : comptée une seule fois', $s === 200 && $s2 === 200 && (int)$stat($m2id, 'tiktok')['j'] === 1, $r);
+api('DELETE', "/matches/$m2id/join", null, $ines);
+[$s] = api('GET', '/admin/page-stats', null, $ines);
+check('bilan des pages de match : réservé aux admins', $s === 403, $s);
 [$s, $r] = api('GET', '/matches?format=foot8', null, $karim);
 check('filtre par format', $s === 200 && array_column($r['items'], 'id') === [$m2['id']], $r);
 [$s, $r] = api('GET', '/matches?level=4', null, $karim);
@@ -481,6 +513,11 @@ check('impossible de suspendre un admin', $s === 403);
 check('fin de la suspension', $s === 200 && $s2 === 201, $r);
 [$s] = api('POST', "/admin/users/$yassinId/role", ['role' => 'user'], $yassin);
 check('l\'admin ne peut pas se retirer son propre rôle', $s === 403);
+[$s, $r] = api('GET', '/admin/page-stats?days=7', null, $yassin);
+$src = array_column($r['by_source'] ?? [], null, 'src');
+check('bilan des pages de match pour l\'admin : vues, comptes et inscriptions par source et par match',
+    $s === 200 && $r['total']['views'] === 4 && ($src['tiktok']['views'] ?? 0) === 2 && ($src['tiktok']['accounts'] ?? 0) === 1 && ($src['tiktok']['joins'] ?? 0) === 1
+    && ($r['by_match'][0]['match_id'] ?? 0) === $m2id && str_ends_with($r['by_match'][0]['url'] ?? '', "/m/$m2id") && count($r['rows']) === 3, $r);
 
 echo "Paiement de la place\n";
 $stripeBase = 'http://127.0.0.1:8097';

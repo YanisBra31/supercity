@@ -6,6 +6,7 @@ import { passwordRules } from '../../lib/password';
 import { BirthDateField, Checkbox, PasswordMeter } from '../../ui/forms';
 import { Button, ErrorText, Field } from '../../ui/ui';
 import { AuthFrame } from './AuthFrame';
+import { signupSource } from '../../lib/source';
 
 export default function Register() {
   const { register } = useAuth();
@@ -35,7 +36,7 @@ export default function Register() {
     setLoading(true);
     try {
       // Connecté : on part confirmer l'e-mail (voir Guest dans App).
-      await register({ display_name: form.display_name, email: form.email.trim(), password: form.password, birth_date: birth, accept_terms: terms });
+      await register({ display_name: form.display_name, email: form.email.trim(), password: form.password, birth_date: birth, accept_terms: terms, ...signupSource() });
     } catch (err) {
       if (err instanceof ApiError) {
         setFields(err.fields);
