@@ -8,6 +8,7 @@ import { dayLabel, distanceLabel, formatLabel, formatShort, levelLabel, orgKindL
 import { shareImage } from '../lib/cardImage';
 import { matchUrl, shareMessage, webUrl } from '../lib/links';
 import { matchStoryImage } from '../lib/matchStory';
+import { clearSource, joinSource } from '../lib/source';
 import { euros, openStripe, returnUrl } from '../lib/pay';
 import { celebrate } from '../ui/celebrate';
 import { Page } from '../ui/Layout';
@@ -206,7 +207,8 @@ export default function MatchDetail() {
   };
   const join = () =>
     act(async () => {
-      const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`) });
+      const r = await post<JoinResult>(`/matches/${m.id}/join`, { ...(teamForMatch ? { team_id: teamForMatch.id } : {}), return_url: returnUrl(`match/${m.id}`), ...joinSource(m.id) });
+      if (joinSource(m.id).src) clearSource();
       const after = await pay(r.checkout_url, r);
       if (after.my_status === 'registered') celebrate({ title: 'Tu joues !', text: `${whenLabel(after.starts_at)} · ${after.venue.name}` });
       if (after.my_status === 'waitlist') setMsg("Tu es en liste d'attente : on te prévient si une place se libère.");

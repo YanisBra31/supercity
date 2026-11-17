@@ -8,6 +8,7 @@ import { timeAgo } from '../lib/format';
 import { Page } from '../ui/Layout';
 import { GradeBadge, RoleBadge } from '../ui/grade';
 import { ModDisputes, ModEvents, ModShop } from '../ui/mod';
+import { ModStats } from '../ui/modStats';
 import { Avatar, Button, Chips, Empty, ErrorText, Kicker, Loading, Success, useConfirm } from '../ui/ui';
 
 const DURATIONS = [
@@ -15,7 +16,7 @@ const DURATIONS = [
   { value: 7, label: '7 jours' },
   { value: 30, label: '30 jours' },
 ];
-type Tab = 'reports' | 'users' | 'events' | 'disputes' | 'shop';
+type Tab = 'reports' | 'users' | 'events' | 'disputes' | 'shop' | 'stats';
 
 export default function Moderation() {
   const { user, setUser } = useAuth();
@@ -99,6 +100,7 @@ export default function Moderation() {
           { value: 'events', label: 'Événements bonus' },
           { value: 'disputes', label: 'Scores contestés' },
           { value: 'shop', label: 'Boutique' },
+          ...(admin ? [{ value: 'stats' as Tab, label: 'Pages de match' }] : []),
         ]}
         value={tab}
         onChange={(v) => {
@@ -114,6 +116,7 @@ export default function Moderation() {
       {tab === 'events' ? <ModEvents act={act} /> : null}
       {tab === 'disputes' ? <ModDisputes /> : null}
       {tab === 'shop' ? <ModShop act={act} /> : null}
+      {tab === 'stats' && admin ? <ModStats /> : null}
 
       {tab === 'reports' ? (
         reports === null ? (

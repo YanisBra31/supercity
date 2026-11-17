@@ -210,6 +210,10 @@ function register_auth_routes(Router $r): void
         );
         $id = (int)db()->lastInsertId();
         $user = one('SELECT * FROM users WHERE id = ?', [$id]);
+        // Compte créé depuis la page publique d'un match (lien partagé) : compté pour ce match et sa source.
+        if (is_int($data['from_match'] ?? null) && one('SELECT id FROM matches WHERE id = ?', [$data['from_match']])) {
+            bump_page_stat($data['from_match'], $data['src'] ?? null, 'accounts');
+        }
         send_code($user, 'verify');
         respond(201, ['user' => private_user($user)] + issue_token($id));
     });

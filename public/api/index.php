@@ -22,6 +22,7 @@ require __DIR__ . '/src/cards.php';
 require __DIR__ . '/src/privacy.php';
 require __DIR__ . '/src/social.php';
 require __DIR__ . '/src/chat.php';
+require __DIR__ . '/src/page_stats.php';
 
 date_default_timezone_set('UTC');
 
@@ -61,6 +62,7 @@ try {
     register_privacy_routes($router);
     register_social_routes($router);
     register_chat_routes($router);
+    register_page_stat_routes($router);
     $router->dispatch($method, $path);
 } catch (HttpError $e) {
     $payload = ['error' => $e->errorCode, 'message' => $e->getMessage()];

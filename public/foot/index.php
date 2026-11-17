@@ -166,7 +166,9 @@ function match_page(int $id, bool $image): never
         match_image($m && !$private ? $m : null);
     }
     // Sans compte : inscription, puis retour sur le match. Déjà connecté : l'appli ouvre directement le match.
-    $join = '/app/register?next=' . rawurlencode("/match/$id");
+    // D'où vient le visiteur (?src=tiktok, insta, affiche…) : gardé jusqu'à l'inscription, pour les statistiques.
+    $src = preg_match('/^[A-Za-z0-9_-]{1,24}$/', (string)($_GET['src'] ?? '')) ? strtolower($_GET['src']) : '';
+    $join = '/app/register?next=' . rawurlencode("/match/$id") . '&amp;src=' . ($src !== '' ? $src : 'direct');
     if (!$m) {
         http_response_code(404);
         page('Match introuvable · Supercity', "Ce match n'existe plus sur Supercity.", '/foot/',
@@ -210,6 +212,11 @@ function match_page(int $id, bool $image): never
         . '<li><b>Et si je n\'ai pas le niveau ?</b><span>Le niveau du match est indiqué plus haut. « Tous niveaux » veut dire que tout le monde est bienvenu.</span></li>'
         . '<li><b>Et si je ne peux plus venir ?</b><span>Tu te retires depuis l\'appli et ta place passe au suivant sur la liste d\'attente.</span></li></ul>'
         . '<p>' . $cityLink . '</p>';
+
+    // Une visite comptée par onglet, envoyée par le navigateur : les robots et les aperçus de liens ne l'envoient pas.
+    $body .= '<script>(function(){try{var k="sc_seen_' . $id . '";if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}'
+        . 'var s=new URLSearchParams(location.search).get("src")||"";'
+        . 'navigator.sendBeacon&&navigator.sendBeacon("/api/v1/public/matches/' . $id . '/view",JSON.stringify({src:s}))})()</script>';
 
     $start = new DateTime($m['starts_at'] . ' UTC');
     page($title . ' · Supercity', $desc, "/m/$id", $body, [

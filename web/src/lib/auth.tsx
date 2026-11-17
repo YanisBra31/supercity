@@ -9,7 +9,7 @@ type AuthState = {
   ready: boolean;
   user: Me | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; display_name: string; birth_date: string; accept_terms: boolean }) => Promise<void>;
+  register: (data: { email: string; password: string; display_name: string; birth_date: string; accept_terms: boolean; from_match?: number; src?: string }) => Promise<void>;
   resetPassword: (data: { email: string; code: string; password: string }) => Promise<void>;
   setUser: (u: Me) => void;
   logout: () => Promise<void>;
